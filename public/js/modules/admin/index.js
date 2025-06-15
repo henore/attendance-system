@@ -1,7 +1,7 @@
 // modules/admin/index.js
 // 管理者モジュール - メイン制御
 
-import BaseModule from '../base-module.js';
+import BaseModule from '../../base-module.js';
 import { modalManager } from '../shared/modal-manager.js';
 import AdminDashboard from './dashboard.js';
 import AdminUserManagement from './user-management.js';

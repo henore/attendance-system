@@ -1,17 +1,3 @@
-/* /css/style.css
-   メインCSSファイル（インポート用） */
-
-@import './shared/variables.css';
-@import './shared/common.css';
-@import './shared/utilities.css';
-@import './components/calendar.css';
-@import './components/modal.css';
-@import './components/form.css';
-@import './components/table.css';
-@import './modules/user.css';
-@import './modules/staff.css';
-@import './modules/admin.css';
-
 /* ==========================================
    勤怠管理システム - 整理されたCSS（最新版）
    ========================================== */
