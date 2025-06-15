@@ -1,0 +1,17 @@
+/* /css/modules/user.css
+   利用者画面専用スタイル */
+
+.user-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--spacing-md);
+}
+
+.user-status-row {
+  transition: all var(--transition-base);
+}
+
+.user-status-row:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}

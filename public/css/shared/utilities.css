@@ -1,0 +1,62 @@
+/* /css/shared/utilities.css
+   ユーティリティクラス */
+
+/* テキスト */
+.text-content {
+  background-color: #f8f9fa;
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius);
+  white-space: pre-wrap;
+}
+
+/* 時刻表示 */
+.time-display {
+  text-align: center;
+}
+
+.time-display .fw-bold {
+  font-size: var(--font-size-lg);
+  color: var(--dark-color);
+}
+
+/* バッジ */
+.role-badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.service-badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-xs);
+  margin-left: var(--spacing-xs);
+}
+
+/* 通知エリア */
+.notification-area {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 1050;
+  max-width: 400px;
+}
+
+.notification {
+  animation: slideIn var(--transition-base);
+  margin-bottom: var(--spacing-sm);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

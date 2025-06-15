@@ -1,0 +1,19 @@
+/* /css/modules/staff.css
+   スタッフ画面専用スタイル */
+
+.staff-dashboard {
+  padding: var(--spacing-md);
+}
+
+.staff-menu {
+  margin-bottom: var(--spacing-lg);
+}
+
+.staff-menu-btn {
+  transition: all var(--transition-fast);
+}
+
+.staff-menu-btn.active {
+  background-color: var(--primary-color);
+  color: white;
+}

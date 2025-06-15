@@ -1,0 +1,595 @@
+// routes/admin.js
+// 管理者API - 完全版
+
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const router = express.Router();
+
+// 申し送り更新の制御用
+const handoverUpdateControl = new Map();
+const HANDOVER_UPDATE_COOLDOWN = 5 * 60 * 1000; // 5分
+
+module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
+    // ユーザー登録
+    router.post('/register', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { username, password, name, role, serviceType } = req.body;
+            
+            // バリデーション
+            if (!username || !password || !name || !role) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '必須項目が不足しています' 
+                });
+            }
+            
+            if (username.length < 3) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: 'ユーザーIDは3文字以上で入力してください' 
+                });
+            }
+            
+            if (password.length < 4) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: 'パスワードは4文字以上で入力してください' 
+                });
+            }
+            
+            if (role === 'user' && !serviceType) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '利用者の場合はサービス区分を選択してください' 
+                });
+            }
+            
+            // パスワードのハッシュ化
+            const hashedPassword = await bcrypt.hash(password, 10);
+            
+            // 重複チェック
+            const existing = await dbGet(
+                'SELECT * FROM users WHERE username = ?', 
+                [username]
+            );
+            
+            if (existing) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '同じユーザーIDが既に存在します' 
+                });
+            }
+            
+            // ユーザー登録
+            const result = await dbRun(
+                'INSERT INTO users (username, password, name, role, service_type) VALUES (?, ?, ?, ?, ?)', 
+                [username, hashedPassword, name, role, serviceType || null]
+            );
+            
+            // 監査ログ記録
+            await dbRun(
+                'INSERT INTO audit_log (admin_id, action_type, new_value, ip_address) VALUES (?, ?, ?, ?)',
+                [
+                    req.session.user.id, 
+                    'account_create', 
+                    JSON.stringify({ username, name, role, serviceType }), 
+                    req.ip
+                ]
+            );
+            
+            res.json({ 
+                success: true, 
+                message: `ユーザー「${name}」を正常に登録しました` 
+            });
+            
+        } catch (error) {
+            console.error('ユーザー登録エラー:', error);
+            if (error.message && error.message.includes('UNIQUE')) {
+                res.status(400).json({ 
+                    success: false,
+                    error: 'このユーザーIDは既に使用されています' 
+                });
+            } else {
+                res.status(500).json({ 
+                    success: false,
+                    error: 'ユーザー登録処理でエラーが発生しました' 
+                });
+            }
+        }
+    });
+
+    // 全ユーザー取得（退職者除く）
+    router.get('/users', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { role } = req.query;
+            let query = `
+                SELECT id, username, name, role, service_type, created_at 
+                FROM users 
+                WHERE is_active = 1
+            `;
+            const params = [];
+            
+            if (role) {
+                query += ' AND role = ?';
+                params.push(role);
+            }
+            
+            query += ' ORDER BY role, name';
+            
+            const users = await dbAll(query, params);
+            res.json({ 
+                success: true,
+                users 
+            });
+            
+        } catch (error) {
+            console.error('ユーザー一覧取得エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: 'ユーザー一覧の取得に失敗しました' 
+            });
+        }
+    });
+
+    // 今日の全体状況取得
+    router.get('/status/today', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            
+            const users = await dbAll(`
+                SELECT 
+                    u.*,
+                    a.clock_in,
+                    a.clock_out,
+                    a.status,
+                    dr.id as report_id,
+                    sc.comment
+                FROM users u
+                LEFT JOIN attendance a ON u.id = a.user_id AND a.date = ?
+                LEFT JOIN daily_reports dr ON u.id = dr.user_id AND dr.date = ?
+                LEFT JOIN staff_comments sc ON u.id = sc.user_id AND sc.date = ?
+                WHERE u.is_active = 1
+                ORDER BY u.role, u.name
+            `, [today, today, today]);
+            
+            res.json({ 
+                success: true,
+                users, 
+                date: today 
+            });
+            
+        } catch (error) {
+            console.error('全体状況取得エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: '全体状況の取得に失敗しました' 
+            });
+        }
+    });
+
+    // 出退勤記録検索
+    router.get('/attendance/search', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { date, userId, role } = req.query;
+            
+            if (!date) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '検索日付を指定してください' 
+                });
+            }
+            
+            let query = `
+                SELECT 
+                    a.*,
+                    u.name as user_name,
+                    u.role as user_role,
+                    dr.id as report_id,
+                    sc.id as comment_id
+                FROM attendance a
+                JOIN users u ON a.user_id = u.id
+                LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
+                LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
+                WHERE u.is_active = 1 AND a.date = ?
+            `;
+            
+            const params = [date];
+            
+            if (userId) {
+                query += ' AND a.user_id = ?';
+                params.push(userId);
+            }
+            
+            if (role) {
+                query += ' AND u.role = ?';
+                params.push(role);
+            }
+            
+            query += ' ORDER BY u.name';
+            
+            const records = await dbAll(query, params);
+            res.json({ 
+                success: true,
+                records, 
+                searchDate: date 
+            });
+            
+        } catch (error) {
+            console.error('出退勤記録検索エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: '出退勤記録の検索に失敗しました' 
+            });
+        }
+    });
+
+    // 出退勤記録訂正
+    router.post('/attendance/correct', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { recordId, newClockIn, newClockOut, status, reason } = req.body;
+            
+            // バリデーション
+            if (!recordId) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '記録IDが指定されていません' 
+                });
+            }
+            
+            if (!reason || reason.trim() === '') {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '変更理由を入力してください' 
+                });
+            }
+            
+            // 現在の値を取得
+            const oldRecord = await dbGet(
+                'SELECT * FROM attendance WHERE id = ?', 
+                [recordId]
+            );
+            
+            if (!oldRecord) {
+                return res.status(404).json({ 
+                    success: false,
+                    error: '記録が見つかりません' 
+                });
+            }
+            
+            // 更新
+            await dbRun(
+                'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [newClockIn, newClockOut, status, recordId]
+            );
+            
+            // 監査ログ
+            await dbRun(
+                `INSERT INTO audit_log (
+                    admin_id, action_type, target_id, target_type,
+                    old_value, new_value, reason, ip_address
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    req.session.user.id,
+                    'attendance_correction',
+                    recordId,
+                    'attendance',
+                    JSON.stringify({
+                        clock_in: oldRecord.clock_in,
+                        clock_out: oldRecord.clock_out,
+                        status: oldRecord.status
+                    }),
+                    JSON.stringify({
+                        clock_in: newClockIn,
+                        clock_out: newClockOut,
+                        status: status
+                    }),
+                    reason,
+                    req.ip
+                ]
+            );
+            
+            res.json({ 
+                success: true, 
+                message: '出勤記録を正常に更新しました' 
+            });
+            
+        } catch (error) {
+            console.error('出退勤訂正エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: '出勤記録の訂正に失敗しました' 
+            });
+        }
+    });
+
+    // 月次出勤簿取得
+    router.get('/attendance/:year/:month/:userId', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { year, month, userId } = req.params;
+            
+            // パラメータ検証
+            if (!year || !month || !userId) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: 'パラメータが不正です' 
+                });
+            }
+            
+            const startDate = `${year}-${month.padStart(2, '0')}-01`;
+            const endDate = `${year}-${month.padStart(2, '0')}-31`;
+            
+            // ユーザー情報取得
+            const user = await dbGet(
+                'SELECT * FROM users WHERE id = ? AND is_active = 1', 
+                [userId]
+            );
+            
+            if (!user) {
+                return res.status(404).json({ 
+                    success: false,
+                    error: 'ユーザーが見つかりません' 
+                });
+            }
+            
+            // 出勤記録取得
+            const records = await dbAll(`
+                SELECT 
+                    a.*,
+                    dr.id as report_id,
+                    sc.comment,
+                    br.start_time as break_start,
+                    br.end_time as break_end
+                FROM attendance a
+                LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
+                LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
+                LEFT JOIN break_records br ON a.user_id = br.user_id AND a.date = br.date
+                WHERE a.user_id = ? AND a.date BETWEEN ? AND ?
+                ORDER BY a.date
+            `, [userId, startDate, endDate]);
+            
+            // 監査ログ記録
+            await dbRun(
+                'INSERT INTO audit_log (admin_id, action_type, target_id, target_type, ip_address) VALUES (?, ?, ?, ?, ?)',
+                [req.session.user.id, 'monthly_attendance_view', userId, 'user', req.ip]
+            );
+            
+            res.json({ 
+                success: true,
+                records, 
+                user 
+            });
+            
+        } catch (error) {
+            console.error('月次出勤簿取得エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: '月次出勤簿の取得に失敗しました' 
+            });
+        }
+    });
+
+    // ユーザー無効化処理
+    router.put('/retire/:userId', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { userId } = req.params;
+            
+            // ユーザー存在確認
+            const user = await dbGet(
+                'SELECT username, name FROM users WHERE id = ? AND is_active = 1', 
+                [userId]
+            );
+            
+            if (!user) {
+                return res.status(404).json({ 
+                    success: false,
+                    error: 'ユーザーが見つかりません' 
+                });
+            }
+            
+            // デフォルトユーザーは無効化不可
+            const defaultUsers = ['admin', 'staff1', 'user1', 'user2'];
+            if (defaultUsers.includes(user.username)) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: 'デフォルトユーザーは無効化できません' 
+                });
+            }
+            
+            // 無効化実行
+            await dbRun(
+                'UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
+                [userId]
+            );
+            
+            // 監査ログ記録
+            await dbRun(
+                'INSERT INTO audit_log (admin_id, action_type, target_id, target_type, new_value, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
+                [
+                    req.session.user.id, 
+                    'user_deactivation', 
+                    userId, 
+                    'user',
+                    JSON.stringify({ username: user.username, name: user.name }),
+                    req.ip
+                ]
+            );
+            
+            res.json({ 
+                success: true, 
+                message: `ユーザー「${user.name}」を無効化しました` 
+            });
+            
+        } catch (error) {
+            console.error('ユーザー無効化エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: 'ユーザー無効化処理でエラーが発生しました' 
+            });
+        }
+    });
+
+    // 監査ログ取得
+    router.get('/audit-log', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { 
+                limit = 50, 
+                offset = 0, 
+                actionType, 
+                adminId, 
+                startDate, 
+                endDate 
+            } = req.query;
+            
+            let query = `
+                SELECT 
+                    a.*,
+                    u.name as admin_name
+                FROM audit_log a
+                JOIN users u ON a.admin_id = u.id
+                WHERE 1=1
+            `;
+            
+            const params = [];
+            
+            // フィルター適用
+            if (actionType) {
+                query += ' AND a.action_type = ?';
+                params.push(actionType);
+            }
+            
+            if (adminId) {
+                query += ' AND a.admin_id = ?';
+                params.push(adminId);
+            }
+            
+            if (startDate) {
+                query += ' AND DATE(a.created_at) >= ?';
+                params.push(startDate);
+            }
+            
+            if (endDate) {
+                query += ' AND DATE(a.created_at) <= ?';
+                params.push(endDate);
+            }
+            
+            // 総件数取得
+            const countQuery = query.replace('SELECT a.*, u.name as admin_name', 'SELECT COUNT(*) as total');
+            const totalResult = await dbGet(countQuery, params);
+            const total = totalResult ? totalResult.total : 0;
+            
+            // ページネーション適用
+            query += ' ORDER BY a.created_at DESC LIMIT ? OFFSET ?';
+            params.push(parseInt(limit), parseInt(offset));
+            
+            const logs = await dbAll(query, params);
+            
+            res.json({ 
+                success: true,
+                logs, 
+                total,
+                pagination: {
+                    limit: parseInt(limit),
+                    offset: parseInt(offset),
+                    totalPages: Math.ceil(total / parseInt(limit))
+                }
+            });
+            
+        } catch (error) {
+            console.error('監査ログ取得エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: '監査ログの取得に失敗しました' 
+            });
+        }
+    });
+
+    // 申し送り事項取得（管理者用）
+    router.get('/handover', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const handover = await dbGet(
+                'SELECT * FROM handover_notes ORDER BY created_at DESC LIMIT 1'
+            );
+            
+            res.json({
+                success: true,
+                handover: handover || null
+            });
+            
+        } catch (error) {
+            console.error('申し送り事項取得エラー:', error);
+            res.status(500).json({ 
+                success: false, 
+                error: '申し送り事項の取得に失敗しました' 
+            });
+        }
+    });
+    
+    // 申し送り事項更新（管理者用・排他制御付き）
+    router.post('/handover', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { content } = req.body;
+            const updatedBy = req.session.user.name;
+            const userId = req.session.user.id;
+            
+            if (!content || content.trim() === '') {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: '申し送り事項を入力してください' 
+                });
+            }
+            
+            // 5分以内の更新制限チェック
+            const lastUpdate = handoverUpdateControl.get(userId);
+            if (lastUpdate) {
+                const timeDiff = Date.now() - lastUpdate;
+                if (timeDiff < HANDOVER_UPDATE_COOLDOWN) {
+                    const remainingMinutes = Math.ceil((HANDOVER_UPDATE_COOLDOWN - timeDiff) / 60000);
+                    return res.status(429).json({ 
+                        success: false, 
+                        error: `申し送り事項の更新は5分間隔で行ってください。あと${remainingMinutes}分お待ちください。` 
+                    });
+                }
+            }
+            
+            // 最新の申し送りを取得（楽観的ロック）
+            const latestHandover = await dbGet(
+                'SELECT id, created_at FROM handover_notes ORDER BY created_at DESC LIMIT 1'
+            );
+            
+            // 他のユーザーが同時に更新していないかチェック（1秒以内）
+            if (latestHandover) {
+                const lastUpdateTime = new Date(latestHandover.created_at).getTime();
+                const now = Date.now();
+                if (now - lastUpdateTime < 1000) {
+                    return res.status(409).json({ 
+                        success: false, 
+                        error: '他のユーザーが申し送りを更新中です。しばらくしてから再度お試しください。' 
+                    });
+                }
+            }
+            
+            // 申し送り更新
+            await dbRun(`
+                INSERT INTO handover_notes (content, updated_by)
+                VALUES (?, ?)
+            `, [content.trim(), updatedBy]);
+            
+            // 更新時刻を記録
+            handoverUpdateControl.set(userId, Date.now());
+            
+            res.json({ 
+                success: true,
+                message: '申し送り事項を更新しました'
+            });
+            
+        } catch (error) {
+            console.error('申し送り事項更新エラー:', error);
+            res.status(500).json({ 
+                success: false, 
+                error: '申し送り事項の更新に失敗しました' 
+            });
+        }
+    });
+
+    return router;
+};

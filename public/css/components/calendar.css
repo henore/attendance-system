@@ -1,0 +1,65 @@
+/* /css/components/calendar.css
+   カレンダーコンポーネント */
+
+.calendar-container {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: var(--spacing-md);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.calendar-nav-btn {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  padding: var(--spacing-sm);
+  transition: all var(--transition-fast);
+}
+
+.calendar-nav-btn:hover {
+  background-color: var(--light-color);
+  border-radius: var(--border-radius);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  padding: var(--spacing-xs);
+  border: 1px solid #e0e0e0;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.calendar-day:hover {
+  background-color: var(--light-color);
+  transform: scale(1.05);
+}
+
+.calendar-day.today {
+  background-color: #e3f2fd;
+  font-weight: bold;
+}
+
+.calendar-day.has-work {
+  border-color: var(--success-color);
+  border-width: 2px;
+}
+
+.calendar-day.has-comment {
+  border-color: var(--warning-color);
+  border-width: 2px;
+}

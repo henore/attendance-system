@@ -1,0 +1,19 @@
+/* /css/modules/admin.css
+   管理者画面専用スタイル */
+
+.admin-dashboard {
+  padding: var(--spacing-md);
+}
+
+.admin-section {
+  animation: fadeIn var(--transition-base);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

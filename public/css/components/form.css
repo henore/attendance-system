@@ -1,0 +1,26 @@
+/* /css/components/form.css
+   フォームコンポーネント */
+
+.past-form-label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: #6c757d;
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
+.past-form-value {
+  font-size: var(--font-size-base);
+  color: var(--dark-color);
+  padding: var(--spacing-sm);
+  background-color: var(--light-color);
+  border-radius: var(--border-radius);
+}
+
+.past-form-textarea {
+  background-color: var(--light-color);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius);
+  min-height: 100px;
+  white-space: pre-wrap;
+}
