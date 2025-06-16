@@ -1226,3 +1226,24 @@ button:focus,
     from { box-shadow: 0 0 5px rgba(40, 167, 69, 0.3); }
     to { box-shadow: 0 0 15px rgba(40, 167, 69, 0.6); }
 }
+
+/* 利用者ダッシュボードのマージン調整 */
+.user-dashboard .status-card {
+    margin-bottom: 1.5rem;
+}
+
+.user-dashboard .row.mb-4 {
+    margin-bottom: 2rem !important;
+}
+
+/* 出勤状況と休憩管理の間のマージン */
+.user-dashboard .col-md-6:first-child .status-card {
+    margin-right: 1rem;
+}
+
+@media (max-width: 768px) {
+    .user-dashboard .col-md-6:first-child .status-card {
+        margin-right: 0;
+        margin-bottom: 1.5rem;
+    }
+}

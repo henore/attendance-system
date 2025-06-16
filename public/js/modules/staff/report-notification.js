@@ -45,37 +45,47 @@ export class StaffReportNotification {
    * 新しい日報をチェック
    */
   async checkForNewReports() {
-    try {
-      const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS);
-      const currentReports = new Set();
-      const newReports = [];
-      
-      response.users.forEach(user => {
-        if (user.report_id) {
-          currentReports.add(user.report_id);
+      try {
+          const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS);
+          const currentReports = new Set();
+          const newReports = [];
+          const uncommentedReports = [];  // 追加
           
-          // 新規日報かつコメント未記入
-          if (!this.lastCheckedReports.has(user.report_id) && !user.comment_id) {
-            newReports.push({
-              userId: user.id,
-              userName: user.name,
-              reportId: user.report_id
-            });
+          response.users.forEach(user => {
+              if (user.report_id) {
+                  currentReports.add(user.report_id);
+                  
+                  // コメント未記入の日報をチェック
+                  if (!user.comment_id) {
+                      uncommentedReports.push({
+                          userId: user.id,
+                          userName: user.name,
+                          reportId: user.report_id
+                      });
+                      
+                      // 新規日報の場合
+                      if (!this.lastCheckedReports.has(user.report_id)) {
+                          newReports.push({
+                              userId: user.id,
+                              userName: user.name,
+                              reportId: user.report_id
+                          });
+                      }
+                  }
+              }
+          });
+          
+          // 新しい日報または未コメント日報がある場合は通知
+          if (newReports.length > 0 || uncommentedReports.length > 0) {
+              this.showReportNotification(newReports, uncommentedReports);
           }
-        }
-      });
-      
-      // 新しい日報がある場合は通知
-      if (newReports.length > 0) {
-        this.showReportNotification(newReports);
+          
+          // チェック済みリストを更新
+          this.lastCheckedReports = currentReports;
+          
+      } catch (error) {
+          console.error('日報チェックエラー:', error);
       }
-      
-      // チェック済みリストを更新
-      this.lastCheckedReports = currentReports;
-      
-    } catch (error) {
-      console.error('日報チェックエラー:', error);
-    }
   }
 
   /**

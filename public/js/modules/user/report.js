@@ -18,23 +18,54 @@ export class UserReportHandler {
    * @param {Object} attendance 
    */
   async loadForm(container, attendance) {
-    if (!container) return;
+      if (!container) return;
 
-    try {
-      const response = await this.apiCall(API_ENDPOINTS.USER.ATTENDANCE_TODAY);
-      
-      // 退勤後のみ日報入力可能
-      if (response.attendance && response.attendance.clock_out) {
-        this.hasTodayReport = response.attendance.has_report;
-        container.innerHTML = this.generateReportForm(response.report);
-      } else {
-        container.innerHTML = this.generateWaitingMessage();
+      try {
+          // 今日の日付を取得
+          const today = new Date().toISOString().split('T')[0];
+          
+          // API呼び出しを修正
+          const response = await this.apiCall(`${API_ENDPOINTS.USER.REPORT_BY_DATE(today)}`);
+          
+          // デバッグログ
+          console.log('[日報フォーム] レスポンス:', response);
+          
+          // 出勤記録がない場合
+          if (!response.attendance) {
+              container.innerHTML = this.generateNotYetMessage();
+              return;
+          }
+          
+          // 退勤後のみ日報入力可能
+          if (response.attendance && response.attendance.clock_out) {
+              this.hasTodayReport = response.report !== null;
+              container.innerHTML = this.generateReportForm(response.report);
+              
+              // フォームイベントの再設定
+              const form = document.getElementById('reportForm');
+              if (form) {
+                  form.addEventListener('submit', (e) => {
+                      e.preventDefault();
+                      this.submitReport(e, response.attendance);
+                  });
+              }
+          } else {
+              container.innerHTML = this.generateWaitingMessage();
+          }
+      } catch (error) {
+          console.error('日報フォーム読み込みエラー:', error);
+          container.innerHTML = this.generateErrorMessage();
       }
-    } catch (error) {
-      console.error('日報フォーム読み込みエラー:', error);
-      container.innerHTML = this.generateErrorMessage();
-    }
   }
+
+  generateNotYetMessage() {
+    return `
+        <div class="text-center text-muted">
+            <i class="fas fa-clock fa-2x mb-3"></i>
+            <p>本日はまだ出勤していません</p>
+        </div>
+    `;
+}
 
   /**
    * 日報フォームを生成
