@@ -60,3 +60,27 @@
     opacity: 1;
   }
 }
+
+/* 前回記録確認モーダルのハイライト */
+.form-check-highlight {
+  transition: all var(--transition-base);
+}
+
+.form-check-highlight:hover {
+  background-color: #e9ecef !important;
+  border-color: var(--primary-color) !important;
+}
+
+.form-check-input-lg:checked {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.staff-comment-highlight {
+  animation: fadeIn var(--transition-base);
+}
+
+.staff-comment-highlight .comment-box {
+  font-size: 1.1rem;
+  line-height: 1.6;
+}

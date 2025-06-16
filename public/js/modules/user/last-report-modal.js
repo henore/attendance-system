@@ -83,16 +83,28 @@ export class LastReportModal {
       </div>
     `;
     
-    // スタッフコメントがある場合
-    if (staffComment) {
+    // スタッフコメントがある場合（より目立つデザインに）
+    if (staffComment && staffComment.comment) {
       html += `
-        <div class="staff-comment-display mt-3">
-          <div class="staff-comment-title">
-            <i class="fas fa-comment"></i> スタッフからのコメント
+        <div class="staff-comment-highlight mt-4 p-3 bg-primary bg-opacity-10 border border-primary rounded">
+          <div class="d-flex align-items-center mb-2">
+            <i class="fas fa-comment fa-lg text-primary me-2"></i>
+            <h6 class="mb-0 text-primary">スタッフからの重要なメッセージ</h6>
           </div>
-          <div class="comment-box bg-info text-white">
-            ${staffComment.comment}
+          <div class="comment-box bg-white p-3 rounded shadow-sm">
+            <strong class="d-block mb-2 text-dark">${staffComment.comment}</strong>
+            <small class="text-muted">
+              <i class="fas fa-user"></i> ${staffComment.staff_name || 'スタッフ'} 
+              <i class="fas fa-clock ms-2"></i> ${new Date(staffComment.created_at).toLocaleDateString('ja-JP')}
+            </small>
           </div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="mt-3 p-3 bg-light rounded">
+          <i class="fas fa-info-circle text-muted"></i> 
+          <span class="text-muted">スタッフからのコメントはありません</span>
         </div>
       `;
     }
@@ -117,15 +129,23 @@ export class LastReportModal {
               <div id="lastReportModalContent">
                 ${content}
               </div>
-              <div class="form-check mt-3">
-                <input class="form-check-input" type="checkbox" id="confirmLastReportCheck">
-                <label class="form-check-label" for="confirmLastReportCheck">
-                  <strong><i class="fas fa-check-square"></i> 上記の内容とスタッフコメントを確認しました</strong>
-                </label>
+              
+              <!-- チェックボックスを目立つデザインに -->
+              <div class="form-check-highlight mt-4 p-3 bg-light border border-2 border-primary rounded">
+                <div class="form-check d-flex align-items-center">
+                  <input class="form-check-input form-check-input-lg" type="checkbox" 
+                         id="confirmLastReportCheck" style="width: 1.5rem; height: 1.5rem;">
+                  <label class="form-check-label ms-3 fs-5" for="confirmLastReportCheck">
+                    <strong>
+                      <i class="fas fa-check-square text-primary"></i> 
+                      上記の内容とスタッフコメントを確認しました
+                    </strong>
+                  </label>
+                </div>
               </div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-primary" id="confirmLastReportBtn" disabled>
+              <button type="button" class="btn btn-lg btn-primary px-5" id="confirmLastReportBtn" disabled>
                 <i class="fas fa-check"></i> 確認して閉じる
               </button>
             </div>
@@ -155,6 +175,15 @@ export class LastReportModal {
       checkbox.addEventListener('change', (e) => {
         if (confirmBtn) {
           confirmBtn.disabled = !e.target.checked;
+          
+          // チェック時にボタンを強調
+          if (e.target.checked) {
+            confirmBtn.classList.add('btn-success');
+            confirmBtn.classList.remove('btn-primary');
+          } else {
+            confirmBtn.classList.add('btn-primary');
+            confirmBtn.classList.remove('btn-success');
+          }
         }
       });
     }

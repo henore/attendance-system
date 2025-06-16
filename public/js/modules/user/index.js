@@ -61,7 +61,39 @@ export default class UserModule extends BaseModule {
     this.setupPageLeaveWarning();
     await this.checkAndShowLastReportModal();
   }
-
+   /**
+   * 前回の出勤記録を取得
+   */
+    async getLastReport() {
+      try {
+        const today = new Date();
+        let lastReportFound = null;
+        
+        // 過去30日間をチェック
+        for (let i = 1; i <= 30; i++) {
+          const checkDate = new Date(today);
+          checkDate.setDate(today.getDate() - i);
+          const dateStr = checkDate.toISOString().split('T')[0];
+          
+          const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
+          
+          if (response.attendance && response.report) {
+            lastReportFound = {
+              date: dateStr,
+              attendance: response.attendance,
+              report: response.report,
+              staffComment: response.staffComment || null // スタッフコメントを確実に含める
+            };
+            break;
+          }
+        }
+        
+        return lastReportFound;
+      } catch (error) {
+        console.error('前回記録取得エラー:', error);
+        return null;
+      }
+    }
   render() {
     const content = document.getElementById('app-content');
     content.innerHTML = `

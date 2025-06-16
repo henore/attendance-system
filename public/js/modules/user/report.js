@@ -79,7 +79,7 @@ export class UserReportHandler {
             <label for="workContent" class="form-label">
               <i class="fas fa-tasks"></i> 作業内容
             </label>
-            <textarea class="form-control" id="workContent" rows="4" 
+            <textarea class="form-control" id="workContent" rows="1" 
                       placeholder="今日行った作業内容を記入してください..." required>${report.work_content || ''}</textarea>
           </div>
         </div>
@@ -142,7 +142,7 @@ export class UserReportHandler {
             <label for="reflection" class="form-label">
               <i class="fas fa-lightbulb"></i> 振り返り・感想
             </label>
-            <textarea class="form-control" id="reflection" rows="3" 
+            <textarea class="form-control" id="reflection" rows="2" 
                       placeholder="今日の振り返りや感想を記入してください..." required>${report.reflection || ''}</textarea>
           </div>
         </div>

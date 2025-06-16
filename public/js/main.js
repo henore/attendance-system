@@ -54,6 +54,18 @@ class AttendanceManagementSystem {
                         <h3><i class="fas fa-clock"></i> 勤怠管理システム</h3>
                     </div>
                     <div class="card-body">
+                        <!-- 時刻表示（大きめ） -->
+                        <div class="login-clock-display text-center mb-4">
+                            <div id="loginClock" class="display-4 text-primary">
+                                <i class="far fa-clock"></i> --:--:--
+                            </div>
+                            <div id="loginDate" class="h5 text-muted mt-2">
+                                ----年--月--日（-）
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
                         <form id="loginForm">
                             <div class="mb-3">
                                 <label for="username" class="form-label">ユーザーID</label>
@@ -77,6 +89,9 @@ class AttendanceManagementSystem {
         if (loginForm) {
             loginForm.addEventListener('submit', (e) => this.handleLogin(e));
         }
+        
+        // ログイン画面の時計を開始
+        this.startLoginClock();
     }
 
     async handleLogin(e) {
