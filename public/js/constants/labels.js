@@ -86,7 +86,7 @@ export const MESSAGES = {
         DELETE_SUCCESS: '削除しました',
         DELETE_ERROR: '削除に失敗しました',
         UPDATE_SUCCESS: '更新しました',
-        UPDATE_ERROR: '更新に失敗しました',
+        UPDATE_ERROR: '現在更新できません、時間を置いて再試行して下さい',
         LOADING: '読み込み中...',
         NO_DATA: 'データがありません',
         NETWORK_ERROR: 'ネットワークエラーが発生しました',
