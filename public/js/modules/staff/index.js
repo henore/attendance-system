@@ -244,11 +244,49 @@ export default class StaffModule extends BaseModule {
    * 出勤処理
    */
   async handleClockIn() {
-    const result = await this.attendanceHandler.clockIn();
-    if (result.success) {
-      this.state.currentAttendance = result.attendance;
-      this.state.isWorking = true;
-      this.updateAttendanceUI();
+      const result = await this.attendanceHandler.clockIn();
+      if (result.success) {
+          this.state.currentAttendance = result.attendance;
+          this.state.isWorking = true;
+          
+          // 休憩ハンドラーの状態をリセット
+          this.attendanceHandler.isWorking = true;  // 追加
+          this.attendanceHandler.currentAttendance = result.attendance;  // 追加
+          
+          this.updateAttendanceUI();
+          
+          // 休憩ボタンを有効化
+          const breakBtn = document.getElementById('breakStartBtn');
+          if (breakBtn) {
+              breakBtn.disabled = false;
+          }
+      }
+  }
+
+  updateAttendanceUI() {
+    const statusElement = document.getElementById('staffAttendanceStatus');
+    const breakElement = document.getElementById('breakManagementStatus');
+    
+    this.attendanceHandler.updateUI(this.state, statusElement, {
+        onClockIn: () => this.handleClockIn(),
+        onClockOut: () => this.handleClockOut()
+    });
+    
+    // 休憩UIの更新を修正
+    if (this.state.isWorking) {
+        // 休憩ハンドラーに正しい状態を渡す
+        this.attendanceHandler.isWorking = true;
+        this.attendanceHandler.updateBreakUI(breakElement);
+    } else {
+        // 出勤していない場合は休憩ボタンを無効化
+        if (breakElement) {
+            breakElement.innerHTML = `
+                <p class="text-muted">出勤後に休憩機能が利用できます</p>
+                <button class="btn btn-info" id="breakStartBtn" disabled>
+                    <i class="fas fa-pause"></i> 休憩開始
+                </button>
+            `;
+        }
     }
   }
 

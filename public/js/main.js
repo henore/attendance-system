@@ -200,6 +200,73 @@ class AttendanceManagementSystem {
         }
     }
 
+    async loadDashboard() {
+    const app = document.getElementById('app');
+    app.innerHTML = `
+        <nav class="navbar navbar-dark bg-primary">
+            <div class="container-fluid">
+                <span class="navbar-brand">
+                    <i class="fas fa-clock"></i> 勤怠管理システム
+                </span>
+                <div class="d-flex align-items-center">
+                    <span class="navbar-clock" id="navbarClock">
+                        <!-- 時刻がここに表示される -->
+                    </span>
+                    <span class="text-white me-3">
+                        <i class="fas fa-user"></i> ${this.currentUser.name} 
+                        <span class="badge bg-light text-primary ms-1">${this.getRoleDisplayName(this.currentUser.role)}</span>
+                    </span>
+                    <button class="btn btn-outline-light btn-sm" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i> ログアウト
+                    </button>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="container-fluid">
+            <div id="app-content">
+                <!-- モジュールコンテンツ -->
+            </div>
+        </div>
+        
+        <!-- 通知エリア -->
+        <div id="notificationArea" class="notification-area"></div>
+    `;
+
+    // 時計を開始
+    this.startClock();
+
+    // ログアウトボタン
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => this.handleLogout());
+    }
+
+    // 権限に応じたモジュールをロード
+    await this.loadModule();
+}
+
+// 時計機能を追加
+    startClock() {
+    const updateClock = () => {
+        const clockElement = document.getElementById('navbarClock');
+        if (clockElement) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('ja-JP');
+            const dateStr = now.toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                weekday: 'short'
+            });
+            clockElement.innerHTML = `<i class="far fa-clock"></i> ${dateStr} ${timeStr}`;
+        }
+    };
+    
+    updateClock();
+    setInterval(updateClock, 1000);
+    }   
+
     // API呼び出しラッパー
     async apiCall(endpoint, options = {}) {
         const defaultOptions = {
@@ -329,6 +396,8 @@ class AttendanceManagementSystem {
         return roles[role] || role;
     }
 }
+
+
 
 // アプリケーション起動
 document.addEventListener('DOMContentLoaded', () => {

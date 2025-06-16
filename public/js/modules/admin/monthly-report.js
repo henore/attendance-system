@@ -88,33 +88,6 @@ export default class AdminMonthlyReport {
                     </div>
                 </div>
             </div>
-
-            <!-- 申し送り事項セクション -->
-            <div class="custom-card mt-4">
-                <div class="custom-card-header">
-                    <h5><i class="fas fa-exchange-alt"></i> 申し送り事項</h5>
-                    <button class="btn btn-outline-light btn-sm" id="refreshHandoverBtn">
-                        <i class="fas fa-sync"></i> 更新
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label for="handoverContent" class="form-label">
-                            <i class="fas fa-info-circle"></i> 申し送り事項
-                        </label>
-                        <textarea class="form-control" id="handoverContent" rows="9" 
-                                  placeholder="申し送り事項を入力してください..."></textarea>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <small class="text-muted" id="handoverUpdateInfo">
-                            <i class="fas fa-clock"></i> 最終更新: 未設定
-                        </small>
-                        <button class="btn btn-primary" id="updateHandoverBtn">
-                            <i class="fas fa-save"></i> 申し送り更新
-                        </button>
-                    </div>
-                </div>
-            </div>
         `;
     }
 
@@ -665,57 +638,6 @@ export default class AdminMonthlyReport {
         // 出勤管理モジュールの機能を利用（委譲）
         if (this.parent.subModules.attendanceManagement) {
             await this.parent.subModules.attendanceManagement.showReportDetail(userId, userName, date);
-        }
-    }
-
-    // =================================
-    // 申し送り事項関連
-    // =================================
-
-    async loadHandoverData() {
-        try {
-            const response = await this.parent.callApi('/api/handover');
-            
-            const textarea = this.container.querySelector('#handoverContent');
-            const updateInfo = this.container.querySelector('#handoverUpdateInfo');
-            
-            if (response.handover) {
-                const content = response.handover.content || '';
-                
-                if (textarea) textarea.value = content;
-                
-                const updateText = response.handover.created_at ? 
-                    `<i class="fas fa-clock"></i> 最終更新: ${new Date(response.handover.created_at).toLocaleString('ja-JP')}${response.handover.updated_by ? ` (${response.handover.updated_by})` : ''}` :
-                    '<i class="fas fa-clock"></i> 最終更新: 未設定';
-                
-                if (updateInfo) updateInfo.innerHTML = updateText;
-            }
-        } catch (error) {
-            console.error('申し送り事項読み込みエラー:', error);
-        }
-    }
-
-    async updateHandover() {
-        const textarea = this.container.querySelector('#handoverContent');
-        const content = textarea ? textarea.value.trim() : '';
-        
-        if (!content) {
-            this.parent.showNotification('申し送り事項を入力してください', 'warning');
-            return;
-        }
-        
-        try {
-            await this.parent.callApi('/api/handover', {
-                method: 'POST',
-                body: JSON.stringify({ content })
-            });
-            
-            await this.loadHandoverData();
-            this.parent.showNotification('申し送り事項を更新しました', 'success');
-            
-        } catch (error) {
-            console.error('申し送り更新エラー:', error);
-            this.parent.showNotification('申し送り事項の更新に失敗しました', 'danger');
         }
     }
 

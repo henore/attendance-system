@@ -174,7 +174,7 @@ export default class UserModule extends BaseModule {
     document.addEventListener('submit', (e) => {
       if (e.target.id === 'reportForm') {
         e.preventDefault();
-        this.reportHandler.submitReport(e, this.state.currentAttendance);
+        this.reportHandler.submitReport(e); // attendanceパラメータを削除
       }
     });
   }

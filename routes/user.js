@@ -38,67 +38,74 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     
     // 日報提出
     router.post('/report', requireAuth, async (req, res) => {
-        try {
-            const userId = req.session.user.id;
-            const today = new Date().toISOString().split('T')[0];
-            const {
-                workContent,
-                temperature,
-                appetite,
-                medicationTime,
-                bedtime,
-                wakeupTime,
-                sleepQuality,
-                reflection,
-                interviewRequest
-            } = req.body;
-            
-            // 出勤記録確認
-            const attendance = await dbGet(
-                'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
-                [userId, today]
-            );
-            
-            if (!attendance || !attendance.clock_out) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: '退勤後に日報を提出してください' 
-                });
-            }
-            
-            // 日報登録または更新
-            await dbRun(`
-                INSERT OR REPLACE INTO daily_reports (
-                    user_id, date, work_content, temperature, appetite,
-                    medication_time, bedtime, wakeup_time, sleep_quality,
-                    reflection, interview_request
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                userId, today, workContent, temperature, appetite,
-                medicationTime, bedtime, wakeupTime, sleepQuality,
-                reflection, interviewRequest
-            ]);
-            
-            // 出勤記録の日報フラグ更新
-            await dbRun(
-                'UPDATE attendance SET has_report = 1 WHERE user_id = ? AND date = ?',
-                [userId, today]
-            );
-            
-            res.json({ 
-                success: true,
-                message: '日報を提出しました'
-            });
-            
-        } catch (error) {
-            console.error('日報提出エラー:', error);
-            res.status(500).json({ 
+    try {
+        const userId = req.session.user.id;
+        const today = new Date().toISOString().split('T')[0];
+        
+        console.log('[日報API] リクエストボディ:', req.body);
+        console.log('[日報API] ユーザーID:', userId);
+        console.log('[日報API] 日付:', today);
+        
+        const {
+            workContent,
+            temperature,
+            appetite,
+            medicationTime,
+            bedtime,
+            wakeupTime,
+            sleepQuality,
+            reflection,
+            interviewRequest
+        } = req.body;
+        
+        // 出勤記録確認
+        const attendance = await dbGet(
+            'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+            [userId, today]
+        );
+        
+        console.log('[日報API] 出勤記録:', attendance);
+        
+        if (!attendance || !attendance.clock_out) {
+            return res.status(400).json({ 
                 success: false, 
-                error: '日報の提出に失敗しました' 
+                error: '退勤後に日報を提出してください' 
             });
         }
+        
+        // 日報登録または更新
+        await dbRun(`
+            INSERT OR REPLACE INTO daily_reports (
+                user_id, date, work_content, temperature, appetite,
+                medication_time, bedtime, wakeup_time, sleep_quality,
+                reflection, interview_request
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            userId, today, workContent, temperature, appetite,
+            medicationTime || null, bedtime || null, wakeupTime || null, 
+            sleepQuality, reflection || '', interviewRequest || null
+        ]);
+        
+        // 出勤記録の日報フラグ更新
+        await dbRun(
+            'UPDATE attendance SET has_report = 1 WHERE user_id = ? AND date = ?',
+            [userId, today]
+        );
+        
+        res.json({ 
+            success: true,
+            message: '日報を提出しました'
+        });
+        
+    } catch (error) {
+        console.error('日報提出エラー詳細:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: '日報の提出に失敗しました',
+            details: error.message
+        });
+    }
     });
-    
     // 特定日の記録取得
     router.get('/report/:date', requireAuth, async (req, res) => {
         try {

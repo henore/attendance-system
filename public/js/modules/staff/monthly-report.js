@@ -227,23 +227,22 @@ export class StaffMonthlyReport {
             ${formatServiceType(user.service_type)}
           </small>
         </h5>
-        
-        <div class="table-responsive">
-          <table class="table table-bordered table-striped">
-            <thead class="table-primary">
-              <tr>
-                <th width="8%">日付</th>
-                <th width="8%">曜日</th>
-                <th width="10%">勤務場所</th>
-                <th width="10%">出勤時間</th>
-                <th width="10%">退勤時間</th>
-                <th width="10%">休憩時間</th>
-                <th width="10%">実働時間</th>
-                <th width="18%">備考</th>
-                <th width="16%">操作</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead class="table-primary">
+                    <tr>
+                        <th width="8%">日付</th>
+                        <th width="8%">曜日</th>
+                        <th width="10%">勤務場所</th>
+                        <th width="10%">出勤時間</th>
+                        <th width="10%">退勤時間</th>
+                        <th width="10%">休憩時間</th>
+                        <th width="10%">実働時間</th>
+                        <th width="18%">備考</th>
+                        <th width="16%">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
     `;
     
     let totalWorkDays = 0;
@@ -299,16 +298,16 @@ export class StaffMonthlyReport {
               ${record.report_id ? '<span class="badge bg-success">日報提出済み</span>' : ''}
               ${record.comment ? '<span class="badge bg-info">コメントあり</span>' : ''}
             </td>
-            <td class="text-center">
-              ${record.report_id ? `
-                <button class="btn btn-sm btn-outline-primary btn-show-report" 
-                        data-user-id="${user.id}" 
-                        data-user-name="${user.name}" 
-                        data-date="${dateStr}">
-                  <i class="fas fa-file-alt"></i> 日報
-                </button>
-              ` : '-'}
-            </td>
+                <td class="text-center">
+                    ${record.report_id ? `
+                        <button class="btn btn-sm btn-outline-primary btn-show-report" 
+                                data-user-id="${user.id}" 
+                                data-user-name="${user.name}" 
+                                data-date="${dateStr}">
+                            <i class="fas fa-file-alt"></i> 日報
+                        </button>
+                    ` : '-'}
+                </td>
           </tr>
         `;
       } else {

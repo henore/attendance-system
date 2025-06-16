@@ -10,6 +10,9 @@ import AdminMonthlyReport from './monthly-report.js';
 import AdminHandover from './handover.js';
 import AdminAuditLog from './audit-log.js';
 
+// グローバルに modalManager を公開（一時的な対処）
+window.modalManager = modalManager;
+
 export default class AdminModule extends BaseModule {
     constructor(app) {
         super(app);

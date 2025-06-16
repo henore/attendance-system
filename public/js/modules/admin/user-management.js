@@ -2,6 +2,7 @@
 // 管理者ユーザー管理機能
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
+import { modalManager } from '../shared/modal-manager.js';  // インポート追加
 
 export default class AdminUserManagement {
     constructor(app, parentModule) {
@@ -170,7 +171,11 @@ export default class AdminUserManagement {
         }
 
         // モーダルを事前に登録
-          modalManager.register('userDetailModal');
+        try {
+            modalManager.register('userDetailModal');
+        } catch (error) {
+            console.warn('モーダル登録エラー:', error);
+        }
 
         // イベント委譲で動的ボタンを処理（修正）
         this.container.addEventListener('click', (e) => {

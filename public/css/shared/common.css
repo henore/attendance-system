@@ -1,58 +1,50 @@
 /* /css/shared/common.css
-   共通基本スタイル */
+   共通基本スタイル（修正版） */
 
-/* リセット・ベース */
-* {
-  box-sizing: border-box;
+/* ... 既存のコード ... */
+
+/* ナビゲーションバー */
+.navbar {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-body {
-  background-color: var(--light-color);
-  font-size: var(--font-size-base);
-}
-
-/* 共通カード */
-.custom-card {
-  background-color: white;
-  border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-  margin-bottom: var(--spacing-lg);
-}
-
-.custom-card-header {
-  background-color: var(--primary-color);
+/* 現在時刻表示 */
+.navbar-clock {
   color: white;
-  padding: var(--spacing-md) var(--spacing-lg);
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-right: 1rem;
+}
+
+/* ログインカード（サイズ調整） */
+.login-container {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  min-height: 100vh;
+  padding: 1rem;
 }
 
-/* ステータスカード */
-.status-card {
-  background-color: white;
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-lg);
-  box-shadow: var(--shadow-md);
-  height: 100%;
+.login-card {
+  width: 100%;
+  max-width: 400px; /* 横幅を制限 */
+  box-shadow: var(--shadow-lg);
 }
 
-/* ボタン共通 */
-.btn-clock {
-  min-width: 150px;
-  font-weight: 600;
-  transition: all var(--transition-base);
+.login-card .form-control {
+  font-size: 1rem;
+  padding: 0.75rem 1rem;
 }
 
-.btn-clock-in {
-  background-color: var(--clock-in-color);
-  border-color: var(--clock-in-color);
-  color: white;
+/* 日報フォームのマージン調整 */
+.user-dashboard .custom-card {
+  margin-left: 1rem;
+  margin-right: 1rem;
 }
 
-.btn-clock-out {
-  background-color: var(--clock-out-color);
-  border-color: var(--clock-out-color);
-  color: white;
+@media (max-width: 768px) {
+  .user-dashboard .custom-card {
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+  }
 }

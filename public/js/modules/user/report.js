@@ -1,5 +1,5 @@
 // modules/user/report.js
-// 利用者の日報機能ハンドラー
+// 利用者の日報機能ハンドラー（完全修正版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { MESSAGES } from '../../constants/labels.js';
@@ -10,64 +10,61 @@ export class UserReportHandler {
     this.apiCall = apiCall;
     this.showNotification = showNotification;
     this.hasTodayReport = false;
+    this.currentAttendance = null;
   }
 
   /**
    * 日報フォームを読み込み
    * @param {HTMLElement} container 
-   * @param {Object} attendance 
+   * @param {Object} attendance - 現在の出勤情報
    */
   async loadForm(container, attendance) {
-      if (!container) return;
+    if (!container) return;
 
-      try {
-          // 今日の日付を取得
-          const today = new Date().toISOString().split('T')[0];
-          
-          // API呼び出しを修正
-          const response = await this.apiCall(`${API_ENDPOINTS.USER.REPORT_BY_DATE(today)}`);
-          
-          // デバッグログ
-          console.log('[日報フォーム] レスポンス:', response);
-          
-          // 出勤記録がない場合
-          if (!response.attendance) {
-              container.innerHTML = this.generateNotYetMessage();
-              return;
-          }
-          
-          // 退勤後のみ日報入力可能
-          if (response.attendance && response.attendance.clock_out) {
-              this.hasTodayReport = response.report !== null;
-              container.innerHTML = this.generateReportForm(response.report);
-              
-              // フォームイベントの再設定
-              const form = document.getElementById('reportForm');
-              if (form) {
-                  form.addEventListener('submit', (e) => {
-                      e.preventDefault();
-                      this.submitReport(e, response.attendance);
-                  });
-              }
-          } else {
-              container.innerHTML = this.generateWaitingMessage();
-          }
-      } catch (error) {
-          console.error('日報フォーム読み込みエラー:', error);
-          container.innerHTML = this.generateErrorMessage();
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const response = await this.apiCall(`${API_ENDPOINTS.USER.REPORT_BY_DATE(today)}`);
+      
+      console.log('[日報フォーム] APIレスポンス:', response);
+      console.log('[日報フォーム] 引数attendance:', attendance);
+      
+      // 再ログイン時などはAPIレスポンスの出勤情報を優先
+      if (response.attendance) {
+        this.currentAttendance = response.attendance;
+      } else if (attendance) {
+        this.currentAttendance = attendance;
+      } else {
+        this.currentAttendance = null;
       }
+      
+      console.log('[日報フォーム] 使用するattendance:', this.currentAttendance);
+      
+      // 出勤記録がない場合
+      if (!this.currentAttendance) {
+        container.innerHTML = this.generateNotYetMessage();
+        return;
+      }
+      
+      // 退勤後のみ日報入力可能
+      if (this.currentAttendance.clock_out) {
+        this.hasTodayReport = response.report !== null;
+        container.innerHTML = this.generateReportForm(response.report);
+        
+        // フォームにイベントリスナーを追加（index.jsの委譲と重複しないように）
+        const form = document.getElementById('reportForm');
+        if (form) {
+          form.dataset.attendance = JSON.stringify(this.currentAttendance);
+        }
+      } else {
+        container.innerHTML = this.generateWaitingMessage();
+      }
+    } catch (error) {
+      console.error('日報フォーム読み込みエラー:', error);
+      container.innerHTML = this.generateErrorMessage();
+    }
   }
 
-  generateNotYetMessage() {
-    return `
-        <div class="text-center text-muted">
-            <i class="fas fa-clock fa-2x mb-3"></i>
-            <p>本日はまだ出勤していません</p>
-        </div>
-    `;
-}
-
-  /**
+   /**
    * 日報フォームを生成
    * @param {Object} existingReport 
    * @returns {string}
@@ -198,14 +195,29 @@ export class UserReportHandler {
   }
 
   /**
-   * 日報を提出
+   * 日報を提出（修正版）
    * @param {Event} event 
-   * @param {Object} attendance 
    */
-  async submitReport(event, attendance) {
+  async submitReport(event) {
     event.preventDefault();
     
-    if (!attendance || !attendance.clock_out) {
+    console.log('[日報提出] currentAttendance:', this.currentAttendance);
+    
+    // 出勤情報の再確認
+    if (!this.currentAttendance) {
+      // フォームのdata属性から復元を試みる
+      const form = event.target;
+      if (form.dataset.attendance) {
+        try {
+          this.currentAttendance = JSON.parse(form.dataset.attendance);
+        } catch (e) {
+          console.error('出勤情報の復元エラー:', e);
+        }
+      }
+    }
+    
+    if (!this.currentAttendance || !this.currentAttendance.clock_out) {
+      console.error('[日報提出] 出勤情報エラー:', this.currentAttendance);
       this.showNotification(MESSAGES.REPORT.REQUIRED_CLOCK_OUT, 'warning');
       return;
     }
@@ -224,7 +236,7 @@ export class UserReportHandler {
       // フォームを再読み込み
       const container = document.getElementById('reportFormContainer');
       if (container) {
-        await this.loadForm(container, attendance);
+        await this.loadForm(container, this.currentAttendance);
       }
     } catch (error) {
       console.error('日報提出エラー:', error);

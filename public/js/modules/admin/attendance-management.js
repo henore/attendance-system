@@ -2,7 +2,7 @@
 // 管理者出勤管理機能（モーダル修正版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-import { modalManager } from '../shared/modal-manager.js';
+import { modalManager } from '../shared/modal-manager.js';  // インポート確認
 
 export default class AdminAttendanceManagement {
     constructor(app, parentModule) {
@@ -293,10 +293,14 @@ export default class AdminAttendanceManagement {
     }
 
     registerModals() {
-        // モーダルマネージャーに登録
-        modalManager.register('attendanceEditModal');
-        modalManager.register('dailyReportDetailModal');
-        modalManager.register('adminCommentModal');
+        // モーダルマネージャーに登録（エラーハンドリング追加）
+        try {
+            modalManager.register('attendanceEditModal');
+            modalManager.register('dailyReportDetailModal');
+            modalManager.register('adminCommentModal');
+        } catch (error) {
+            console.error('モーダル登録エラー:', error);
+        }
     }
 
     async refresh() {
