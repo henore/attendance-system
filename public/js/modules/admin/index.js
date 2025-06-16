@@ -1,5 +1,5 @@
 // modules/admin/index.js
-// 管理者モジュール - メイン制御
+// 管理者モジュール - メイン制御（修正版）
 
 import BaseModule from '../../base-module.js';
 import { modalManager } from '../shared/modal-manager.js';
@@ -7,6 +7,7 @@ import AdminDashboard from './dashboard.js';
 import AdminUserManagement from './user-management.js';
 import AdminAttendanceManagement from './attendance-management.js';
 import AdminMonthlyReport from './monthly-report.js';
+import AdminHandover from './handover.js';
 import AdminAuditLog from './audit-log.js';
 
 export default class AdminModule extends BaseModule {
@@ -27,7 +28,9 @@ export default class AdminModule extends BaseModule {
         
         this.render();
         await this.initializeSubModules();
-        await this.loadInitialData();
+        
+        // 初回表示のためにダッシュボードを明示的に表示
+        await this.switchToView('dashboard');
     }
 
     render() {
@@ -45,6 +48,9 @@ export default class AdminModule extends BaseModule {
                         </button>
                         <button class="btn btn-outline-primary admin-menu-btn" data-target="attendanceManagement">
                             <i class="fas fa-clock"></i> 出勤管理
+                        </button>
+                        <button class="btn btn-outline-primary admin-menu-btn" data-target="handoverSection">
+                            <i class="fas fa-exchange-alt"></i> 申し送り
                         </button>
                         <button class="btn btn-outline-primary admin-menu-btn" data-target="monthlyReport">
                             <i class="fas fa-calendar-alt"></i> 月別出勤簿
@@ -87,6 +93,7 @@ export default class AdminModule extends BaseModule {
             dashboard: new AdminDashboard(this.app, this),
             userManagement: new AdminUserManagement(this.app, this),
             attendanceManagement: new AdminAttendanceManagement(this.app, this),
+            handoverSection: new AdminHandover(this.app, this),
             monthlyReport: new AdminMonthlyReport(this.app, this),
             auditLog: new AdminAuditLog(this.app, this)
         };
@@ -97,23 +104,11 @@ export default class AdminModule extends BaseModule {
         }
     }
 
-    async loadInitialData() {
-        await this.switchToView('dashboard');
-    }
-
     async switchToView(viewName) {
         console.log(`[AdminModule] 画面切り替え: ${viewName}`);
         
-        if (this.currentView === viewName) {
-            // 同じ画面の場合はリフレッシュのみ
-            if (this.subModules[viewName] && this.subModules[viewName].refresh) {
-                await this.subModules[viewName].refresh();
-            }
-            return;
-        }
-
         // 現在のビューを非表示
-        if (this.subModules[this.currentView]) {
+        if (this.currentView && this.subModules[this.currentView]) {
             this.subModules[this.currentView].hide();
         }
 
@@ -126,7 +121,7 @@ export default class AdminModule extends BaseModule {
         }
     }
 
-    // サブモジュール間の状態共有
+    // 以下は既存のメソッドをそのまま使用
     getSharedState() {
         return {
             selectedYear: this.selectedYear,
@@ -139,27 +134,22 @@ export default class AdminModule extends BaseModule {
         Object.assign(this, updates);
     }
 
-    // 共通のAPIコール（サブモジュールから利用）
     async callApi(endpoint, options = {}) {
         return await this.apiCall(endpoint, options);
     }
 
-    // 共通の通知表示（サブモジュールから利用）
     showNotification(message, type = 'info') {
         this.app.showNotification(message, type);
     }
 
-    // 共通のモーダル確認（サブモジュールから利用）
     async showConfirm(options) {
         return await modalManager.confirm(options);
     }
 
-    // 共通のモーダル表示（サブモジュールから利用）
     showModal(id, data = {}) {
         modalManager.show(id, data);
     }
 
-    // 共通のフォーマット関数
     getRoleDisplayName(role) {
         const roleNames = {
             'user': '利用者',

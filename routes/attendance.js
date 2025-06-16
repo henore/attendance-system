@@ -1,14 +1,63 @@
 // routes/attendance.js
-// 出退勤共通API
+// 出退勤共通API（時間丸め機能付き）
 
 const express = require('express');
 const router = express.Router();
+
+// 時間丸め関数
+const roundClockInTime = (timeStr, isUser) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes;
+    
+    if (isUser) {
+        // 11:30-12:30の出勤は12:30固定
+        if (totalMinutes >= 690 && totalMinutes <= 750) { // 11:30-12:30
+            return '12:30';
+        }
+    }
+    
+    // 9:00以前は9:00固定
+    if (totalMinutes <= 540) { // 9:00
+        return '09:00';
+    }
+    
+    // 9:01以降は15分切り上げ
+    const rounded = Math.ceil(totalMinutes / 15) * 15;
+    const roundedHours = Math.floor(rounded / 60);
+    const roundedMinutes = rounded % 60;
+    
+    return `${String(roundedHours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
+};
+
+const roundClockOutTime = (timeStr, isUser) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes;
+    
+    if (isUser) {
+        // 11:30-12:30の退勤は11:30固定
+        if (totalMinutes >= 690 && totalMinutes <= 750) { // 11:30-12:30
+            return '11:30';
+        }
+    }
+    
+    // 15:30以前は15分切り下げ
+    if (totalMinutes <= 930) { // 15:30
+        const rounded = Math.floor(totalMinutes / 15) * 15;
+        const roundedHours = Math.floor(rounded / 60);
+        const roundedMinutes = rounded % 60;
+        return `${String(roundedHours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
+    }
+    
+    // 15:30以降は15:45固定
+    return '15:45';
+};
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     // 出勤処理
     router.post('/clock-in', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
+            const userRole = req.session.user.role;
             const today = new Date().toISOString().split('T')[0];
             const currentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
             
@@ -25,6 +74,9 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 });
             }
             
+            // 利用者の場合は時間を丸める
+            const clockInTime = userRole === 'user' ? roundClockInTime(currentTime, true) : currentTime;
+            
             // 出勤記録作成
             await dbRun(`
                 INSERT INTO attendance (user_id, date, clock_in, status)
@@ -33,7 +85,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                     clock_in = excluded.clock_in,
                     status = excluded.status,
                     updated_at = CURRENT_TIMESTAMP
-            `, [userId, today, currentTime, 'normal']);
+            `, [userId, today, clockInTime, 'normal']);
             
             const attendance = await dbGet(
                 'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
@@ -43,8 +95,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             res.json({ 
                 success: true,
                 attendance,
-                time: currentTime,
-                message: `出勤しました（${currentTime}）`
+                time: clockInTime,
+                message: `出勤しました（${clockInTime}）`
             });
             
         } catch (error) {
@@ -60,6 +112,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     router.post('/clock-out', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
+            const userRole = req.session.user.role;
             const today = new Date().toISOString().split('T')[0];
             const currentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
             
@@ -83,10 +136,13 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 });
             }
             
+            // 利用者の場合は時間を丸める
+            const clockOutTime = userRole === 'user' ? roundClockOutTime(currentTime, true) : currentTime;
+            
             // 退勤時間更新
             await dbRun(
                 'UPDATE attendance SET clock_out = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [currentTime, attendance.id]
+                [clockOutTime, attendance.id]
             );
             
             const updatedAttendance = await dbGet(
@@ -97,8 +153,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             res.json({ 
                 success: true,
                 attendance: updatedAttendance,
-                time: currentTime,
-                message: `退勤しました（${currentTime}）`
+                time: clockOutTime,
+                message: `退勤しました（${clockOutTime}）`
             });
             
         } catch (error) {
