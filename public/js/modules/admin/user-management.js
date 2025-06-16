@@ -169,22 +169,27 @@ export default class AdminUserManagement {
             roleFilter.addEventListener('change', () => this.filterUsers());
         }
 
-        // イベント委譲でユーザーアクションボタンを処理
+        // モーダルを事前に登録
+          modalManager.register('userDetailModal');
+
+        // イベント委譲で動的ボタンを処理（修正）
         this.container.addEventListener('click', (e) => {
             // 無効化ボタン
             if (e.target.closest('.btn-deactivate-user')) {
+                e.preventDefault();  // 追加
                 const btn = e.target.closest('.btn-deactivate-user');
                 const userId = btn.getAttribute('data-user-id');
                 const userName = btn.getAttribute('data-user-name');
                 this.deactivateUser(userId, userName);
             }
             
-            // 詳細ボタン
-            if (e.target.closest('.btn-user-detail')) {
-                const btn = e.target.closest('.btn-user-detail');
-                const userId = btn.getAttribute('data-user-id');
-                this.showUserDetail(userId);
-            }
+        // 詳細ボタン
+        if (e.target.closest('.btn-user-detail')) {
+            e.preventDefault();  // 追加
+            const btn = e.target.closest('.btn-user-detail');
+            const userId = btn.getAttribute('data-user-id');
+            this.showUserDetail(userId);
+        }
         });
     }
 
@@ -430,18 +435,21 @@ export default class AdminUserManagement {
 
             // モーダルに詳細情報を表示
             const content = this.container.querySelector('#userDetailContent');
+             if (content) {
             content.innerHTML = this.generateUserDetailContent(user);
 
+            // モーダル表示（modalManagerを使用）
+            modalManager.show('userDetailModal');
+        }
             // モーダル表示
             const modal = new bootstrap.Modal(this.container.querySelector('#userDetailModal'));
             modal.show();
 
-        } catch (error) {
-            console.error('ユーザー詳細表示エラー:', error);
-            this.parent.showNotification('ユーザー詳細の取得に失敗しました', 'danger');
+            } catch (error) {
+                console.error('ユーザー詳細表示エラー:', error);
+                this.parent.showNotification('ユーザー詳細の取得に失敗しました', 'danger');
+            }
         }
-    }
-
     generateUserDetailContent(user) {
         const defaultUsers = ['admin', 'staff1', 'user1', 'user2'];
         const isDefaultUser = defaultUsers.includes(user.username);
