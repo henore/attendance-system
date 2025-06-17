@@ -1,11 +1,11 @@
 // server.js
 // Node.js Express サーバー
-
 const cors = require('cors');
 app.use(cors({
   origin: 'https://happytime-web.com', // 本番ドメインを指定
   credentials: true,                   // Cookieなど認証情報を送る場合はtrue
 }));
+
 
 require('dotenv').config();
 const express = require('express');
