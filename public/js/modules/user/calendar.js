@@ -1,5 +1,5 @@
 // modules/user/calendar.js
-// 利用者の出勤履歴カレンダー（修正版）
+// 利用者の出勤履歴カレンダー（モーダル修正版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { formatDate, getDaysInMonth } from '../../utils/date-time.js';
@@ -11,6 +11,7 @@ export class UserAttendanceCalendar {
     this.showNotification = showNotification;
     this.currentDate = new Date();
     this.attendanceCache = new Map();
+    this.currentModalId = null; // 現在開いているモーダルのID
   }
 
   /**
@@ -102,23 +103,18 @@ export class UserAttendanceCalendar {
     const year = this.currentDate.getFullYear();
     const month = this.currentDate.getMonth();
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // 時刻をリセット
+    today.setHours(0, 0, 0, 0);
     
-    // 月の最初の日と最後の日
     const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
-    // カレンダーの開始日（前月の日曜日から）
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
 
-    // 月内のすべての日付のデータを事前に取得（修正）
+    // 月内のすべての日付のデータを事前に取得
     const monthDataPromises = [];
     const current = new Date(startDate);
     
     for (let i = 0; i < 42; i++) {
       if (current.getMonth() === month) {
-        // タイムゾーンを考慮した日付文字列生成
         const dateStr = this.formatDateString(current);
         monthDataPromises.push(this.getAttendanceData(dateStr));
       }
@@ -140,7 +136,7 @@ export class UserAttendanceCalendar {
 
     // 日付セル
     current.setTime(startDate.getTime());
-    for (let i = 0; i < 42; i++) { // 6週間分
+    for (let i = 0; i < 42; i++) {
       const isCurrentMonth = current.getMonth() === month;
       const currentDateReset = new Date(current);
       currentDateReset.setHours(0, 0, 0, 0);
@@ -157,12 +153,12 @@ export class UserAttendanceCalendar {
       if (dayOfWeek === 0) classes.push('sunday');
       if (dayOfWeek === 6) classes.push('saturday');
       
-      // 出勤状況による色分け（修正）
+      // 出勤状況による色分け
       if (attendanceData && isCurrentMonth) {
         if (attendanceData.hasReport) {
-          classes.push('has-report'); // 日報提出済み（緑系）
+          classes.push('has-report');
         } else if (attendanceData.hasAttendance) {
-          classes.push('has-attendance'); // 出勤のみ（黄系）
+          classes.push('has-attendance');
         }
       }
 
@@ -192,7 +188,7 @@ export class UserAttendanceCalendar {
   }
 
   /**
-   * 作業インジケーターを生成（修正版）
+   * 作業インジケーターを生成
    * @param {Object} attendanceData 
    * @returns {string}
    */
@@ -220,7 +216,7 @@ export class UserAttendanceCalendar {
   }
 
   /**
-   * 出勤データを取得（修正版）
+   * 出勤データを取得
    * @param {string} dateStr 
    * @returns {Object|null}
    */
@@ -246,7 +242,6 @@ export class UserAttendanceCalendar {
       return data;
     } catch (error) {
       console.error(`出勤データ取得エラー (${dateStr}):`, error);
-      // エラーの場合もキャッシュに登録（再リクエストを防ぐ）
       this.attendanceCache.set(dateStr, null);
       return null;
     }
@@ -271,6 +266,9 @@ export class UserAttendanceCalendar {
    */
   async onDateClick(dateStr) {
     try {
+      // 既存のモーダルを破棄
+      this.destroyCurrentModal();
+      
       const cachedData = this.attendanceCache.get(dateStr);
       
       if (cachedData && (cachedData.hasAttendance || cachedData.hasReport)) {
@@ -289,7 +287,6 @@ export class UserAttendanceCalendar {
             staffComment: response.staffComment
           };
           
-          // キャッシュを更新
           this.attendanceCache.set(dateStr, data);
           this.showAttendanceDetail(dateStr, data);
         } else {
@@ -308,26 +305,55 @@ export class UserAttendanceCalendar {
    * @param {Object} data 
    */
   showAttendanceDetail(dateStr, data) {
-      const formattedDate = formatDate(dateStr, {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          weekday: 'long'
-      });
+    // 既存のモーダルを破棄
+    this.destroyCurrentModal();
+    
+    const formattedDate = formatDate(dateStr, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long'
+    });
 
-      // 日付に対応したコンテンツを生成
-      const content = this.generateAttendanceDetailContent(data);
+    // 一意のモーダルIDを生成
+    this.currentModalId = `userAttendanceDetailModal_${Date.now()}`;
+    
+    // 日付に対応したコンテンツを生成
+    const content = this.generateAttendanceDetailContent(data);
 
-      modalManager.create({
-          id: 'userAttendanceDetailModal',
-          title: `<i class="fas fa-calendar-check"></i> ${formattedDate}の記録`,
-          content: content,
-          size: 'modal-lg',
-          headerClass: 'bg-primary text-white',
-          saveButton: false
-      });
+    // 新しいモーダルを作成
+    const modalId = modalManager.create({
+      id: this.currentModalId,
+      title: `<i class="fas fa-calendar-check"></i> ${formattedDate}の記録`,
+      content: content,
+      size: 'modal-lg',
+      headerClass: 'bg-primary text-white',
+      saveButton: false
+    });
 
-      modalManager.show('userAttendanceDetailModal');
+    // モーダル閉じた時のクリーンアップ
+    const modalElement = document.getElementById(modalId);
+    if (modalElement) {
+      modalElement.addEventListener('hidden.bs.modal', () => {
+        this.destroyCurrentModal();
+      }, { once: true });
+    }
+
+    modalManager.show(modalId);
+  }
+
+  /**
+   * 現在のモーダルを破棄
+   */
+  destroyCurrentModal() {
+    if (this.currentModalId) {
+      try {
+        modalManager.destroy(this.currentModalId);
+      } catch (error) {
+        // モーダルが既に削除されている場合は無視
+      }
+      this.currentModalId = null;
+    }
   }
 
   /**
@@ -423,6 +449,9 @@ export class UserAttendanceCalendar {
    * カレンダーをリフレッシュ
    */
   async refresh() {
+    // 現在のモーダルを閉じる
+    this.destroyCurrentModal();
+    
     // キャッシュをクリア
     this.attendanceCache.clear();
     
@@ -458,5 +487,13 @@ export class UserAttendanceCalendar {
       reportDays,
       totalDays: daysInMonth
     };
+  }
+
+  /**
+   * クリーンアップ
+   */
+  destroy() {
+    this.destroyCurrentModal();
+    this.attendanceCache.clear();
   }
 }

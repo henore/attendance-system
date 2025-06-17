@@ -432,102 +432,121 @@ export default class AdminAttendanceManagement {
         recordsList.innerHTML = this.generateAttendanceRecordsList(records);
     }
 
-    generateAttendanceRecordsList(records) {
-        let html = `
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th>ユーザー</th>
-                            <th>権限</th>
-                            <th>出勤時間</th>
-                            <th>退勤時間</th>
-                            <th>ステータス</th>
-                            <th>勤務時間</th>
-                            <th>日報・コメント</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
+    // modules/admin/attendance-management.js の修正部分
+// generateAttendanceRecordsList メソッドの修正
 
-        records.forEach(record => {
-            const roleClass = this.parent.getRoleColor(record.user_role);
-            const workDuration = this.parent.calculateWorkDuration(record) ? 
-                `${this.parent.calculateWorkDuration(record)}時間` : null;
-            const statusBadge = this.parent.getStatusBadge(record.status);
+generateAttendanceRecordsList(records) {
+    if (!records || records.length === 0) {
+        return '<p class="text-muted text-center">検索条件に該当する記録がありません</p>';
+    }
 
-            // 日報・コメント状況
-            let reportCommentStatus = '';
-            if (record.user_role === 'user') {
-                if (record.report_id) {
-                    reportCommentStatus = '<span class="badge bg-success me-1"><i class="fas fa-file-check"></i> 日報</span>';
-                    if (record.comment_id) {
-                        reportCommentStatus += '<span class="badge bg-info"><i class="fas fa-comment-check"></i> コメント済み</span>';
-                    } else {
-                        reportCommentStatus += '<span class="badge bg-warning"><i class="fas fa-comment-exclamation"></i> コメント未記入</span>';
-                    }
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>ユーザー</th>
+                        <th>権限</th>
+                        <th>出勤時間</th>
+                        <th>休憩時間</th>
+                        <th>退勤時間</th>
+                        <th>ステータス</th>
+                        <th>勤務時間</th>
+                        <th>日報・コメント</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    records.forEach(record => {
+        const roleClass = this.parent.getRoleColor(record.user_role);
+        const workDuration = this.parent.calculateWorkDuration(record) ? 
+            `${this.parent.calculateWorkDuration(record)}時間` : null;
+        const statusBadge = this.parent.getStatusBadge(record.status);
+
+        // 休憩時間の表示
+        let breakTimeDisplay = '-';
+        if (record.break_start) {
+            if (record.break_end) {
+                breakTimeDisplay = `${record.break_start}〜${record.break_end}`;
+            } else {
+                breakTimeDisplay = `${record.break_start}〜(進行中)`;
+            }
+        }
+
+        // 日報・コメント状況
+        let reportCommentStatus = '';
+        if (record.user_role === 'user') {
+            if (record.report_id) {
+                reportCommentStatus = '<span class="badge bg-success me-1"><i class="fas fa-file-check"></i> 日報</span>';
+                if (record.comment_id) {
+                    reportCommentStatus += '<span class="badge bg-info"><i class="fas fa-comment-check"></i> コメント済み</span>';
                 } else {
-                    reportCommentStatus = '<span class="badge bg-secondary"><i class="fas fa-file-times"></i> 日報未提出</span>';
+                    reportCommentStatus += '<span class="badge bg-warning"><i class="fas fa-comment-exclamation"></i> コメント未記入</span>';
                 }
             } else {
-                reportCommentStatus = '<span class="text-muted">-</span>';
+                reportCommentStatus = '<span class="badge bg-secondary"><i class="fas fa-file-times"></i> 日報未提出</span>';
             }
-
-            html += `
-                <tr>
-                    <td>
-                        <strong>${record.user_name}</strong>
-                    </td>
-                    <td><span class="badge bg-${roleClass}">${this.parent.getRoleDisplayName(record.user_role)}</span></td>
-                    <td>${record.clock_in || '-'}</td>
-                    <td>${record.clock_out || '-'}</td>
-                    <td>${statusBadge}</td>
-                    <td>${workDuration || '-'}</td>
-                    <td>${reportCommentStatus}</td>
-                    <td>
-                        <div class="btn-group" role="group">
-                            ${record.user_role === 'user' && record.report_id ? `
-                                <button class="btn btn-sm btn-outline-primary btn-show-report" 
-                                        data-user-id="${record.user_id}"
-                                        data-user-name="${record.user_name}"
-                                        data-date="${record.date}"
-                                        title="日報詳細">
-                                    <i class="fas fa-file-alt"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-info btn-admin-comment" 
-                                        data-user-id="${record.user_id}"
-                                        data-user-name="${record.user_name}"
-                                        title="コメント">
-                                    <i class="fas fa-comment"></i>
-                                </button>
-                            ` : ''}
-                            <button class="btn btn-sm btn-outline-warning btn-edit-attendance" 
-                                    data-user-id="${record.user_id}"
-                                    data-user-name="${record.user_name}"
-                                    data-user-role="${record.user_role}"
-                                    data-record-id="${record.id || ''}"
-                                    data-date="${record.date}"
-                                    data-clock-in="${record.clock_in || ''}"
-                                    data-clock-out="${record.clock_out || ''}"
-                                    data-status="${record.status || 'normal'}"
-                                    title="編集">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
+        } else {
+            reportCommentStatus = '<span class="text-muted">-</span>';
+        }
 
         html += `
-                    </tbody>
-                </table>
-            </div>
+            <tr>
+                <td>
+                    <strong>${record.user_name}</strong>
+                </td>
+                <td><span class="badge bg-${roleClass}">${this.parent.getRoleDisplayName(record.user_role)}</span></td>
+                <td>${record.clock_in || '-'}</td>
+                <td>${breakTimeDisplay}</td>
+                <td>${record.clock_out || '-'}</td>
+                <td>${statusBadge}</td>
+                <td>${workDuration || '-'}</td>
+                <td>${reportCommentStatus}</td>
+                <td>
+                    <div class="btn-group" role="group">
+                        ${record.user_role === 'user' && record.report_id ? `
+                            <button class="btn btn-sm btn-outline-primary btn-show-report" 
+                                    data-user-id="${record.user_id}"
+                                    data-user-name="${record.user_name}"
+                                    data-date="${record.date}"
+                                    title="日報詳細">
+                                <i class="fas fa-file-alt"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-info btn-admin-comment" 
+                                    data-user-id="${record.user_id}"
+                                    data-user-name="${record.user_name}"
+                                    title="コメント">
+                                <i class="fas fa-comment"></i>
+                            </button>
+                        ` : ''}
+                        <button class="btn btn-sm btn-outline-warning btn-edit-attendance" 
+                                data-user-id="${record.user_id}"
+                                data-user-name="${record.user_name}"
+                                data-user-role="${record.user_role}"
+                                data-record-id="${record.id || ''}"
+                                data-date="${record.date}"
+                                data-clock-in="${record.clock_in || ''}"
+                                data-clock-out="${record.clock_out || ''}"
+                                data-status="${record.status || 'normal'}"
+                                title="編集">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
         `;
+    });
 
-        return html;
-    }
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    return html;
+}
 
     async editAttendance(userId, userName, userRole, recordId = null, date = null, clockIn = '', clockOut = '', status = 'normal') {
         // フォーム要素に値設定
