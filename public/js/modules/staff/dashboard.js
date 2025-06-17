@@ -134,80 +134,102 @@ export class StaffDashboard {
    * ユーザー状態行を生成
    */
   generateUserStatusRow(userData) {
-    const reportBadge = userData.hasReport 
-      ? '<span class="badge bg-success"><i class="fas fa-file-check"></i> 提出済み</span>'
-      : '<span class="badge bg-warning"><i class="fas fa-file-times"></i> 未提出</span>';
-    
-    const workDurationText = userData.workDuration 
-      ? `<br><small class="text-muted">勤務時間: ${userData.workDuration}</small>`
-      : '';
+      const reportBadge = userData.hasReport 
+          ? '<span class="badge bg-success"><i class="fas fa-file-check"></i> 提出済み</span>'
+          : '<span class="badge bg-warning"><i class="fas fa-file-times"></i> 未提出</span>';
       
-    const serviceTypeText = userData.serviceType 
-      ? `<small class="text-muted"> (${formatServiceType(userData.serviceType)})</small>`
-      : '';
+      const workDurationText = userData.workDuration 
+          ? `<br><small class="text-muted">勤務時間: ${userData.workDuration}</small>`
+          : '';
+          
+      const serviceTypeText = userData.serviceType 
+          ? `<small class="text-muted"> (${formatServiceType(userData.serviceType)})</small>`
+          : '';
 
-    let commentBadge = '';
-    let commentBtnText = '';
-    let commentBtnClass = '';
-    let rowClass = '';
-    
-    if (userData.hasReport) {
-      if (userData.hasComment) {
-        commentBadge = '<span class="badge bg-info ms-2"><i class="fas fa-comment-check"></i> コメント済み</span>';
-        commentBtnText = 'コメント編集';
-        commentBtnClass = 'btn-outline-info';
-      } else {
-        commentBadge = '<span class="badge bg-danger ms-2"><i class="fas fa-comment-exclamation"></i> コメント未記入</span>';
-        commentBtnText = 'コメント記入';
-        commentBtnClass = 'btn-outline-primary';
-        rowClass = 'border-warning';
+      let commentBadge = '';
+      let commentBtnText = '';
+      let commentBtnClass = '';
+      let rowClass = '';
+      
+      if (userData.hasReport) {
+          if (userData.hasComment) {
+              commentBadge = '<span class="badge bg-info ms-2"><i class="fas fa-comment-check"></i> コメント済み</span>';
+              commentBtnText = 'コメント編集';
+              commentBtnClass = 'btn-outline-info';
+          } else {
+              commentBadge = '<span class="badge bg-danger ms-2"><i class="fas fa-comment-exclamation"></i> コメント未記入</span>';
+              commentBtnText = 'コメント記入';
+              commentBtnClass = 'btn-outline-primary';
+              rowClass = 'border-warning';
+          }
       }
-    }
-    
-    return `
-      <div class="user-status-row mb-3 p-3 border rounded ${rowClass}">
-        <div class="row align-items-center">
-          <div class="col-md-3">
-            <div class="d-flex align-items-center">
-              <span class="badge ${userData.statusClass} me-2">
-                <i class="fas ${userData.statusIcon}"></i>
-              </span>
-              <div>
-                <h6 class="mb-0">${userData.name}</h6>
-                <small class="text-muted">${userData.status}${serviceTypeText}</small>
+      
+      // 休憩時間の表示を追加
+      let breakTimeDisplay = '';
+      if (userData.breakStart) {
+          breakTimeDisplay = `
+              <div class="col-md-2 text-center">
+                  <div class="time-display">
+                      <i class="fas fa-coffee text-warning"></i>
+                      <div class="fw-bold">${userData.breakStart || '-'}</div>
+                      <small class="text-muted">休憩開始</small>
+                  </div>
               </div>
-            </div>
+              <div class="col-md-2 text-center">
+                  <div class="time-display">
+                      <i class="fas fa-coffee text-info"></i>
+                      <div class="fw-bold">${userData.breakEnd || '-'}</div>
+                      <small class="text-muted">休憩終了</small>
+                  </div>
+              </div>
+          `;
+      }
+      
+      return `
+          <div class="user-status-row mb-3 p-3 border rounded ${rowClass}">
+              <div class="row align-items-center">
+                  <div class="col-md-2">
+                      <div class="d-flex align-items-center">
+                          <span class="badge ${userData.statusClass} me-2">
+                              <i class="fas ${userData.statusIcon}"></i>
+                          </span>
+                          <div>
+                              <h6 class="mb-0">${userData.name}</h6>
+                              <small class="text-muted">${userData.status}${serviceTypeText}</small>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="col-md-2 text-center">
+                      <div class="time-display">
+                          <i class="fas fa-clock text-success"></i>
+                          <div class="fw-bold">${userData.clockIn || '-'}</div>
+                          <small class="text-muted">出勤</small>
+                      </div>
+                  </div>
+                  ${breakTimeDisplay}
+                  <div class="col-md-2 text-center">
+                      <div class="time-display">
+                          <i class="fas fa-clock text-info"></i>
+                          <div class="fw-bold">${userData.clockOut || '-'}</div>
+                          <small class="text-muted">退勤</small>
+                      </div>
+                  </div>
+                  <div class="col-md-2 text-center">
+                      ${reportBadge}
+                      ${commentBadge}
+                      ${workDurationText}
+                  </div>
+                  <div class="col-md-2 text-end">
+                      <button class="btn ${commentBtnClass} btn-sm btn-staff-comment" 
+                              data-user-id="${userData.id}"
+                              data-user-name="${userData.name}"
+                              ${!userData.hasReport ? 'disabled title="日報提出後にコメント可能"' : ''}>
+                          <i class="fas fa-comment"></i> ${commentBtnText}
+                      </button>
+                  </div>
+              </div>
           </div>
-          <div class="col-md-2 text-center">
-            <div class="time-display">
-              <i class="fas fa-clock text-success"></i>
-              <div class="fw-bold">${userData.clockIn || '-'}</div>
-              <small class="text-muted">出勤</small>
-            </div>
-          </div>
-          <div class="col-md-2 text-center">
-            <div class="time-display">
-              <i class="fas fa-clock text-info"></i>
-              <div class="fw-bold">${userData.clockOut || '-'}</div>
-              <small class="text-muted">退勤</small>
-            </div>
-          </div>
-          <div class="col-md-3 text-center">
-            ${reportBadge}
-            ${commentBadge}
-            ${workDurationText}
-          </div>
-          <div class="col-md-2 text-end">
-            <button class="btn ${commentBtnClass} btn-sm btn-staff-comment" 
-                    data-user-id="${userData.id}"
-                    data-user-name="${userData.name}"
-                    ${!userData.hasReport ? 'disabled title="日報提出後にコメント可能"' : ''}>
-              <i class="fas fa-comment"></i> ${commentBtnText}
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
+      `;
   }
 
   /**

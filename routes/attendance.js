@@ -1,17 +1,32 @@
 // routes/attendance.js
-// 出退勤共通API（時間丸め機能付き）
+// 出退勤共通API（タイムゾーン対応版）
 
 const express = require('express');
 const router = express.Router();
 
-// 時間丸め関数
+// 日本時間を取得する関数
+const getJapanTime = () => {
+    const now = new Date();
+    // UTC時間に9時間を加算して日本時間に変換
+    const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    return japanTime.toISOString().slice(11, 16); // HH:MM形式
+};
+
+// 日本の日付を取得する関数
+const getJapanDate = () => {
+    const now = new Date();
+    const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    return japanTime.toISOString().split('T')[0];
+};
+
+// 時間丸め関数（修正版）
 const roundClockInTime = (timeStr, isUser) => {
     const [hours, minutes] = timeStr.split(':').map(Number);
     const totalMinutes = hours * 60 + minutes;
     
     if (isUser) {
-        // 11:30-12:30の出勤は12:30固定
-        if (totalMinutes >= 690 && totalMinutes <= 750) { // 11:30-12:30
+        // 11:30-12:29の出勤は12:30固定
+        if (totalMinutes >= 690 && totalMinutes < 750) { // 11:30-12:29
             return '12:30';
         }
     }
@@ -48,7 +63,7 @@ const roundClockOutTime = (timeStr, isUser) => {
         return `${String(roundedHours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
     }
     
-    // 15:30以降は15:45固定
+    // 15:30より後は15:45固定
     return '15:45';
 };
 
@@ -58,8 +73,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         try {
             const userId = req.session.user.id;
             const userRole = req.session.user.role;
-            const today = new Date().toISOString().split('T')[0];
-            const currentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
+            const today = getJapanDate();
+            const currentTime = getJapanTime();
+            
+            console.log(`[出勤] 日本時間: ${today} ${currentTime}`);
             
             // 既存の出勤記録チェック
             const existing = await dbGet(
@@ -76,6 +93,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             
             // 利用者の場合は時間を丸める
             const clockInTime = userRole === 'user' ? roundClockInTime(currentTime, true) : currentTime;
+            
+            console.log(`[出勤] 元の時刻: ${currentTime}, 丸め後: ${clockInTime}`);
             
             // 出勤記録作成
             await dbRun(`
@@ -113,8 +132,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         try {
             const userId = req.session.user.id;
             const userRole = req.session.user.role;
-            const today = new Date().toISOString().split('T')[0];
-            const currentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
+            const today = getJapanDate();
+            const currentTime = getJapanTime();
+            
+            console.log(`[退勤] 日本時間: ${today} ${currentTime}`);
             
             // 出勤記録確認
             const attendance = await dbGet(
@@ -138,6 +159,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             
             // 利用者の場合は時間を丸める
             const clockOutTime = userRole === 'user' ? roundClockOutTime(currentTime, true) : currentTime;
+            
+            console.log(`[退勤] 元の時刻: ${currentTime}, 丸め後: ${clockOutTime}`);
             
             // 退勤時間更新
             await dbRun(

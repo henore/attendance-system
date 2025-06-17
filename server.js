@@ -8,7 +8,6 @@ const path = require('path');
 const morgan = require('morgan');
 const helmet = require('helmet');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
 
 // Express アプリケーション作成
 const app = express();
@@ -90,7 +89,7 @@ app.use(express.static('public', {
     }
 }));
 
-// セッション設定
+// セッション設定（修正版）
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
     resave: false,
@@ -101,14 +100,6 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24 // 24時間
     }
 }));
-
-// レート制限
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15分
-    max: 100 // リクエスト数
-});
-
-app.use('/api/', limiter);
 
 // 認証ミドルウェア
 const requireAuth = (req, res, next) => {

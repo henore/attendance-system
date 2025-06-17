@@ -146,11 +146,11 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     });
     
     // 休憩開始
-    router.post('/break/start', requireAuth, async (req, res) => {
+      router.post('/break/start', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
-            const today = new Date().toISOString().split('T')[0];
-            const currentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
+            const today = getJapanDate();
+            const currentTime = getJapanTime();
             
             // 出勤チェック
             const attendance = await dbGet(
@@ -184,7 +184,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             let isCompleted = false;
             
             if (user.service_type === 'commute') {
-                // 通所：11:30-12:30固定
+                // 通所：11:30-12:30固定（ボタンを押したタイミングに関係なく）
                 startTime = '11:30';
                 endTime = '12:30';
                 isCompleted = true;
@@ -195,13 +195,31 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 `, [userId, today, startTime, endTime, 60]);
                 
             } else {
-                // 在宅：現在時刻から開始
-                startTime = currentTime;
+                // 在宅：現在時刻を15分単位で切り捨て
+                const [hours, minutes] = currentTime.split(':').map(Number);
+                const totalMinutes = hours * 60 + minutes;
+                const roundedMinutes = Math.floor(totalMinutes / 15) * 15;
+                const roundedHours = Math.floor(roundedMinutes / 60);
+                const roundedMins = roundedMinutes % 60;
+                
+                startTime = `${String(roundedHours).padStart(2, '0')}:${String(roundedMins).padStart(2, '0')}`;
+                
+                // 60分後の終了時間を計算
+                let endHours = roundedHours + 1;
+                let endMins = roundedMins;
+                
+                if (endHours >= 24) {
+                    endHours = 23;
+                    endMins = 59;
+                }
+                
+                endTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
+                isCompleted = true;
                 
                 await dbRun(`
-                    INSERT INTO break_records (user_id, date, start_time)
-                    VALUES (?, ?, ?)
-                `, [userId, today, startTime]);
+                    INSERT INTO break_records (user_id, date, start_time, end_time, duration)
+                    VALUES (?, ?, ?, ?, ?)
+                `, [userId, today, startTime, endTime, 60]);
             }
             
             res.json({ 
@@ -209,9 +227,9 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 startTime,
                 endTime,
                 isCompleted,
-                message: isCompleted ? 
+                message: user.service_type === 'commute' ? 
                     '休憩時間を記録しました（11:30-12:30 60分）' : 
-                    `休憩開始（${startTime}）60分で自動終了します`
+                    `休憩時間を記録しました（${startTime}-${endTime} 60分）`
             });
             
         } catch (error) {

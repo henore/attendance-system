@@ -9,55 +9,64 @@ module.exports = (dbGet, dbAll, dbRun) => {
     // ログイン
     router.post('/login', async (req, res) => {
         console.log('🔑 ログイン試行開始');
-        console.log('リクエストボディ:', req.body);
         
         try {
             const { username, password } = req.body;
             
-            console.log('📝 受信データ:', { username, password: password ? '***' : 'なし' });
-            
             if (!username || !password) {
-                console.log('❌ バリデーションエラー: 必須項目不足');
                 return res.status(400).json({ 
                     success: false, 
                     error: 'ユーザーIDとパスワードを入力してください' 
                 });
             }
             
-            console.log('🔍 データベース検索開始');
+            // セッションリセット（既存セッションがある場合）
+            if (req.session.user) {
+                await new Promise((resolve, reject) => {
+                    req.session.regenerate((err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    });
+                });
+            }
             
-            // ユーザー取得
-            const user = await dbGet(
-                'SELECT * FROM users WHERE username = ? AND is_active = 1',
-                [username]
-            );
+            // ユーザー取得（リトライ付き）
+            let user = null;
+            let retryCount = 0;
+            const maxRetries = 3;
             
-            console.log('👤 ユーザー検索結果:', user ? '見つかりました' : '見つかりません');
+            while (!user && retryCount < maxRetries) {
+                try {
+                    user = await dbGet(
+                        'SELECT * FROM users WHERE username = ? AND is_active = 1',
+                        [username]
+                    );
+                    break;
+                } catch (dbError) {
+                    console.error(`データベースエラー (試行 ${retryCount + 1}):`, dbError);
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒待機
+                    }
+                }
+            }
             
             if (!user) {
-                console.log('❌ ユーザーが見つからない');
                 return res.status(401).json({ 
                     success: false, 
                     error: 'ユーザーIDまたはパスワードが正しくありません' 
                 });
             }
-            
-            console.log('🔐 パスワード検証開始');
             
             // パスワード検証
             const isValid = await bcrypt.compare(password, user.password);
             
-            console.log('🔐 パスワード検証結果:', isValid ? '正しい' : '間違っている');
-            
             if (!isValid) {
-                console.log('❌ パスワードが間違っている');
                 return res.status(401).json({ 
                     success: false, 
                     error: 'ユーザーIDまたはパスワードが正しくありません' 
                 });
             }
-            
-            console.log('📋 セッション設定開始');
             
             // セッション設定
             req.session.user = {
@@ -67,6 +76,14 @@ module.exports = (dbGet, dbAll, dbRun) => {
                 role: user.role,
                 service_type: user.service_type
             };
+            
+            // セッション保存を明示的に実行
+            await new Promise((resolve, reject) => {
+                req.session.save((err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
             
             console.log('✅ ログイン成功:', req.session.user);
             
@@ -78,7 +95,6 @@ module.exports = (dbGet, dbAll, dbRun) => {
             
         } catch (error) {
             console.error('❌ ログインエラー詳細:', error);
-            console.error('エラースタック:', error.stack);
             res.status(500).json({ 
                 success: false, 
                 error: 'ログイン処理でエラーが発生しました',

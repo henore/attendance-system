@@ -308,25 +308,26 @@ export class UserAttendanceCalendar {
    * @param {Object} data 
    */
   showAttendanceDetail(dateStr, data) {
-    const formattedDate = formatDate(dateStr, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
+      const formattedDate = formatDate(dateStr, {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          weekday: 'long'
+      });
 
-    const content = this.generateAttendanceDetailContent(data);
+      // 日付に対応したコンテンツを生成
+      const content = this.generateAttendanceDetailContent(data);
 
-    modalManager.create({
-      id: 'userAttendanceDetailModal',
-      title: `<i class="fas fa-calendar-check"></i> ${formattedDate}の記録`,
-      content: content,
-      size: 'modal-lg',
-      headerClass: 'bg-primary text-white',
-      saveButton: false
-    });
+      modalManager.create({
+          id: 'userAttendanceDetailModal',
+          title: `<i class="fas fa-calendar-check"></i> ${formattedDate}の記録`,
+          content: content,
+          size: 'modal-lg',
+          headerClass: 'bg-primary text-white',
+          saveButton: false
+      });
 
-    modalManager.show('userAttendanceDetailModal');
+      modalManager.show('userAttendanceDetailModal');
   }
 
   /**
