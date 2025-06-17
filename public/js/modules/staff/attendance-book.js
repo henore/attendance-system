@@ -215,31 +215,38 @@ export class StaffAttendanceBook {
   }
 
   /**
-   * 出勤キャッシュを読み込み
-   */
-  async loadAttendanceCache() {
-    // 現在月の出勤データを取得
-    const year = this.currentDate.getFullYear();
-    const month = this.currentDate.getMonth();
-    const daysInMonth = getDaysInMonth(year, month + 1);
-    
-    // キャッシュクリア
-    this.attendanceCache.clear();
-    
-    // 各日付のデータを取得（実際のAPIに依存）
-    // ここでは仮実装として、現在のスタッフの出勤記録を想定
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+     * 出勤キャッシュを読み込み
+     */
+    async loadAttendanceCache() {
+      // 現在月の出勤データを取得
+      const year = this.currentDate.getFullYear();
+      const month = this.currentDate.getMonth();
+      const daysInMonth = getDaysInMonth(year, month + 1);
       
-      try {
-        // 実際のAPIエンドポイントがある場合はここで呼び出し
-        // const attendance = await this.apiCall(`/api/staff/attendance/${dateStr}`);
-        // this.attendanceCache.set(dateStr, attendance);
-      } catch (error) {
-        console.error(`出勤データ取得エラー (${dateStr}):`, error);
+      // キャッシュクリア
+      this.attendanceCache.clear();
+      
+      // 各日付のデータを取得
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        try {
+          // スタッフ自身の出勤記録を取得
+          const attendance = await this.apiCall(`/api/staff/attendance/${dateStr}`);
+          if (attendance.attendance) {
+            // 休憩記録も取得
+            const breakData = await this.apiCall(`/api/user/break/status/${dateStr}`);
+            const attendanceData = {
+              ...attendance.attendance,
+              break_time: breakData.breakRecord ? 60 : 0
+            };
+            this.attendanceCache.set(dateStr, attendanceData);
+          }
+        } catch (error) {
+          console.error(`出勤データ取得エラー (${dateStr}):`, error);
+        }
       }
     }
-  }
 
   /**
    * 日付クリックハンドラーを設定

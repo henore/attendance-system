@@ -39,36 +39,36 @@ export default class AdminModule extends BaseModule {
     render() {
         const content = document.getElementById('app-content');
         content.innerHTML = `
-            <div class="admin-dashboard">
-                <!-- 管理者メニュー（画面切り替え） -->
-                <div class="staff-menu mb-4">
-                    <div class="btn-group w-100" role="group">
-                        <button class="btn btn-outline-primary admin-menu-btn active" data-target="dashboard">
-                            <i class="fas fa-tachometer-alt"></i> ダッシュボード
-                        </button>
-                        <button class="btn btn-outline-primary admin-menu-btn" data-target="userManagement">
-                            <i class="fas fa-users-cog"></i> ユーザー管理
-                        </button>
-                        <button class="btn btn-outline-primary admin-menu-btn" data-target="attendanceManagement">
-                            <i class="fas fa-clock"></i> 出勤管理
-                        </button>
-                        <button class="btn btn-outline-primary admin-menu-btn" data-target="handoverSection">
-                            <i class="fas fa-exchange-alt"></i> 申し送り
-                        </button>
-                        <button class="btn btn-outline-primary admin-menu-btn" data-target="monthlyReport">
-                            <i class="fas fa-calendar-alt"></i> 月別出勤簿
-                        </button>
-                        <button class="btn btn-outline-primary admin-menu-btn" data-target="auditLog">
-                            <i class="fas fa-clipboard-list"></i> 監査ログ
-                        </button>
-                    </div>
-                </div>
-
-                <!-- コンテンツエリア -->
-                <div id="adminContentArea">
-                    <!-- 各サブモジュールのコンテンツがここに表示される -->
+     <div class="admin-dashboard">
+            <!-- 管理者メニュー（画面切り替え） -->
+            <div class="staff-menu mb-4">
+                <div class="btn-group w-100" role="group">
+                    <button class="btn btn-outline-primary admin-menu-btn active" data-target="dashboard">
+                        <i class="fas fa-tachometer-alt"></i> ダッシュボード
+                    </button>
+                    <button class="btn btn-outline-primary admin-menu-btn" data-target="userManagement">
+                        <i class="fas fa-users-cog"></i> ユーザー管理
+                    </button>
+                    <button class="btn btn-outline-primary admin-menu-btn" data-target="attendanceManagement">
+                        <i class="fas fa-clock"></i> 出勤管理
+                    </button>
+                    <button class="btn btn-outline-primary admin-menu-btn" data-target="handoverSection">
+                        <i class="fas fa-exchange-alt"></i> 申し送り
+                    </button>
+                    <button class="btn btn-outline-primary admin-menu-btn" data-target="monthlyReport">
+                        <i class="fas fa-calendar-alt"></i> 月別出勤簿
+                    </button>
+                    <button class="btn btn-outline-primary admin-menu-btn" data-target="auditLog">
+                        <i class="fas fa-clipboard-list"></i> 監査ログ
+                    </button>
                 </div>
             </div>
+
+            <!-- コンテンツエリア -->
+            <div id="adminContentArea">
+                <!-- 各サブモジュールのコンテンツがここに表示される -->
+            </div>
+        </div>
         `;
         
         this.setupEventListeners();

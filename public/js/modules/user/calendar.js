@@ -96,7 +96,7 @@ export class UserAttendanceCalendar {
 
   /**
    * カレンダーグリッドを生成
-   * @returns {string}
+   * @returns {Promise<string>}
    */
   async generateCalendarGrid() {
     const year = this.currentDate.getFullYear();
@@ -111,6 +111,18 @@ export class UserAttendanceCalendar {
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
 
+    // 月内のすべての日付のデータを事前に取得
+    const monthDataPromises = [];
+    const current = new Date(startDate);
+    for (let i = 0; i < 42; i++) {
+      if (current.getMonth() === month) {
+        const dateStr = current.toISOString().split('T')[0];
+        monthDataPromises.push(this.getAttendanceData(dateStr));
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    await Promise.all(monthDataPromises);
+
     let html = '';
 
     // 曜日ヘッダー
@@ -120,16 +132,21 @@ export class UserAttendanceCalendar {
     });
 
     // 日付セル
-    const current = new Date(startDate);
+    current.setTime(startDate.getTime());
     for (let i = 0; i < 42; i++) { // 6週間分
       const isCurrentMonth = current.getMonth() === month;
       const isToday = current.toDateString() === today.toDateString();
       const dateStr = current.toISOString().split('T')[0];
-      const attendanceData = await this.getAttendanceData(dateStr);
+      const dayOfWeek = current.getDay();
+      const attendanceData = this.attendanceCache.get(dateStr);
       
       let classes = ['calendar-day'];
       if (!isCurrentMonth) classes.push('other-month');
       if (isToday) classes.push('today');
+      
+      // 土日の色分け
+      if (dayOfWeek === 0) classes.push('sunday');
+      if (dayOfWeek === 6) classes.push('saturday');
       
       // 出勤状況による色分け
       if (attendanceData) {

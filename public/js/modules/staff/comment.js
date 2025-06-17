@@ -130,7 +130,7 @@ export class StaffCommentHandler {
   /**
    * 日報サマリーを生成
    */
-  generateReportSummary(user, attendance, report) {
+  generateReportSummary(user, attendance, report, breakRecord = null) {
     return `
       <h6><i class="fas fa-file-alt"></i> ${user.name}さんの日報内容</h6>
       
@@ -147,6 +147,7 @@ export class StaffCommentHandler {
               `${breakRecord.start_time}〜${breakRecord.end_time || ''}` : 
               '-'}
           </div>
+        </div>
         <div class="col-4">
           <label class="past-form-label"><i class="fas fa-clock"></i> 退勤時間</label>
           <div class="past-form-value">${attendance ? attendance.clock_out : '-'}</div>

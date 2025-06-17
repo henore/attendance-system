@@ -264,12 +264,18 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 [userId, date]
             );
             
+            const breakRecord = await dbGet(
+                'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
+                [userId, date]
+            );
+            
             res.json({
                 success: true,
                 user,
                 attendance,
                 report,
-                comment
+                comment,
+                breakRecord
             });
             
         } catch (error) {
