@@ -136,11 +136,18 @@ export class StaffCommentHandler {
       
       <!-- 勤務時間表示 -->
       <div class="row mb-3">
-        <div class="col-6">
+        <div class="col-4">
           <label class="past-form-label"><i class="fas fa-clock"></i> 出勤時間</label>
           <div class="past-form-value">${attendance ? attendance.clock_in : '-'}</div>
         </div>
-        <div class="col-6">
+        <div class="col-4">
+          <label class="past-form-label"><i class="fas fa-coffee"></i> 休憩時間</label>
+          <div class="past-form-value">
+            ${breakRecord && breakRecord.start_time ? 
+              `${breakRecord.start_time}〜${breakRecord.end_time || ''}` : 
+              '-'}
+          </div>
+        <div class="col-4">
           <label class="past-form-label"><i class="fas fa-clock"></i> 退勤時間</label>
           <div class="past-form-value">${attendance ? attendance.clock_out : '-'}</div>
         </div>

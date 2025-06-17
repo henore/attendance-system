@@ -13,6 +13,19 @@ export class UserReportHandler {
     this.currentAttendance = null;
   }
 
+    /**
+   * 未出勤時のメッセージを生成
+   * @returns {string}
+   */
+  generateNotYetMessage() {
+    return `
+      <div class="text-center text-muted p-5">
+        <i class="fas fa-info-circle fa-3x mb-3"></i>
+        <p>出勤後に日報を入力できます</p>
+      </div>
+    `;
+  }
+
   /**
    * 日報フォームを読み込み
    * @param {HTMLElement} container 

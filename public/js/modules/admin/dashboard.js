@@ -388,9 +388,13 @@ export default class AdminDashboard {
     }
 
     async openCommentModal(userId, userName) {
-        // 他のモジュールの機能を利用（委譲）
-        if (this.parent.subModules.attendanceManagement) {
-            await this.parent.subModules.attendanceManagement.openCommentModal(userId, userName);
+        // 出勤管理モジュールを直接参照
+        const attendanceModule = this.parent.subModules.attendanceManagement;
+        if (attendanceModule) {
+            await attendanceModule.openCommentModal(userId, userName);
+        } else {
+            console.error('出勤管理モジュールが見つかりません');
+            this.parent.showNotification('コメント機能を利用できません', 'danger');
         }
     }
 

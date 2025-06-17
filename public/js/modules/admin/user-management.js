@@ -114,31 +114,76 @@ export default class AdminUserManagement {
                     </div>
                 </div>
             </div>
-
-            <!-- ユーザー詳細モーダル -->
-            <div class="modal fade" id="userDetailModal" tabindex="-1">
+            <!-- ユーザー編集モーダル -->
+            <div class="modal fade" id="userEditModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
-                        <div class="modal-header bg-info text-white">
+                        <div class="modal-header bg-warning text-dark">
                             <h5 class="modal-title">
-                                <i class="fas fa-user"></i> ユーザー詳細
+                                <i class="fas fa-user-edit"></i> ユーザー情報編集
                             </h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="modal-body" id="userDetailContent">
-                            <!-- ユーザー詳細がここに表示される -->
+                        <div class="modal-body">
+                            <form id="userEditForm">
+                                <input type="hidden" id="editUserId">
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="editUsername" class="form-label">ユーザーID</label>
+                                        <input type="text" class="form-control" id="editUsername" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="editPassword" class="form-label">パスワード</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="editPassword" 
+                                                   placeholder="変更する場合のみ入力">
+                                            <button class="btn btn-outline-secondary" type="button" 
+                                                    id="generatePasswordBtn">
+                                                <i class="fas fa-key"></i> 生成
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="editName" class="form-label">名前</label>
+                                        <input type="text" class="form-control" id="editName" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="editRole" class="form-label">権限</label>
+                                        <select class="form-control" id="editRole" required>
+                                            <option value="user">利用者</option>
+                                            <option value="staff">スタッフ</option>
+                                            <option value="admin">管理者</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3" id="editServiceTypeGroup" style="display: none;">
+                                    <label for="editServiceType" class="form-label">サービス区分</label>
+                                    <select class="form-control" id="editServiceType">
+                                        <option value="">選択してください</option>
+                                        <option value="commute">通所</option>
+                                        <option value="home">在宅</option>
+                                    </select>
+                                </div>
+                            </form>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                <i class="fas fa-times"></i> 閉じる
+                                <i class="fas fa-times"></i> キャンセル
+                            </button>
+                            <button type="button" class="btn btn-warning" id="saveUserEditBtn">
+                                <i class="fas fa-save"></i> 変更を保存
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
-        `;
-    }
-
+    `;
+}
     setupEventListeners() {
         // ユーザー登録フォーム
         const form = this.container.querySelector('#userRegistrationForm');
@@ -157,6 +202,14 @@ export default class AdminUserManagement {
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => this.refresh());
         }
+
+        // 編集ボタン
+            if (e.target.closest('.btn-edit-user')) {
+                e.preventDefault();
+                const btn = e.target.closest('.btn-edit-user');
+                const userId = btn.getAttribute('data-user-id');
+                this.showUserEditModal(userId);
+            }
 
         // 検索・フィルター
         const searchInput = this.container.querySelector('#userSearchInput');
@@ -196,6 +249,163 @@ export default class AdminUserManagement {
             this.showUserDetail(userId);
         }
         });
+    }
+
+    /**
+     * ユーザー編集モーダルを表示
+     */
+    async showUserEditModal(userId) {
+        try {
+            const user = this.allUsers.find(u => u.id == userId);
+            if (!user) {
+                this.parent.showNotification('ユーザー情報が見つかりません', 'warning');
+                return;
+            }
+
+            // フォームに値を設定
+            document.getElementById('editUserId').value = user.id;
+            document.getElementById('editUsername').value = user.username;
+            document.getElementById('editName').value = user.name;
+            document.getElementById('editRole').value = user.role;
+            document.getElementById('editPassword').value = '';
+
+            // サービス区分の表示制御
+            const serviceTypeGroup = document.getElementById('editServiceTypeGroup');
+            const serviceTypeSelect = document.getElementById('editServiceType');
+            
+            if (user.role === 'user') {
+                serviceTypeGroup.style.display = 'block';
+                serviceTypeSelect.value = user.service_type || '';
+                serviceTypeSelect.required = true;
+            } else {
+                serviceTypeGroup.style.display = 'none';
+                serviceTypeSelect.value = '';
+                serviceTypeSelect.required = false;
+            }
+
+            // パスワード生成ボタン
+            const generateBtn = document.getElementById('generatePasswordBtn');
+            if (generateBtn) {
+                generateBtn.replaceWith(generateBtn.cloneNode(true));
+                document.getElementById('generatePasswordBtn').addEventListener('click', () => {
+                    const password = this.generateRandomPassword();
+                    document.getElementById('editPassword').value = password;
+                });
+            }
+
+            // 権限変更時のイベント
+            const roleSelect = document.getElementById('editRole');
+            if (roleSelect) {
+                roleSelect.replaceWith(roleSelect.cloneNode(true));
+                document.getElementById('editRole').addEventListener('change', (e) => {
+                    const editServiceTypeGroup = document.getElementById('editServiceTypeGroup');
+                    const editServiceType = document.getElementById('editServiceType');
+                    
+                    if (e.target.value === 'user') {
+                        editServiceTypeGroup.style.display = 'block';
+                        editServiceType.required = true;
+                    } else {
+                        editServiceTypeGroup.style.display = 'none';
+                        editServiceType.required = false;
+                        editServiceType.value = '';
+                    }
+                });
+            }
+
+            // 保存ボタン
+            const saveBtn = document.getElementById('saveUserEditBtn');
+            if (saveBtn) {
+                saveBtn.replaceWith(saveBtn.cloneNode(true));
+                document.getElementById('saveUserEditBtn').addEventListener('click', () => {
+                    this.saveUserEdit();
+                });
+            }
+
+            // モーダル表示
+            const modal = new bootstrap.Modal(document.getElementById('userEditModal'));
+            modal.show();
+
+        } catch (error) {
+            console.error('ユーザー編集モーダル表示エラー:', error);
+            this.parent.showNotification('エラーが発生しました', 'danger');
+        }
+    }
+
+    /**
+     * ランダムパスワード生成
+     */
+    generateRandomPassword() {
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let password = '';
+        for (let i = 0; i < 8; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return password;
+    }
+
+    /**
+     * ユーザー編集保存
+     */
+    async saveUserEdit() {
+        const userId = document.getElementById('editUserId').value;
+        const username = document.getElementById('editUsername').value.trim();
+        const password = document.getElementById('editPassword').value;
+        const name = document.getElementById('editName').value.trim();
+        const role = document.getElementById('editRole').value;
+        const serviceType = document.getElementById('editServiceType').value;
+
+        // バリデーション
+        if (!username || !name || !role) {
+            this.parent.showNotification('必須項目を入力してください', 'warning');
+            return;
+        }
+
+        if (role === 'user' && !serviceType) {
+            this.parent.showNotification('利用者の場合はサービス区分を選択してください', 'warning');
+            return;
+        }
+
+        // 確認ダイアログ
+        const confirmed = await this.parent.showConfirm({
+            title: 'ユーザー情報変更',
+            message: `${name}さんの情報を変更しますか？`,
+            confirmText: '変更する',
+            confirmClass: 'btn-warning',
+            icon: 'fas fa-edit'
+        });
+
+        if (!confirmed) return;
+
+        try {
+            const requestData = {
+                userId,
+                username,
+                name,
+                role,
+                serviceType: role === 'user' ? serviceType : null
+            };
+
+            if (password) {
+                requestData.password = password;
+            }
+
+            await this.parent.callApi('/api/admin/user/update', {
+                method: 'PUT',
+                body: JSON.stringify(requestData)
+            });
+
+            this.parent.showNotification('ユーザー情報を更新しました', 'success');
+            
+            // モーダルを閉じる
+            bootstrap.Modal.getInstance(document.getElementById('userEditModal')).hide();
+            
+            // ユーザー一覧を更新
+            await this.loadExistingUsers();
+
+        } catch (error) {
+            console.error('ユーザー編集エラー:', error);
+            this.parent.showNotification(error.message || 'ユーザー情報の更新に失敗しました', 'danger');
+        }
     }
 
     async show() {
@@ -431,20 +641,34 @@ export default class AdminUserManagement {
 
     async showUserDetail(userId) {
         try {
-            // ユーザー詳細情報を取得
             const user = this.allUsers.find(u => u.id == userId);
             if (!user) {
                 this.parent.showNotification('ユーザー情報が見つかりません', 'warning');
                 return;
             }
 
-            // モーダルに詳細情報を表示
             const content = this.container.querySelector('#userDetailContent');
             if (content) {
                 content.innerHTML = this.generateUserDetailContent(user);
 
-                // モーダル表示（modalManagerを使用）
-                modalManager.show('userDetailModal');
+                // Bootstrap モーダルを直接使用
+                const modalElement = document.getElementById('userDetailModal');
+                const modal = new bootstrap.Modal(modalElement, {
+                    backdrop: true,
+                    keyboard: true
+                });
+                
+                // モーダルが閉じられた時の処理
+                modalElement.addEventListener('hidden.bs.modal', () => {
+                    // 背景のグレーアウトを確実に削除
+                    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+                        backdrop.remove();
+                    });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                }, { once: true });
+                
+                modal.show();
             }
 
         } catch (error) {

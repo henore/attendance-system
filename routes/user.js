@@ -232,9 +232,17 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             
             // 進行中の休憩記録取得
             const breakRecord = await dbGet(
-                'SELECT * FROM break_records WHERE user_id = ? AND date = ? AND end_time IS NULL',
-                [userId, today]
+                'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
+                [userId, date]
             );
+            
+            res.json({
+                success: true,
+                attendance,
+                report,
+                staffComment,
+                breakRecord  // 追加
+            });
             
             if (!breakRecord) {
                 return res.status(400).json({ 

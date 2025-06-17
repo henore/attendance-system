@@ -449,10 +449,10 @@ export default class AdminMonthlyReport {
                 if (record.report_id) remarks.push('<span class="badge bg-success">日報提出</span>');
                 if (record.comment) remarks.push('<span class="badge bg-info">コメントあり</span>');
                 
-                // 操作ボタンの表示（利用者の場合のみ）
+                // 操作ボタンの表示
                 let actionButtons = '';
                 if (user.role === 'user' && record.report_id) {
-                    actionButtons = `
+                    actionButtons += `
                         <button class="btn btn-sm btn-outline-primary btn-show-report" 
                                 data-user-id="${user.id}" 
                                 data-user-name="${user.name}" 
@@ -461,6 +461,22 @@ export default class AdminMonthlyReport {
                         </button>
                     `;
                 }
+
+                // 管理者は過去の記録も編集可能
+                actionButtons += `
+                    <button class="btn btn-sm btn-outline-warning btn-edit-attendance ms-1" 
+                            data-user-id="${user.id}"
+                            data-user-name="${user.name}"
+                            data-user-role="${user.role}"
+                            data-record-id="${record.id || ''}"
+                            data-date="${dateStr}"
+                            data-clock-in="${record.clock_in || ''}"
+                            data-clock-out="${record.clock_out || ''}"
+                            data-status="${record.status || 'normal'}"
+                            title="編集">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                `;
                 
                 
                 html += `
@@ -635,11 +651,107 @@ export default class AdminMonthlyReport {
         this.parent.showNotification('Excel出力機能は今後実装予定です', 'info');
     }
 
+    // showReportDetail メソッドを修正（635行目あたり）
     async showReportDetail(userId, userName, date) {
-        // 出勤管理モジュールの機能を利用（委譲）
-        if (this.parent.subModules.attendanceManagement) {
-            await this.parent.subModules.attendanceManagement.showReportDetail(userId, userName, date);
+        try {
+            const response = await this.parent.callApi(API_ENDPOINTS.STAFF.REPORT(userId, date));
+            
+            if (!response.report) {
+                this.parent.showNotification('この日の日報はありません', 'info');
+                return;
+            }
+
+            // 日報詳細を表示（出勤管理モジュールのメソッドを使用）
+            const attendanceModule = this.parent.subModules.attendanceManagement;
+            if (attendanceModule) {
+                await attendanceModule.showReportDetail(userId, userName, date);
+            } else {
+                // フォールバック：独自に表示
+                const formattedDate = formatDate(date, {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'long'
+                });
+                
+                const content = this.generateReportDetailContent(response);
+
+                modalManager.create({
+                    id: 'monthlyReportDetailModal',
+                    title: `<i class="fas fa-file-alt"></i> ${userName}さんの日報詳細 - ${formattedDate}`,
+                    content: content,
+                    size: 'modal-lg',
+                    headerClass: 'bg-primary text-white',
+                    saveButton: false
+                });
+
+                modalManager.show('monthlyReportDetailModal');
+            }
+        } catch (error) {
+            console.error('日報詳細取得エラー:', error);
+            this.parent.showNotification('日報の取得に失敗しました', 'danger');
         }
+    }
+
+    // generateReportDetailContent メソッドを追加
+    generateReportDetailContent(data) {
+        const { user, attendance, report, comment } = data;
+        const breakRecord = data.breakRecord || {};
+        
+        return `
+            <!-- 出勤情報 -->
+            <div class="row mb-3">
+                <div class="col-4">
+                    <div class="detail-section">
+                        <h6><i class="fas fa-clock text-success"></i> 出勤時間</h6>
+                        <div class="detail-value h4 text-success">${attendance ? attendance.clock_in : '-'}</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="detail-section">
+                        <h6><i class="fas fa-clock text-info"></i> 退勤時間</h6>
+                        <div class="detail-value h4 ${attendance && attendance.clock_out ? 'text-info' : 'text-muted'}">${attendance ? (attendance.clock_out || '未退勤') : '-'}</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="detail-section">
+                        <h6><i class="fas fa-coffee text-warning"></i> 休憩時間</h6>
+                        <div class="detail-value h4 text-warning">
+                            ${breakRecord && breakRecord.start_time ? 
+                                `${breakRecord.start_time}〜${breakRecord.end_time || ''}` : 
+                                '-'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- 日報内容 -->
+            <div class="report-summary">
+                ${this.generateReportSummary(user, attendance, report)}
+            </div>
+
+            <!-- スタッフコメント -->
+            ${comment && comment.comment ? `
+                <hr>
+                <div class="staff-comment-display">
+                    <h6><i class="fas fa-comment"></i> スタッフコメント</h6>
+                    <div class="comment-box bg-light p-3">
+                        ${comment.comment}
+                    </div>
+                    <small class="text-muted">
+                        <i class="fas fa-user"></i> 記入者: スタッフ | 
+                        <i class="fas fa-clock"></i> 記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
+                    </small>
+                </div>
+            ` : `
+                <hr>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> スタッフコメントはまだ記入されていません
+                </div>
+            `}
+        `;
     }
 
     showReportError(message) {

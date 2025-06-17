@@ -53,7 +53,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
     
-    // 休憩開始（スタッフ用）
+    // 休憩開始（スタッフ用）を修正（45行目あたり）
     router.post('/break/start', requireAuth, async (req, res) => {
         try {
             const staffId = req.session.user.id;
@@ -73,28 +73,43 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 });
             }
             
-            // 進行中の休憩チェック
-            const ongoingBreak = await dbGet(
-                'SELECT * FROM break_records WHERE user_id = ? AND date = ? AND end_time IS NULL',
+            // 既存の休憩記録チェック
+            const existingBreak = await dbGet(
+                'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
                 [staffId, today]
             );
             
-            if (ongoingBreak) {
+            if (existingBreak) {
                 return res.status(400).json({ 
                     success: false, 
-                    error: '既に休憩中です' 
+                    error: '本日の休憩は既に取得済みです' 
                 });
             }
             
+            // 1時間後の終了時間を計算
+            const [hours, minutes] = currentTime.split(':').map(Number);
+            let endHours = hours + 1;
+            let endMinutes = minutes;
+            
+            if (endHours >= 24) {
+                endHours = 23;
+                endMinutes = 59;
+            }
+            
+            const endTime = `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+            
+            // 休憩記録を即座に完了状態で作成
             await dbRun(`
-                INSERT INTO break_records (user_id, date, start_time)
-                VALUES (?, ?, ?)
-            `, [staffId, today, currentTime]);
+                INSERT INTO break_records (user_id, date, start_time, end_time, duration)
+                VALUES (?, ?, ?, ?, ?)
+            `, [staffId, today, currentTime, endTime, 60]);
             
             res.json({ 
                 success: true,
                 startTime: currentTime,
-                message: `休憩開始（${currentTime}）`
+                endTime: endTime,
+                duration: 60,
+                message: `休憩時間を記録しました（${currentTime}〜${endTime} 60分）`
             });
             
         } catch (error) {
