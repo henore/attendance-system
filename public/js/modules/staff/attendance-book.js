@@ -1,5 +1,5 @@
 // modules/staff/attendance-book.js
-// スタッフの出勤簿機能ハンドラー
+// スタッフの出勤簿機能ハンドラー（修正版）
 
 import { formatDate, getDaysInMonth } from '../../utils/date-time.js';
 import { modalManager } from '../shared/modal-manager.js';
@@ -129,12 +129,13 @@ export class StaffAttendanceBook {
   }
 
   /**
-   * カレンダーグリッドを生成
+   * カレンダーグリッドを生成（修正版）
    */
   async generateCalendarGrid() {
     const year = this.currentDate.getFullYear();
     const month = this.currentDate.getMonth();
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // 時刻をリセット
     
     // 月の最初の日と最後の日
     const firstDay = new Date(year, month, 1);
@@ -148,28 +149,38 @@ export class StaffAttendanceBook {
 
     // 曜日ヘッダー
     const dayHeaders = ['日', '月', '火', '水', '木', '金', '土'];
-    dayHeaders.forEach(day => {
-      html += `<div class="calendar-day-header">${day}</div>`;
+    dayHeaders.forEach((day, index) => {
+      let headerClass = 'calendar-day-header';
+      if (index === 0) headerClass += ' sunday-header';
+      if (index === 6) headerClass += ' saturday-header';
+      html += `<div class="${headerClass}">${day}</div>`;
     });
 
     // 日付セル
     const current = new Date(startDate);
     for (let i = 0; i < 42; i++) { // 6週間分
       const isCurrentMonth = current.getMonth() === month;
-      const isToday = current.toDateString() === today.toDateString();
-      const dateStr = current.toISOString().split('T')[0];
+      const currentDateReset = new Date(current);
+      currentDateReset.setHours(0, 0, 0, 0);
+      const isToday = currentDateReset.getTime() === today.getTime();
+      const dateStr = this.formatDateString(current);
+      const dayOfWeek = current.getDay();
       const attendanceData = this.getAttendanceData(dateStr);
       
       let classes = ['calendar-day'];
       if (!isCurrentMonth) classes.push('other-month');
       if (isToday) classes.push('today');
       
+      // 土日の色分け
+      if (dayOfWeek === 0) classes.push('sunday');
+      if (dayOfWeek === 6) classes.push('saturday');
+      
       // 出勤状況による色分け
-      if (attendanceData) {
+      if (attendanceData && isCurrentMonth) {
         if (attendanceData.clock_out) {
           classes.push('has-work'); // 正常勤務完了（緑）
         } else if (attendanceData.clock_in) {
-          classes.push('has-comment'); // 出勤中または未退勤（黄）
+          classes.push('has-attendance'); // 出勤中または未退勤（黄）
         }
       }
 
@@ -187,6 +198,18 @@ export class StaffAttendanceBook {
   }
 
   /**
+   * 日付を文字列にフォーマット（タイムゾーン対応）
+   * @param {Date} date 
+   * @returns {string}
+   */
+  formatDateString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
    * 作業インジケーターを生成
    */
   generateWorkIndicators(attendanceData) {
@@ -199,7 +222,7 @@ export class StaffAttendanceBook {
     
     // 休憩マーク
     if (attendanceData.break_time > 0) {
-      html += '<span class="calendar-indicator indicator-break" title="休憩記録あり" style="background: #17a2b8;"></span>';
+      html += '<span class="calendar-indicator indicator-break" title="休憩記録あり"></span>';
     }
     
     html += '</div>';
@@ -215,38 +238,39 @@ export class StaffAttendanceBook {
   }
 
   /**
-     * 出勤キャッシュを読み込み
-     */
-    async loadAttendanceCache() {
-      // 現在月の出勤データを取得
-      const year = this.currentDate.getFullYear();
-      const month = this.currentDate.getMonth();
-      const daysInMonth = getDaysInMonth(year, month + 1);
+   * 出勤キャッシュを読み込み（修正版）
+   */
+  async loadAttendanceCache() {
+    // 現在月の出勤データを取得
+    const year = this.currentDate.getFullYear();
+    const month = this.currentDate.getMonth();
+    const daysInMonth = getDaysInMonth(year, month + 1);
+    
+    // キャッシュクリア
+    this.attendanceCache.clear();
+    
+    // 各日付のデータを取得
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const dateStr = this.formatDateString(date);
       
-      // キャッシュクリア
-      this.attendanceCache.clear();
-      
-      // 各日付のデータを取得
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        
-        try {
-          // スタッフ自身の出勤記録を取得
-          const attendance = await this.apiCall(`/api/staff/attendance/${dateStr}`);
-          if (attendance.attendance) {
-            // 休憩記録も取得
-            const breakData = await this.apiCall(`/api/user/break/status/${dateStr}`);
-            const attendanceData = {
-              ...attendance.attendance,
-              break_time: breakData.breakRecord ? 60 : 0
-            };
-            this.attendanceCache.set(dateStr, attendanceData);
-          }
-        } catch (error) {
-          console.error(`出勤データ取得エラー (${dateStr}):`, error);
+      try {
+        // スタッフ自身の出勤記録を取得
+        const attendance = await this.apiCall(`/api/staff/attendance/${dateStr}`);
+        if (attendance.attendance) {
+          // 休憩記録も取得
+          const breakData = await this.apiCall(`/api/user/break/status/${dateStr}`);
+          const attendanceData = {
+            ...attendance.attendance,
+            break_time: breakData.breakRecord ? 60 : 0
+          };
+          this.attendanceCache.set(dateStr, attendanceData);
         }
+      } catch (error) {
+        console.error(`出勤データ取得エラー (${dateStr}):`, error);
       }
     }
+  }
 
   /**
    * 日付クリックハンドラーを設定

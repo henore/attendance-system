@@ -1,5 +1,5 @@
 // modules/user/calendar.js
-// 利用者の出勤履歴カレンダー
+// 利用者の出勤履歴カレンダー（修正版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { formatDate, getDaysInMonth } from '../../utils/date-time.js';
@@ -95,13 +95,14 @@ export class UserAttendanceCalendar {
   }
 
   /**
-   * カレンダーグリッドを生成
+   * カレンダーグリッドを生成（修正版）
    * @returns {Promise<string>}
    */
   async generateCalendarGrid() {
     const year = this.currentDate.getFullYear();
     const month = this.currentDate.getMonth();
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // 時刻をリセット
     
     // 月の最初の日と最後の日
     const firstDay = new Date(year, month, 1);
@@ -111,32 +112,40 @@ export class UserAttendanceCalendar {
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
 
-    // 月内のすべての日付のデータを事前に取得
+    // 月内のすべての日付のデータを事前に取得（修正）
     const monthDataPromises = [];
     const current = new Date(startDate);
+    
     for (let i = 0; i < 42; i++) {
       if (current.getMonth() === month) {
-        const dateStr = current.toISOString().split('T')[0];
+        // タイムゾーンを考慮した日付文字列生成
+        const dateStr = this.formatDateString(current);
         monthDataPromises.push(this.getAttendanceData(dateStr));
       }
       current.setDate(current.getDate() + 1);
     }
+    
     await Promise.all(monthDataPromises);
 
     let html = '';
 
     // 曜日ヘッダー
     const dayHeaders = ['日', '月', '火', '水', '木', '金', '土'];
-    dayHeaders.forEach(day => {
-      html += `<div class="calendar-day-header">${day}</div>`;
+    dayHeaders.forEach((day, index) => {
+      let headerClass = 'calendar-day-header';
+      if (index === 0) headerClass += ' sunday-header';
+      if (index === 6) headerClass += ' saturday-header';
+      html += `<div class="${headerClass}">${day}</div>`;
     });
 
     // 日付セル
     current.setTime(startDate.getTime());
     for (let i = 0; i < 42; i++) { // 6週間分
       const isCurrentMonth = current.getMonth() === month;
-      const isToday = current.toDateString() === today.toDateString();
-      const dateStr = current.toISOString().split('T')[0];
+      const currentDateReset = new Date(current);
+      currentDateReset.setHours(0, 0, 0, 0);
+      const isToday = currentDateReset.getTime() === today.getTime();
+      const dateStr = this.formatDateString(current);
       const dayOfWeek = current.getDay();
       const attendanceData = this.attendanceCache.get(dateStr);
       
@@ -148,12 +157,12 @@ export class UserAttendanceCalendar {
       if (dayOfWeek === 0) classes.push('sunday');
       if (dayOfWeek === 6) classes.push('saturday');
       
-      // 出勤状況による色分け
-      if (attendanceData) {
+      // 出勤状況による色分け（修正）
+      if (attendanceData && isCurrentMonth) {
         if (attendanceData.hasReport) {
-          classes.push('has-work'); // 日報提出済み（緑）
+          classes.push('has-report'); // 日報提出済み（緑系）
         } else if (attendanceData.hasAttendance) {
-          classes.push('has-comment'); // 出勤のみ（黄）
+          classes.push('has-attendance'); // 出勤のみ（黄系）
         }
       }
 
@@ -171,7 +180,19 @@ export class UserAttendanceCalendar {
   }
 
   /**
-   * 作業インジケーターを生成
+   * 日付を文字列にフォーマット（タイムゾーン対応）
+   * @param {Date} date 
+   * @returns {string}
+   */
+  formatDateString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * 作業インジケーターを生成（修正版）
    * @param {Object} attendanceData 
    * @returns {string}
    */
@@ -185,12 +206,12 @@ export class UserAttendanceCalendar {
     
     // 日報マーク
     if (attendanceData.hasReport) {
-      html += '<span class="calendar-indicator indicator-report" title="日報提出済み" style="background: #28a745;"></span>';
+      html += '<span class="calendar-indicator indicator-report" title="日報提出済み"></span>';
     }
     
     // コメントマーク
     if (attendanceData.hasComment) {
-      html += '<span class="calendar-indicator indicator-comment" title="スタッフコメントあり" style="background: #007bff;"></span>';
+      html += '<span class="calendar-indicator indicator-comment" title="スタッフコメントあり"></span>';
     }
     
     html += '</div>';
@@ -199,7 +220,7 @@ export class UserAttendanceCalendar {
   }
 
   /**
-   * 出勤データを取得
+   * 出勤データを取得（修正版）
    * @param {string} dateStr 
    * @returns {Object|null}
    */
@@ -211,6 +232,7 @@ export class UserAttendanceCalendar {
 
     try {
       const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
+      
       const data = {
         hasAttendance: !!(response.attendance && response.attendance.clock_in),
         hasReport: !!response.report,
@@ -219,10 +241,13 @@ export class UserAttendanceCalendar {
         report: response.report,
         staffComment: response.staffComment
       };
+      
       this.attendanceCache.set(dateStr, data);
       return data;
     } catch (error) {
-      console.error('出勤データ取得エラー:', error);
+      console.error(`出勤データ取得エラー (${dateStr}):`, error);
+      // エラーの場合もキャッシュに登録（再リクエストを防ぐ）
+      this.attendanceCache.set(dateStr, null);
       return null;
     }
   }
@@ -241,7 +266,7 @@ export class UserAttendanceCalendar {
   }
 
   /**
-   * 日付クリック時の処理
+   * 日付クリック時の処理（修正版）
    * @param {string} dateStr 
    */
   async onDateClick(dateStr) {
@@ -253,12 +278,19 @@ export class UserAttendanceCalendar {
       } else {
         // キャッシュにない場合は再取得
         const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
+        
         if (response.attendance || response.report) {
           const data = {
+            hasAttendance: !!(response.attendance && response.attendance.clock_in),
+            hasReport: !!response.report,
+            hasComment: !!response.staffComment,
             attendance: response.attendance,
             report: response.report,
             staffComment: response.staffComment
           };
+          
+          // キャッシュを更新
+          this.attendanceCache.set(dateStr, data);
           this.showAttendanceDetail(dateStr, data);
         } else {
           this.showNotification('この日の記録はありません', 'info');
@@ -266,11 +298,12 @@ export class UserAttendanceCalendar {
       }
     } catch (error) {
       console.error('記録取得エラー:', error);
+      this.showNotification('記録の取得に失敗しました', 'danger');
     }
   }
 
   /**
-   * 出勤詳細を表示
+   * 出勤詳細を表示（修正版）
    * @param {string} dateStr 
    * @param {Object} data 
    */
@@ -282,10 +315,7 @@ export class UserAttendanceCalendar {
       weekday: 'long'
     });
 
-    // 日報ハンドラーのインスタンスを作成（表示生成のため）
-    const { UserReportHandler } = require('./report.js');
-    const reportHandler = new UserReportHandler(this.apiCall, this.showNotification);
-    const content = reportHandler.generatePastRecordDisplay(data);
+    const content = this.generateAttendanceDetailContent(data);
 
     modalManager.create({
       id: 'userAttendanceDetailModal',
@@ -297,6 +327,95 @@ export class UserAttendanceCalendar {
     });
 
     modalManager.show('userAttendanceDetailModal');
+  }
+
+  /**
+   * 出勤詳細コンテンツを生成
+   * @param {Object} data 
+   * @returns {string}
+   */
+  generateAttendanceDetailContent(data) {
+    const { attendance, report, staffComment } = data;
+    
+    if (!attendance && !report) {
+      return '<p class="text-muted text-center">この日の記録はありません</p>';
+    }
+
+    let html = '';
+    
+    // 出勤記録
+    if (attendance) {
+      html += `
+        <div class="past-work-times mb-3">
+          <div class="row">
+            <div class="col-6 text-center">
+              <div class="past-work-time-label">出勤時間</div>
+              <div class="past-work-time-value">${attendance.clock_in || '-'}</div>
+            </div>
+            <div class="col-6 text-center">
+              <div class="past-work-time-label">退勤時間</div>
+              <div class="past-work-time-value">${attendance.clock_out || '-'}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    // 日報内容
+    if (report) {
+      html += `
+        <div class="past-form-section">
+          <label class="past-form-label">作業内容</label>
+          <div class="past-form-textarea">${report.work_content || ''}</div>
+        </div>
+        
+        <div class="row mb-3">
+          <div class="col-4">
+            <label class="past-form-label">体温</label>
+            <div class="past-form-value">${report.temperature}℃</div>
+          </div>
+          <div class="col-4">
+            <label class="past-form-label">食欲</label>
+            <div class="past-form-value">${this.formatAppetite(report.appetite)}</div>
+          </div>
+          <div class="col-4">
+            <label class="past-form-label">頓服服用</label>
+            <div class="past-form-value">${report.medication_time ? report.medication_time + '時頃' : 'なし'}</div>
+          </div>
+        </div>
+        
+        <div class="past-form-section">
+          <label class="past-form-label">振り返り・感想</label>
+          <div class="past-form-textarea">${report.reflection || ''}</div>
+        </div>
+      `;
+    }
+    
+    // スタッフコメント
+    if (staffComment) {
+      html += `
+        <hr>
+        <div class="staff-comment-display">
+          <div class="staff-comment-title">
+            <i class="fas fa-comment"></i> スタッフからのコメント
+          </div>
+          <div class="comment-box">${staffComment.comment}</div>
+          <small class="text-muted">
+            記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
+          </small>
+        </div>
+      `;
+    }
+    
+    return html;
+  }
+
+  /**
+   * フォーマットヘルパー
+   */
+  formatAppetite(value) {
+    const labels = { 'good': 'あり', 'none': 'なし' };
+    return labels[value] || value;
   }
 
   /**
@@ -323,7 +442,8 @@ export class UserAttendanceCalendar {
     let reportDays = 0;
     
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const date = new Date(year, month, day);
+      const dateStr = this.formatDateString(date);
       const data = await this.getAttendanceData(dateStr);
       
       if (data) {
@@ -339,33 +459,3 @@ export class UserAttendanceCalendar {
     };
   }
 }
-
-// カレンダーインジケーター用のCSS（必要に応じて）
-const calendarStyles = `
-.calendar-day-indicators {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  display: flex;
-  gap: 2px;
-}
-
-.calendar-indicator {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.indicator-work {
-  background: #6c757d;
-}
-
-.indicator-report {
-  background: #28a745;
-}
-
-.indicator-comment {
-  background: #007bff;
-}
-`;

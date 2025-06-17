@@ -204,14 +204,6 @@ export default class AdminUserManagement {
             refreshBtn.addEventListener('click', () => this.refresh());
         }
 
-        // 編集ボタン
-            if (e.target.closest('.btn-edit-user')) {
-                e.preventDefault();
-                const btn = e.target.closest('.btn-edit-user');
-                const userId = btn.getAttribute('data-user-id');
-                this.showUserEditModal(userId);
-            }
-
         // 検索・フィルター
         const searchInput = this.container.querySelector('#userSearchInput');
         const roleFilter = this.container.querySelector('#roleFilterSelect');
@@ -247,8 +239,9 @@ export default class AdminUserManagement {
             e.preventDefault();  // 追加
             const btn = e.target.closest('.btn-user-detail');
             const userId = btn.getAttribute('data-user-id');
-            this.showUserDetail(userId);
+            this.showUserEditModal(userId);
         }
+
         });
     }
 

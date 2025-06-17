@@ -83,3 +83,62 @@
   height: 3px;
   border-radius: 50%;
 }
+
+.calendar-indicator {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+}
+
+/* 土日の色分け */
+.calendar-day.sunday .calendar-day-number {
+  color: #dc3545; /* 赤色 */
+}
+
+.calendar-day.saturday .calendar-day-number {
+  color: #007bff; /* 青色 */
+}
+
+.calendar-day-header.sunday-header {
+  background: #dc3545;
+  color: white;
+}
+
+.calendar-day-header.saturday-header {
+  background: #007bff;
+  color: white;
+}
+
+/* 出勤状況による色分け */
+.calendar-day.has-attendance {
+  background: #fff8dc; /* 出勤のみ（薄い黄色） */
+}
+
+.calendar-day.has-report {
+  background: #e6f7e6; /* 日報提出済み（薄い緑） */
+}
+
+.calendar-day.has-work {
+  background: #e6f7e6; /* 正常勤務（薄い緑） */
+}
+
+.calendar-day.has-comment {
+  background: #ffeeba; /* コメントあり（薄い黄色） */
+}
+
+/* インジケーターの色 */
+.indicator-work {
+  background: #6c757d;
+}
+
+.indicator-report {
+  background: #28a745;
+}
+
+.indicator-comment {
+  background: #007bff;
+}
+
+.indicator-break {
+  background: #17a2b8;
+}
