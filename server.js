@@ -10,15 +10,15 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
+// Express アプリケーション作成
+const app = express();
+const PORT = process.env.PORT || 3000;
+
 // CORS設定
 app.use(cors({
   origin: 'https://happytime-web.com',
   credentials: true,
 }));
-
-// Express アプリケーション作成
-const app = express();
-const PORT = process.env.PORT || 3000;
 
 // データベース接続
 const db = new sqlite3.Database('./database/attendance.db', (err) => {
