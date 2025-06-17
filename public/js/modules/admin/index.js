@@ -3,7 +3,6 @@
 
 import BaseModule from '../../base-module.js';
 import { modalManager } from '../shared/modal-manager.js';
-import AdminDashboard from './dashboard.js';
 import AdminUserManagement from './user-management.js';
 import AdminAttendanceManagement from './attendance-management.js';
 import AdminMonthlyReport from './monthly-report.js';
@@ -16,7 +15,7 @@ window.modalManager = modalManager;
 export default class AdminModule extends BaseModule {
     constructor(app) {
         super(app);
-        this.currentView = 'dashboard';
+        this.currentView = 'attendanceManagement';
         this.subModules = {};
         this.selectedYear = new Date().getFullYear();
         this.selectedMonth = new Date().getMonth() + 1;
@@ -33,7 +32,7 @@ export default class AdminModule extends BaseModule {
         await this.initializeSubModules();
         
         // 初回表示のためにダッシュボードを明示的に表示
-        await this.switchToView('dashboard');
+        await this.switchToView('attendanceManagement');
     }
 
     render() {
@@ -43,14 +42,11 @@ export default class AdminModule extends BaseModule {
             <!-- 管理者メニュー（画面切り替え） -->
             <div class="staff-menu mb-4">
                 <div class="btn-group w-100" role="group">
-                    <button class="btn btn-outline-primary admin-menu-btn active" data-target="dashboard">
-                        <i class="fas fa-tachometer-alt"></i> ダッシュボード
+                    <button class="btn btn-outline-primary admin-menu-btn active" data-target="attendanceManagement">
+                        <i class="fas fa-clock"></i> 出勤管理
                     </button>
                     <button class="btn btn-outline-primary admin-menu-btn" data-target="userManagement">
                         <i class="fas fa-users-cog"></i> ユーザー管理
-                    </button>
-                    <button class="btn btn-outline-primary admin-menu-btn" data-target="attendanceManagement">
-                        <i class="fas fa-clock"></i> 出勤管理
                     </button>
                     <button class="btn btn-outline-primary admin-menu-btn" data-target="handoverSection">
                         <i class="fas fa-exchange-alt"></i> 申し送り
@@ -93,7 +89,6 @@ export default class AdminModule extends BaseModule {
         
         // 各サブモジュールを初期化
         this.subModules = {
-            dashboard: new AdminDashboard(this.app, this),
             userManagement: new AdminUserManagement(this.app, this),
             attendanceManagement: new AdminAttendanceManagement(this.app, this),
             handoverSection: new AdminHandover(this.app, this),
