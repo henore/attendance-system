@@ -1,5 +1,5 @@
 // modules/user/index.js
-// 利用者機能モジュール - メインクラス
+// 利用者機能モジュール - メインクラス（修正版）
 
 import BaseModule from '../../base-module.js';
 import { UserAttendanceHandler } from './attendance.js';
@@ -47,11 +47,13 @@ export default class UserModule extends BaseModule {
       isWorking: false,
       hasTodayReport: false,
       hasConfirmedLastReport: false,
-      lastReportData: null
+      lastReportData: null,
+      hasClockInToday: false  // 今日出勤したかのフラグ
     };
     
     // ページ離脱警告用
     this.beforeUnloadHandler = null;
+    this.visibilityChangeHandler = null;
   }
 
   async init() {
@@ -61,39 +63,38 @@ export default class UserModule extends BaseModule {
     this.setupPageLeaveWarning();
     await this.checkAndShowLastReportModal();
   }
-   /**
-   * 前回の出勤記録を取得
-   */
-    async getLastReport() {
-      try {
-        const today = new Date();
-        let lastReportFound = null;
+
+  async getLastReport() {
+    try {
+      const today = new Date();
+      let lastReportFound = null;
+      
+      // 過去30日間をチェック
+      for (let i = 1; i <= 30; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() - i);
+        const dateStr = checkDate.toISOString().split('T')[0];
         
-        // 過去30日間をチェック
-        for (let i = 1; i <= 30; i++) {
-          const checkDate = new Date(today);
-          checkDate.setDate(today.getDate() - i);
-          const dateStr = checkDate.toISOString().split('T')[0];
-          
-          const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
-          
-          if (response.attendance && response.report) {
-            lastReportFound = {
-              date: dateStr,
-              attendance: response.attendance,
-              report: response.report,
-              staffComment: response.staffComment || null // スタッフコメントを確実に含める
-            };
-            break;
-          }
+        const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
+        
+        if (response.attendance && response.report) {
+          lastReportFound = {
+            date: dateStr,
+            attendance: response.attendance,
+            report: response.report,
+            staffComment: response.staffComment || null
+          };
+          break;
         }
-        
-        return lastReportFound;
-      } catch (error) {
-        console.error('前回記録取得エラー:', error);
-        return null;
       }
+      
+      return lastReportFound;
+    } catch (error) {
+      console.error('前回記録取得エラー:', error);
+      return null;
     }
+  }
+
   render() {
     const content = document.getElementById('app-content');
     content.innerHTML = `
@@ -206,7 +207,7 @@ export default class UserModule extends BaseModule {
     document.addEventListener('submit', (e) => {
       if (e.target.id === 'reportForm') {
         e.preventDefault();
-        this.reportHandler.submitReport(e); // attendanceパラメータを削除
+        this.reportHandler.submitReport(e);
       }
     });
   }
@@ -228,11 +229,15 @@ export default class UserModule extends BaseModule {
     this.state.isWorking = result.isWorking;
     this.state.hasTodayReport = result.hasReport;
     
+    // 今日出勤したかのフラグを設定
+    this.state.hasClockInToday = !!(result.attendance && result.attendance.clock_in);
+    
     if (result.attendance) {
       await this.breakHandler.loadBreakStatus(this.state.currentAttendance);
     }
     
     this.updateAttendanceUI();
+    this.updateLogoutButtonVisibility();
   }
 
   /**
@@ -254,6 +259,19 @@ export default class UserModule extends BaseModule {
   }
 
   /**
+   * ログアウトボタンの表示制御
+   */
+  updateLogoutButtonVisibility() {
+    if (this.state.hasClockInToday) {
+      // 今日出勤した場合はログアウトボタンを非表示
+      this.app.hideLogoutButtonForUser();
+    } else {
+      // 出勤前はログアウトボタンを表示
+      this.app.showLogoutButtonForUser();
+    }
+  }
+
+  /**
    * 出勤処理
    */
   async handleClockIn() {
@@ -267,8 +285,16 @@ export default class UserModule extends BaseModule {
     if (result.success) {
       this.state.currentAttendance = result.attendance;
       this.state.isWorking = true;
+      this.state.hasClockInToday = true;  // 出勤フラグを設定
+      
       this.breakHandler.resetBreakState();
       this.updateAttendanceUI();
+      this.updateLogoutButtonVisibility();
+      
+      // 出勤後の警告設定を更新
+      this.updatePageLeaveWarning();
+      
+      this.app.showNotification('出勤しました。本日の業務を開始してください。', 'success');
     }
   }
 
@@ -290,6 +316,8 @@ export default class UserModule extends BaseModule {
       this.breakHandler.stopBreakTimeMonitoring();
       this.updateAttendanceUI();
       this.loadReportForm();
+      
+      this.app.showNotification('退勤しました。日報の入力をお願いします。', 'info');
     }
   }
 
@@ -300,6 +328,9 @@ export default class UserModule extends BaseModule {
     const container = document.getElementById('reportFormContainer');
     await this.reportHandler.loadForm(container, this.state.currentAttendance);
     this.state.hasTodayReport = this.reportHandler.hasTodayReport;
+    
+    // 日報提出状況に応じて警告を更新
+    this.updatePageLeaveWarning();
   }
 
   /**
@@ -391,19 +422,76 @@ export default class UserModule extends BaseModule {
   }
 
   /**
-   * ページ離脱警告設定
+   * ページ離脱警告設定（修正版）
    */
   setupPageLeaveWarning() {
     this.beforeUnloadHandler = (e) => {
-      if (this.state.isWorking && !this.state.hasTodayReport) {
-        const message = '退勤と日報提出が完了していません。このまま終了しますか？';
+      // 出勤したが退勤していない、または退勤したが日報未提出の場合に警告
+      if (this.shouldShowLeaveWarning()) {
+        const message = this.getLeaveWarningMessage();
         e.preventDefault();
         e.returnValue = message;
         return message;
       }
     };
     
+    // ページ離脱・リロード警告
     window.addEventListener('beforeunload', this.beforeUnloadHandler);
+    
+    // ブラウザタブ/ウィンドウを閉じる時の警告
+    this.visibilityChangeHandler = () => {
+      if (document.visibilityState === 'hidden' && this.shouldShowLeaveWarning()) {
+        // バックグラウンドに移行した場合の処理
+        console.log('ブラウザがバックグラウンドに移行：出勤中のため注意');
+      }
+    };
+    
+    document.addEventListener('visibilitychange', this.visibilityChangeHandler);
+  }
+
+  /**
+   * ページ離脱警告を更新
+   */
+  updatePageLeaveWarning() {
+    // 何もしない（既にイベントリスナーが設定済み）
+    // 状態が変わるたびにshouldShowLeaveWarningが適切に判定される
+  }
+
+  /**
+   * 離脱警告を表示すべきかの判定
+   */
+  shouldShowLeaveWarning() {
+    // 今日出勤した場合のみ警告を表示
+    if (!this.state.hasClockInToday) {
+      return false;
+    }
+    
+    // 出勤中の場合は警告
+    if (this.state.isWorking) {
+      return true;
+    }
+    
+    // 退勤済みだが日報未提出の場合も警告
+    if (!this.state.isWorking && !this.state.hasTodayReport) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * 離脱警告メッセージを取得
+   */
+  getLeaveWarningMessage() {
+    if (this.state.isWorking && !this.state.hasTodayReport) {
+      return '退勤と日報提出が完了していません。このまま終了しますか？';
+    } else if (this.state.isWorking) {
+      return '出勤中です。退勤処理を行わずにページを離れますか？';
+    } else if (!this.state.hasTodayReport) {
+      return '日報が未提出です。このまま終了しますか？';
+    }
+    
+    return '作業が完了していない可能性があります。このまま終了しますか？';
   }
 
   /**
@@ -416,6 +504,10 @@ export default class UserModule extends BaseModule {
     // ページ離脱警告を削除
     if (this.beforeUnloadHandler) {
       window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+    }
+    
+    if (this.visibilityChangeHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
     }
     
     // 親クラスのクリーンアップ

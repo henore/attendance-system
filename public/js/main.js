@@ -1,5 +1,5 @@
 // /public/js/main.js
-// メインアプリケーション
+// メインアプリケーション（修正版）
 
 import UserModule from './modules/user/index.js';
 import StaffModule from './modules/staff/index.js';
@@ -13,6 +13,8 @@ class AttendanceManagementSystem {
         this.currentModule = null;
         this.notificationTimeout = null;
         this.sessionCheckInterval = null;
+        this.loginClockInterval = null; // ログイン画面時計用
+        this.navbarClockInterval = null; // ナビバー時計用
     }
 
     async init() {
@@ -94,6 +96,39 @@ class AttendanceManagementSystem {
         this.startLoginClock();
     }
 
+    // ログイン画面の時計機能（修正版）
+    startLoginClock() {
+        // 既存の時計があれば停止
+        if (this.loginClockInterval) {
+            clearInterval(this.loginClockInterval);
+        }
+
+        const updateLoginClock = () => {
+            const clockElement = document.getElementById('loginClock');
+            const dateElement = document.getElementById('loginDate');
+            
+            if (clockElement && dateElement) {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('ja-JP');
+                const dateStr = now.toLocaleDateString('ja-JP', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    weekday: 'short'
+                });
+                
+                clockElement.innerHTML = `<i class="far fa-clock"></i> ${timeStr}`;
+                dateElement.textContent = dateStr;
+            }
+        };
+        
+        // 即座に実行
+        updateLoginClock();
+        
+        // 1秒ごとに更新
+        this.loginClockInterval = setInterval(updateLoginClock, 1000);
+    }
+
     async handleLogin(e) {
         e.preventDefault();
         
@@ -109,6 +144,13 @@ class AttendanceManagementSystem {
             if (response.success && response.user) {
                 this.currentUser = response.user;
                 this.showNotification(MESSAGES.AUTH.LOGIN_SUCCESS, 'success');
+                
+                // ログイン画面の時計を停止
+                if (this.loginClockInterval) {
+                    clearInterval(this.loginClockInterval);
+                    this.loginClockInterval = null;
+                }
+                
                 await this.loadDashboard();
                 this.startSessionMonitoring();
             } else {
@@ -128,11 +170,14 @@ class AttendanceManagementSystem {
                         <i class="fas fa-clock"></i> 勤怠管理システム
                     </span>
                     <div class="d-flex align-items-center">
+                        <span class="navbar-clock" id="navbarClock">
+                            <!-- 時刻がここに表示される -->
+                        </span>
                         <span class="text-white me-3">
                             <i class="fas fa-user"></i> ${this.currentUser.name} 
                             <span class="badge bg-light text-primary ms-1">${this.getRoleDisplayName(this.currentUser.role)}</span>
                         </span>
-                        <button class="btn btn-outline-light btn-sm" id="logoutBtn">
+                        <button class="btn btn-outline-light btn-sm" id="logoutBtn" ${this.currentUser.role === 'user' ? 'style="display: none;"' : ''}>
                             <i class="fas fa-sign-out-alt"></i> ログアウト
                         </button>
                     </div>
@@ -149,7 +194,10 @@ class AttendanceManagementSystem {
             <div id="notificationArea" class="notification-area"></div>
         `;
 
-        // ログアウトボタン
+        // 時計を開始
+        this.startNavbarClock();
+
+        // ログアウトボタン（利用者以外のみ表示）
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => this.handleLogout());
@@ -157,6 +205,32 @@ class AttendanceManagementSystem {
 
         // 権限に応じたモジュールをロード
         await this.loadModule();
+    }
+
+    // ナビバーの時計機能
+    startNavbarClock() {
+        // 既存の時計があれば停止
+        if (this.navbarClockInterval) {
+            clearInterval(this.navbarClockInterval);
+        }
+
+        const updateNavbarClock = () => {
+            const clockElement = document.getElementById('navbarClock');
+            if (clockElement) {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('ja-JP');
+                const dateStr = now.toLocaleDateString('ja-JP', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    weekday: 'short'
+                });
+                clockElement.innerHTML = `<i class="far fa-clock"></i> ${dateStr} ${timeStr}`;
+            }
+        };
+        
+        updateNavbarClock();
+        this.navbarClockInterval = setInterval(updateNavbarClock, 1000);
     }
 
     async loadModule() {
@@ -194,95 +268,48 @@ class AttendanceManagementSystem {
                 if (!canLogout) return;
             }
 
-            await this.apiCall(API_ENDPOINTS.AUTH.LOGOUT, { method: 'POST' });
+            // ログアウトAPI呼び出し
+            const response = await this.apiCall(API_ENDPOINTS.AUTH.LOGOUT, { method: 'POST' });
+            
+            // レスポンスが成功でなくてもログアウト処理を続行（セッション強制破棄）
+            console.log('ログアウトレスポンス:', response);
             
             this.showNotification(MESSAGES.AUTH.LOGOUT_SUCCESS, 'success');
             
-            // クリーンアップ
-            if (this.currentModule) {
-                this.currentModule.destroy();
-                this.currentModule = null;
-            }
-            this.currentUser = null;
-            this.stopSessionMonitoring();
-            
-            // ログイン画面へ
-            this.showLoginForm();
+            // 必ずクリーンアップとログイン画面表示を実行
+            this.performLogoutCleanup();
             
         } catch (error) {
             console.error('ログアウトエラー:', error);
-            this.showNotification('ログアウトに失敗しました', 'danger');
+            // エラーが発生してもクリーンアップは実行
+            this.showNotification('ログアウト処理でエラーが発生しましたが、セッションをクリアします', 'warning');
+            this.performLogoutCleanup();
         }
     }
 
-    async loadDashboard() {
-    const app = document.getElementById('app');
-    app.innerHTML = `
-        <nav class="navbar navbar-dark bg-primary">
-            <div class="container-fluid">
-                <span class="navbar-brand">
-                    <i class="fas fa-clock"></i> 勤怠管理システム
-                </span>
-                <div class="d-flex align-items-center">
-                    <span class="navbar-clock" id="navbarClock">
-                        <!-- 時刻がここに表示される -->
-                    </span>
-                    <span class="text-white me-3">
-                        <i class="fas fa-user"></i> ${this.currentUser.name} 
-                        <span class="badge bg-light text-primary ms-1">${this.getRoleDisplayName(this.currentUser.role)}</span>
-                    </span>
-                    <button class="btn btn-outline-light btn-sm" id="logoutBtn">
-                        <i class="fas fa-sign-out-alt"></i> ログアウト
-                    </button>
-                </div>
-            </div>
-        </nav>
+    // ログアウト時のクリーンアップ処理（確実に実行）
+    performLogoutCleanup() {
+        // 時計を停止
+        if (this.navbarClockInterval) {
+            clearInterval(this.navbarClockInterval);
+            this.navbarClockInterval = null;
+        }
         
-        <div class="container-fluid">
-            <div id="app-content">
-                <!-- モジュールコンテンツ -->
-            </div>
-        </div>
+        // クリーンアップ
+        if (this.currentModule) {
+            this.currentModule.destroy();
+            this.currentModule = null;
+        }
+        this.currentUser = null;
+        this.stopSessionMonitoring();
         
-        <!-- 通知エリア -->
-        <div id="notificationArea" class="notification-area"></div>
-    `;
-
-    // 時計を開始
-    this.startClock();
-
-    // ログアウトボタン
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => this.handleLogout());
+        // 強制的にログイン画面へ
+        setTimeout(() => {
+            this.showLoginForm();
+        }, 100);
     }
 
-    // 権限に応じたモジュールをロード
-    await this.loadModule();
-}
-
-// 時計機能を追加
-    startClock() {
-    const updateClock = () => {
-        const clockElement = document.getElementById('navbarClock');
-        if (clockElement) {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('ja-JP');
-            const dateStr = now.toLocaleDateString('ja-JP', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                weekday: 'short'
-            });
-            clockElement.innerHTML = `<i class="far fa-clock"></i> ${dateStr} ${timeStr}`;
-        }
-    };
-    
-    updateClock();
-    setInterval(updateClock, 1000);
-    }   
-
-    // API呼び出しラッパー
+    // API呼び出しラッパー（修正版）
     async apiCall(endpoint, options = {}) {
         const defaultOptions = {
             method: 'GET',
@@ -299,7 +326,7 @@ class AttendanceManagementSystem {
             
             if (!response.ok) {
                 if (response.status === 401) {
-                    // 認証エラー
+                    // 認証エラーの場合は必ずログイン画面へ
                     this.handleSessionExpired();
                     throw new Error(MESSAGES.AUTH.SESSION_EXPIRED);
                 }
@@ -346,15 +373,23 @@ class AttendanceManagementSystem {
         }
         
         this.notificationTimeout = setTimeout(() => {
-            notification.remove();
+            if (notification.parentNode) {
+                notification.remove();
+            }
         }, 5000);
     }
 
-    // セッション監視
+    // セッション監視（修正版）
     startSessionMonitoring() {
         this.stopSessionMonitoring();
         
-        // 30分ごとにセッションチェック
+        // 利用者の場合はセッション監視を行わない（要件：セッションタイムアウトなし）
+        if (this.currentUser.role === 'user') {
+            console.log('利用者のため、セッション監視を無効化');
+            return;
+        }
+        
+        // 30分ごとにセッションチェック（スタッフ・管理者のみ）
         this.sessionCheckInterval = setInterval(async () => {
             const isValid = await this.checkAuthentication();
             if (!isValid) {
@@ -372,15 +407,7 @@ class AttendanceManagementSystem {
 
     handleSessionExpired() {
         this.showNotification(MESSAGES.AUTH.SESSION_EXPIRED, 'warning');
-        
-        if (this.currentModule) {
-            this.currentModule.destroy();
-            this.currentModule = null;
-        }
-        
-        this.currentUser = null;
-        this.stopSessionMonitoring();
-        this.showLoginForm();
+        this.performLogoutCleanup();
     }
 
     // グローバルイベントリスナー
@@ -410,9 +437,23 @@ class AttendanceManagementSystem {
         };
         return roles[role] || role;
     }
+
+    // 利用者用ログアウトボタン表示制御（出勤後に呼び出される）
+    showLogoutButtonForUser() {
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn && this.currentUser.role === 'user') {
+            logoutBtn.style.display = 'inline-block';
+        }
+    }
+
+    // 利用者用ログアウトボタン非表示制御（出勤前）
+    hideLogoutButtonForUser() {
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn && this.currentUser.role === 'user') {
+            logoutBtn.style.display = 'none';
+        }
+    }
 }
-
-
 
 // アプリケーション起動
 document.addEventListener('DOMContentLoaded', () => {

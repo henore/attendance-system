@@ -1,5 +1,5 @@
 // modules/user/break.js
-// 利用者の休憩機能ハンドラー
+// 利用者の休憩機能ハンドラー（修正版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { MESSAGES } from '../../constants/labels.js';
@@ -16,6 +16,7 @@ export class UserBreakHandler {
     this.currentBreakStart = null;
     this.hasBreakToday = false;
     this.breakCheckInterval = null;
+    this.autoEndTimeout = null; // 自動終了タイマー
   }
 
   /**
@@ -52,13 +53,18 @@ export class UserBreakHandler {
     if (!breakElement) return;
 
     const clockInTime = this.getCurrentClockInTime();
-    if (!clockInTime) return;
-
-    // 11:30以降の出勤は休憩なし
-    const clockInMinutes = timeToMinutes(clockInTime);
-    if (clockInMinutes >= 690) { // 11:30 = 690分
-      this.renderNoBreakUI(breakElement, breakDisplay);
+    if (!clockInTime) {
+      this.renderNotWorkingUI(breakElement, breakDisplay);
       return;
+    }
+
+    // 出勤時刻による休憩可否判定（通所者のみ）
+    if (this.currentUser.service_type === 'commute') {
+      const clockInMinutes = timeToMinutes(clockInTime);
+      if (clockInMinutes >= 690) { // 11:30以降の出勤
+        this.renderNoBreakUI(breakElement, breakDisplay);
+        return;
+      }
     }
 
     if (this.hasBreakToday) {
@@ -73,7 +79,20 @@ export class UserBreakHandler {
   }
 
   /**
-   * 休憩不可UIを表示
+   * 未出勤時のUI
+   */
+  renderNotWorkingUI(breakElement, breakDisplay) {
+    breakElement.innerHTML = `
+      <p class="text-muted">出勤後に休憩機能が利用できます</p>
+      <button class="btn btn-info" disabled>
+        <i class="fas fa-pause"></i> 休憩開始
+      </button>
+    `;
+    if (breakDisplay) breakDisplay.style.display = 'none';
+  }
+
+  /**
+   * 休憩不可UIを表示（通所者の午後出勤）
    */
   renderNoBreakUI(breakElement, breakDisplay) {
     breakElement.innerHTML = `
@@ -91,21 +110,28 @@ export class UserBreakHandler {
   renderBreakingUI(breakElement, breakDisplay) {
     const serviceType = this.currentUser.service_type;
     
+    let endInfo = '';
+    if (serviceType === 'commute') {
+      endInfo = '<p class="text-info">通所の方は12:30に自動終了します</p>';
+    } else {
+      endInfo = `
+        <button class="btn btn-warning" id="userBreakEndBtn">
+          <i class="fas fa-play"></i> 休憩終了
+        </button>
+        <p class="text-info mt-2">60分で自動終了します</p>
+      `;
+    }
+    
     breakElement.innerHTML = `
       <p class="mb-3 text-warning">
         <i class="fas fa-pause-circle"></i> 休憩中（${this.currentBreakStart}〜）
       </p>
-      ${serviceType === 'home' ? `
-        <button class="btn btn-warning" id="userBreakEndBtn">
-          <i class="fas fa-play"></i> 休憩終了
-        </button>
-      ` : `
-        <p class="text-info">通所の方は12:30に自動終了します</p>
-      `}
+      ${endInfo}
     `;
     
     if (breakDisplay) breakDisplay.style.display = 'block';
     
+    // 在宅者の手動終了ボタン
     if (serviceType === 'home') {
       const endBtn = document.getElementById('userBreakEndBtn');
       if (endBtn) {
@@ -132,9 +158,13 @@ export class UserBreakHandler {
    */
   renderBreakAvailableUI(breakElement, breakDisplay) {
     const serviceType = this.currentUser.service_type;
-    const breakInfo = serviceType === 'commute' 
-      ? '通所の方：11:30-12:30固定（60分）'
-      : '在宅の方：開始から60分固定';
+    let breakInfo = '';
+    
+    if (serviceType === 'commute') {
+      breakInfo = '通所の方：どのタイミングでも11:30-12:30固定（60分）';
+    } else {
+      breakInfo = '在宅の方：15分刻み切り捨てで開始、60分固定';
+    }
       
     breakElement.innerHTML = `
       <p class="text-muted">${breakInfo}</p>
@@ -173,7 +203,7 @@ export class UserBreakHandler {
   }
 
   /**
-   * 休憩開始処理
+   * 休憩開始処理（改善版）
    */
   async handleBreakStart() {
     if (this.hasBreakToday) {
@@ -182,29 +212,56 @@ export class UserBreakHandler {
     }
 
     try {
-      const response = await this.apiCall(API_ENDPOINTS.USER.BREAK_START, { method: 'POST' });
+      const currentTime = getCurrentTime();
+      let adjustedStartTime = currentTime;
+      
+      // 在宅者の場合は15分刻み切り捨て
+      if (this.currentUser.service_type === 'home') {
+        const currentMinutes = timeToMinutes(currentTime);
+        const adjustedMinutes = Math.floor(currentMinutes / 15) * 15;
+        const hours = Math.floor(adjustedMinutes / 60);
+        const minutes = adjustedMinutes % 60;
+        adjustedStartTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+      }
+
+      const response = await this.apiCall(API_ENDPOINTS.USER.BREAK_START, { 
+        method: 'POST',
+        body: JSON.stringify({ startTime: adjustedStartTime })
+      });
       
       if (response && response.success) {
         this.hasBreakToday = true;
-        this.currentBreakStart = response.startTime;
+        this.currentBreakStart = response.startTime || adjustedStartTime;
         
         const serviceType = this.currentUser.service_type;
         
         if (serviceType === 'commute' || response.isCompleted) {
           // 通所者は即座に完了状態
           this.isOnBreak = false;
-          this.showNotification(response.message || '休憩時間を記録しました（11:30-12:30 60分）', 'success');
+          this.showNotification(
+            response.message || '休憩時間を記録しました（11:30-12:30 60分）', 
+            'success'
+          );
         } else {
           // 在宅者は休憩開始
           this.isOnBreak = true;
           this.startBreakTimeMonitoring();
-          this.showNotification(response.message || `休憩開始（${response.startTime}）60分で自動終了します`, 'info');
+          this.setupAutoBreakEnd(); // 60分後自動終了設定
+          
+          let message = `休憩開始（${this.currentBreakStart}）`;
+          if (adjustedStartTime !== currentTime) {
+            message += ` ※開始時刻を${adjustedStartTime}に調整しました`;
+          }
+          message += ' - 60分で自動終了します';
+          
+          this.showNotification(message, 'info');
         }
         
         this.updateUI();
       }
     } catch (error) {
       console.error('休憩開始エラー:', error);
+      this.showNotification(error.message || '休憩開始に失敗しました', 'danger');
     }
   }
 
@@ -218,19 +275,45 @@ export class UserBreakHandler {
     }
 
     try {
-      const response = await this.apiCall('/api/user/break/end', { method: 'POST' });
+      const response = await this.apiCall(API_ENDPOINTS.USER.BREAK_END, { method: 'POST' });
       
-      if (response && response.success) {
-        this.isOnBreak = false;
-        this.currentBreakStart = null;
-        this.stopBreakTimeMonitoring();
-        this.updateUI();
-        
-        const message = response.message || `休憩終了（${response.endTime}）`;
-        this.showNotification(message, 'success');
-      }
+      this.isOnBreak = false;
+      this.currentBreakStart = null;
+      this.stopBreakTimeMonitoring();
+      this.clearAutoBreakEnd();
+      this.updateUI();
+      
+      const message = response.message || `休憩終了（${getCurrentTime()}）`;
+      this.showNotification(message, 'success');
+      
     } catch (error) {
       console.error('休憩終了エラー:', error);
+      this.showNotification(error.message || '休憩終了処理でエラーが発生しました', 'danger');
+    }
+  }
+
+  /**
+   * 60分後自動終了の設定
+   */
+  setupAutoBreakEnd() {
+    this.clearAutoBreakEnd();
+    
+    // 60分 = 3,600,000ミリ秒
+    this.autoEndTimeout = setTimeout(() => {
+      if (this.isOnBreak) {
+        this.showNotification('休憩時間が60分に達したため自動終了します', 'info');
+        this.handleBreakEnd();
+      }
+    }, 60 * 60 * 1000);
+  }
+
+  /**
+   * 自動終了タイマーをクリア
+   */
+  clearAutoBreakEnd() {
+    if (this.autoEndTimeout) {
+      clearTimeout(this.autoEndTimeout);
+      this.autoEndTimeout = null;
     }
   }
 
@@ -238,6 +321,8 @@ export class UserBreakHandler {
    * 休憩時間監視を開始
    */
   startBreakTimeMonitoring() {
+    this.stopBreakTimeMonitoring();
+    
     this.breakCheckInterval = setInterval(() => {
       this.updateBreakTimeDisplay();
       this.checkBreakTimeLimit();
@@ -280,8 +365,9 @@ export class UserBreakHandler {
     const currentTime = getCurrentTime();
     const duration = calculateBreakDuration(this.currentBreakStart, currentTime);
     
-    // 60分経過で自動終了
+    // 60分経過で自動終了（安全策として監視も継続）
     if (duration >= 60) {
+      this.showNotification('休憩時間が60分に達しました。自動終了します。', 'info');
       this.handleBreakEnd();
     }
   }
@@ -304,5 +390,15 @@ export class UserBreakHandler {
     this.hasBreakToday = false;
     this.isOnBreak = false;
     this.currentBreakStart = null;
+    this.stopBreakTimeMonitoring();
+    this.clearAutoBreakEnd();
+  }
+
+  /**
+   * クリーンアップ
+   */
+  destroy() {
+    this.stopBreakTimeMonitoring();
+    this.clearAutoBreakEnd();
   }
 }
