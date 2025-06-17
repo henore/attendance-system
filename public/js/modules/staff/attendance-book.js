@@ -10,6 +10,7 @@ export class StaffAttendanceBook {
     this.showNotification = showNotification;
     this.currentDate = new Date();
     this.attendanceCache = new Map();
+    this.currentModalId = null; // 現在のモーダルIDを追跡
   }
 
   /**
@@ -123,6 +124,9 @@ export class StaffAttendanceBook {
       });
     }
 
+    // キャッシュをクリアして再読み込み
+    await this.loadAttendanceCache();
+    
     // カレンダーグリッド更新
     gridElement.innerHTML = await this.generateCalendarGrid();
     this.setupDateClickHandlers();
@@ -299,9 +303,14 @@ export class StaffAttendanceBook {
   }
 
   /**
-   * 出勤詳細を表示
+   * 出勤詳細を表示（修正版）
    */
   showAttendanceDetail(dateStr, attendanceData) {
+    // 既存のモーダルがあれば破棄
+    if (this.currentModalId) {
+      modalManager.destroy(this.currentModalId);
+    }
+    
     const formattedDate = formatDate(dateStr, {
       year: 'numeric',
       month: 'long',
@@ -310,9 +319,13 @@ export class StaffAttendanceBook {
     });
 
     const content = this.generateAttendanceDetailContent(attendanceData);
+    
+    // 日付を含む一意のモーダルIDを生成
+    const modalId = `staffAttendanceDetailModal_${dateStr.replace(/-/g, '_')}`;
+    this.currentModalId = modalId;
 
     modalManager.create({
-      id: 'staffAttendanceDetailModal',
+      id: modalId,
       title: `<i class="fas fa-calendar-check"></i> ${formattedDate}の出勤記録`,
       content: content,
       size: 'modal-lg',
@@ -320,7 +333,7 @@ export class StaffAttendanceBook {
       saveButton: false
     });
 
-    modalManager.show('staffAttendanceDetailModal');
+    modalManager.show(modalId);
   }
 
   /**
@@ -440,6 +453,17 @@ export class StaffAttendanceBook {
       return durationMs / (1000 * 60 * 60);
     } catch (error) {
       return 0;
+    }
+  }
+
+  /**
+   * クリーンアップ
+   */
+  destroy() {
+    // 既存のモーダルがあれば破棄
+    if (this.currentModalId) {
+      modalManager.destroy(this.currentModalId);
+      this.currentModalId = null;
     }
   }
 }
