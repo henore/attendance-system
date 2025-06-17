@@ -14,7 +14,6 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const morgan = require('morgan');
 const helmet = require('helmet');
-const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
 // Express アプリケーション作成
