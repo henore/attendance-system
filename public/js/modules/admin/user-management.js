@@ -114,6 +114,7 @@ export default class AdminUserManagement {
                     </div>
                 </div>
             </div>
+            
             <!-- ユーザー編集モーダル -->
             <div class="modal fade" id="userEditModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
@@ -328,6 +329,83 @@ export default class AdminUserManagement {
         } catch (error) {
             console.error('ユーザー編集モーダル表示エラー:', error);
             this.parent.showNotification('エラーが発生しました', 'danger');
+        }
+    }
+
+    /**
+     * ランダムパスワード生成
+     */
+    generateRandomPassword() {
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let password = '';
+        for (let i = 0; i < 8; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return password;
+    }
+
+    /**
+     * ユーザー編集保存
+     */
+    async saveUserEdit() {
+        const userId = document.getElementById('editUserId').value;
+        const username = document.getElementById('editUsername').value.trim();
+        const password = document.getElementById('editPassword').value;
+        const name = document.getElementById('editName').value.trim();
+        const role = document.getElementById('editRole').value;
+        const serviceType = document.getElementById('editServiceType').value;
+
+        // バリデーション
+        if (!username || !name || !role) {
+            this.parent.showNotification('必須項目を入力してください', 'warning');
+            return;
+        }
+
+        if (role === 'user' && !serviceType) {
+            this.parent.showNotification('利用者の場合はサービス区分を選択してください', 'warning');
+            return;
+        }
+
+        // 確認ダイアログ
+        const confirmed = await this.parent.showConfirm({
+            title: 'ユーザー情報変更',
+            message: `${name}さんの情報を変更しますか？`,
+            confirmText: '変更する',
+            confirmClass: 'btn-warning',
+            icon: 'fas fa-edit'
+        });
+
+        if (!confirmed) return;
+
+        try {
+            const requestData = {
+                userId,
+                username,
+                name,
+                role,
+                serviceType: role === 'user' ? serviceType : null
+            };
+
+            if (password) {
+                requestData.password = password;
+            }
+
+            await this.parent.callApi('/api/admin/user/update', {
+                method: 'PUT',
+                body: JSON.stringify(requestData)
+            });
+
+            this.parent.showNotification('ユーザー情報を更新しました', 'success');
+            
+            // モーダルを閉じる
+            bootstrap.Modal.getInstance(document.getElementById('userEditModal')).hide();
+            
+            // ユーザー一覧を更新
+            await this.loadExistingUsers();
+
+        } catch (error) {
+            console.error('ユーザー編集エラー:', error);
+            this.parent.showNotification(error.message || 'ユーザー情報の更新に失敗しました', 'danger');
         }
     }
 

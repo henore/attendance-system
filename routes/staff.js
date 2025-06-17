@@ -129,9 +129,18 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             const currentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
             
             const breakRecord = await dbGet(
-                'SELECT * FROM break_records WHERE user_id = ? AND date = ? AND end_time IS NULL',
-                [staffId, today]
+                'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
+                [userId, date]
             );
+            
+            res.json({
+                success: true,
+                user,
+                attendance,
+                report,
+                comment,
+                breakRecord  // 追加
+            });
             
             if (!breakRecord) {
                 return res.status(400).json({ 

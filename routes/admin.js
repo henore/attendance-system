@@ -98,76 +98,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
-    // ユーザー情報更新
-    router.put('/user/update', requireAuth, requireRole(['admin']), async (req, res) => {
-        try {
-            const { userId, username, password, name, role, serviceType } = req.body;
-            
-            // バリデーション
-            if (!userId || !username || !name || !role) {
-                return res.status(400).json({ 
-                    success: false,
-                    error: '必須項目が不足しています' 
-                });
-            }
-            
-            // 重複チェック（自分以外）
-            const existing = await dbGet(
-                'SELECT * FROM users WHERE username = ? AND id != ?', 
-                [username, userId]
-            );
-            
-            if (existing) {
-                return res.status(400).json({ 
-                    success: false,
-                    error: '同じユーザーIDが既に存在します' 
-                });
-            }
-            
-            // 更新クエリ構築
-            let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, updated_at = CURRENT_TIMESTAMP';
-            const params = [username, name, role, serviceType];
-            
-            // パスワード変更がある場合
-            if (password) {
-                const hashedPassword = await bcrypt.hash(password, 10);
-                updateQuery += ', password = ?';
-                params.push(hashedPassword);
-            }
-            
-            updateQuery += ' WHERE id = ?';
-            params.push(userId);
-            
-            await dbRun(updateQuery, params);
-            
-            // 監査ログ記録
-            await dbRun(
-                'INSERT INTO audit_log (admin_id, action_type, target_id, target_type, new_value, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
-                [
-                    req.session.user.id, 
-                    'user_update', 
-                    userId, 
-                    'user',
-                    JSON.stringify({ username, name, role, serviceType, passwordChanged: !!password }),
-                    req.ip
-                ]
-            );
-            
-            res.json({ 
-                success: true, 
-                message: 'ユーザー情報を更新しました' 
-            });
-            
-        } catch (error) {
-            console.error('ユーザー更新エラー:', error);
-            res.status(500).json({ 
-                success: false,
-                error: 'ユーザー情報の更新に失敗しました' 
-            });
-        }
-    });
-
-    // 全ユーザー取得（退職者除く）
+       // 全ユーザー取得（退職者除く）
     router.get('/users', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
             const { role } = req.query;
@@ -433,6 +364,75 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             res.status(500).json({ 
                 success: false,
                 error: '月次出勤簿の取得に失敗しました' 
+            });
+        }
+    });
+
+    // ユーザー情報更新
+    router.put('/user/update', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { userId, username, password, name, role, serviceType } = req.body;
+            
+            // バリデーション
+            if (!userId || !username || !name || !role) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '必須項目が不足しています' 
+                });
+            }
+            
+            // 重複チェック（自分以外）
+            const existing = await dbGet(
+                'SELECT * FROM users WHERE username = ? AND id != ?', 
+                [username, userId]
+            );
+            
+            if (existing) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '同じユーザーIDが既に存在します' 
+                });
+            }
+            
+            // 更新クエリ構築
+            let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, updated_at = CURRENT_TIMESTAMP';
+            const params = [username, name, role, serviceType];
+            
+            // パスワード変更がある場合
+            if (password) {
+                const hashedPassword = await bcrypt.hash(password, 10);
+                updateQuery += ', password = ?';
+                params.push(hashedPassword);
+            }
+            
+            updateQuery += ' WHERE id = ?';
+            params.push(userId);
+            
+            await dbRun(updateQuery, params);
+            
+            // 監査ログ記録
+            await dbRun(
+                'INSERT INTO audit_log (admin_id, action_type, target_id, target_type, new_value, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
+                [
+                    req.session.user.id, 
+                    'user_update', 
+                    userId, 
+                    'user',
+                    JSON.stringify({ username, name, role, serviceType, passwordChanged: !!password }),
+                    req.ip
+                ]
+            );
+            
+            res.json({ 
+                success: true, 
+                message: 'ユーザー情報を更新しました' 
+            });
+            
+        } catch (error) {
+            console.error('ユーザー更新エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: 'ユーザー情報の更新に失敗しました' 
             });
         }
     });
