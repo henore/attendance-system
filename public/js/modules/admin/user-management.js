@@ -440,21 +440,19 @@ export default class AdminUserManagement {
 
             // モーダルに詳細情報を表示
             const content = this.container.querySelector('#userDetailContent');
-             if (content) {
-            content.innerHTML = this.generateUserDetailContent(user);
+            if (content) {
+                content.innerHTML = this.generateUserDetailContent(user);
 
-            // モーダル表示（modalManagerを使用）
-            modalManager.show('userDetailModal');
-        }
-            // モーダル表示
-            const modal = new bootstrap.Modal(this.container.querySelector('#userDetailModal'));
-            modal.show();
-
-            } catch (error) {
-                console.error('ユーザー詳細表示エラー:', error);
-                this.parent.showNotification('ユーザー詳細の取得に失敗しました', 'danger');
+                // モーダル表示（modalManagerを使用）
+                modalManager.show('userDetailModal');
             }
+
+        } catch (error) {
+            console.error('ユーザー詳細表示エラー:', error);
+            this.parent.showNotification('ユーザー詳細の取得に失敗しました', 'danger');
         }
+    }
+    
     generateUserDetailContent(user) {
         const defaultUsers = ['admin', 'staff1', 'user1', 'user2'];
         const isDefaultUser = defaultUsers.includes(user.username);

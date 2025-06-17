@@ -78,7 +78,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             await dbRun(`
                 INSERT INTO handover_notes (content, updated_by)
                 VALUES (?, ?)
-            `, [content.trim(), updatedBy]);
+            `, [
+                content.trim() + `\n（${new Date().toLocaleString('ja-JP')} - ${updatedBy}）`, 
+                updatedBy
+            ]);
             
             // 更新時刻を記録
             handoverUpdateControl.set(userId, Date.now());

@@ -44,22 +44,37 @@ export class StaffDashboard {
     }
   }
 
-  /**
-   * データを読み込み
-   */
-  async loadData() {
-    try {
-      const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS);
-      const userStatusContainer = document.getElementById('userStatusList');
-      
-      if (userStatusContainer) {
-        userStatusContainer.innerHTML = this.generateUserStatusList(response.users);
-        this.setupEventHandlers();
-      }
-    } catch (error) {
-      console.error('ダッシュボードデータ読み込みエラー:', error);
+    /**
+     * データを読み込み
+     */
+    async loadData() {
+        try {
+            const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS);
+            const userStatusContainer = document.getElementById('userStatusList');
+            
+            if (userStatusContainer && response.users) {
+                userStatusContainer.innerHTML = this.generateUserStatusList(response.users);
+                this.setupEventHandlers();
+            }
+        } catch (error) {
+            console.error('ダッシュボードデータ読み込みエラー:', error);
+            this.showError('ダッシュボードデータの読み込みに失敗しました');
+        }
     }
-  }
+
+    /**
+     * エラー表示
+     */
+    showError(message) {
+        const userStatusContainer = document.getElementById('userStatusList');
+        if (userStatusContainer) {
+            userStatusContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> ${message}
+                </div>
+            `;
+        }
+    }
 
   /**
    * 利用者状態リストを生成

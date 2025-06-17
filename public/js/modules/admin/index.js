@@ -110,10 +110,12 @@ export default class AdminModule extends BaseModule {
     async switchToView(viewName) {
         console.log(`[AdminModule] 画面切り替え: ${viewName}`);
         
-        // 現在のビューを非表示
-        if (this.currentView && this.subModules[this.currentView]) {
-            this.subModules[this.currentView].hide();
-        }
+        // 全てのセクションを非表示
+        Object.values(this.subModules).forEach(module => {
+            if (module.hide) {
+                module.hide();
+            }
+        });
 
         // 新しいビューを表示
         if (this.subModules[viewName]) {

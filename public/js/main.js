@@ -96,38 +96,38 @@ class AttendanceManagementSystem {
         this.startLoginClock();
     }
 
-    // ログイン画面の時計機能（修正版）
-    startLoginClock() {
-        // 既存の時計があれば停止
-        if (this.loginClockInterval) {
-            clearInterval(this.loginClockInterval);
-        }
-
-        const updateLoginClock = () => {
-            const clockElement = document.getElementById('loginClock');
-            const dateElement = document.getElementById('loginDate');
-            
-            if (clockElement && dateElement) {
-                const now = new Date();
-                const timeStr = now.toLocaleTimeString('ja-JP');
-                const dateStr = now.toLocaleDateString('ja-JP', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    weekday: 'short'
-                });
-                
-                clockElement.innerHTML = `<i class="far fa-clock"></i> ${timeStr}`;
-                dateElement.textContent = dateStr;
+        // ログイン画面の時計機能（修正版）
+        startLoginClock() {
+            // 既存の時計があれば停止
+            if (this.loginClockInterval) {
+                clearInterval(this.loginClockInterval);
             }
-        };
-        
-        // 即座に実行
-        updateLoginClock();
-        
-        // 1秒ごとに更新
-        this.loginClockInterval = setInterval(updateLoginClock, 1000);
-    }
+
+            const updateLoginClock = () => {
+                const clockElement = document.getElementById('loginClock');
+                const dateElement = document.getElementById('loginDate');
+                
+                if (clockElement && dateElement) {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString('ja-JP');
+                    const dateStr = now.toLocaleDateString('ja-JP', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        weekday: 'short'
+                    });
+                    
+                    clockElement.innerHTML = `<i class="far fa-clock"></i> ${timeStr}`;
+                    dateElement.textContent = dateStr;
+                }
+            };
+            
+            // 即座に実行
+            updateLoginClock();
+            
+            // 1秒ごとに更新
+            this.loginClockInterval = setInterval(updateLoginClock, 1000);
+        }
 
     async handleLogin(e) {
         e.preventDefault();
@@ -233,6 +233,22 @@ class AttendanceManagementSystem {
         this.navbarClockInterval = setInterval(updateNavbarClock, 1000);
     }
 
+            // 利用者用ログアウトボタン表示制御（出勤後に呼び出される）
+        showLogoutButtonForUser() {
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn && this.currentUser.role === 'user') {
+                logoutBtn.style.display = 'inline-block';
+            }
+        }
+
+        // 利用者用ログアウトボタン非表示制御（出勤前）
+        hideLogoutButtonForUser() {
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn && this.currentUser.role === 'user') {
+                logoutBtn.style.display = 'none';
+            }
+        }
+
     async loadModule() {
         // 既存モジュールをクリーンアップ
         if (this.currentModule) {
@@ -287,28 +303,27 @@ class AttendanceManagementSystem {
         }
     }
 
-    // ログアウト時のクリーンアップ処理（確実に実行）
-    performLogoutCleanup() {
-        // 時計を停止
-        if (this.navbarClockInterval) {
-            clearInterval(this.navbarClockInterval);
-            this.navbarClockInterval = null;
+        // ログアウト時のクリーンアップ処理（確実に実行）
+        performLogoutCleanup() {
+            // 時計を停止
+            if (this.navbarClockInterval) {
+                clearInterval(this.navbarClockInterval);
+                this.navbarClockInterval = null;
+            }
+            
+            // クリーンアップ
+            if (this.currentModule) {
+                this.currentModule.destroy();
+                this.currentModule = null;
+            }
+            this.currentUser = null;
+            this.stopSessionMonitoring();
+            
+            // 強制的にログイン画面へ
+            setTimeout(() => {
+                this.showLoginForm();
+            }, 100);
         }
-        
-        // クリーンアップ
-        if (this.currentModule) {
-            this.currentModule.destroy();
-            this.currentModule = null;
-        }
-        this.currentUser = null;
-        this.stopSessionMonitoring();
-        
-        // 強制的にログイン画面へ
-        setTimeout(() => {
-            this.showLoginForm();
-        }, 100);
-    }
-
     // API呼び出しラッパー（修正版）
     async apiCall(endpoint, options = {}) {
         const defaultOptions = {

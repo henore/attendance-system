@@ -619,7 +619,7 @@ export default class AdminAttendanceManagement {
         }
     }
 
-    async showReportDetail(userId, userName, date) {
+        async showReportDetail(userId, userName, date) {
         try {
             const response = await this.parent.callApi(API_ENDPOINTS.STAFF.REPORT(userId, date));
             

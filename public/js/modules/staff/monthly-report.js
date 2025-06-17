@@ -126,33 +126,34 @@ export class StaffMonthlyReport {
     monthSelect.innerHTML = html;
   }
 
-  /**
-   * 利用者の選択肢を読み込み
-   */
-  async loadUsersForMonthlyAttendance() {
-    try {
-      const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS_LIST);
-      const userSelect = document.getElementById('monthlyUserSelect');
-      
-      if (userSelect && response.users) {
-        let html = '<option value="">利用者を選択してください</option>';
-        
-        // 利用者のみ表示（roleチェックは不要、APIが既に利用者のみ返す）
-        response.users.forEach(user => {
-          const serviceDisplay = user.service_type ? ` (${formatServiceType(user.service_type)})` : '';
-          html += `<option value="${user.id}">${user.name}${serviceDisplay}</option>`;
-        });
-        
-        userSelect.innerHTML = html;
-        
-        if (this.selectedUserId) {
-          userSelect.value = this.selectedUserId;
+      /**
+     * 利用者の選択肢を読み込み
+     */
+    async loadUsersForMonthlyAttendance() {
+        try {
+            const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS_LIST);
+            const userSelect = document.getElementById('monthlyUserSelect');
+            
+            if (userSelect && response.users) {
+                let html = '<option value="">利用者を選択してください</option>';
+                
+                // 利用者のみ表示（roleチェックは不要、APIが既に利用者のみ返す）
+                response.users.forEach(user => {
+                    const serviceDisplay = user.service_type ? ` (${formatServiceType(user.service_type)})` : '';
+                    html += `<option value="${user.id}">${user.name}${serviceDisplay}</option>`;
+                });
+                
+                userSelect.innerHTML = html;
+                
+                if (this.selectedUserId) {
+                    userSelect.value = this.selectedUserId;
+                }
+            }
+        } catch (error) {
+            console.error('利用者読み込みエラー:', error);
+            this.showNotification('利用者一覧の読み込みに失敗しました', 'danger');
         }
-      }
-    } catch (error) {
-      console.error('利用者読み込みエラー:', error);
     }
-  }
 
   /**
    * 月別出勤簿を表示

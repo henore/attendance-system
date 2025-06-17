@@ -462,6 +462,7 @@ export default class AdminMonthlyReport {
                     `;
                 }
                 
+                
                 html += `
                     <tr class="${rowClass}">
                         <td class="text-center fw-bold">${day}</td>
