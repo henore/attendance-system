@@ -1,12 +1,5 @@
 // server.js
 // Node.js Express サーバー
-const cors = require('cors');
-app.use(cors({
-  origin: 'https://happytime-web.com', // 本番ドメインを指定
-  credentials: true,                   // Cookieなど認証情報を送る場合はtrue
-}));
-
-
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -14,7 +7,14 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const morgan = require('morgan');
 const helmet = require('helmet');
+const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+
+// CORS設定
+app.use(cors({
+  origin: 'https://happytime-web.com',
+  credentials: true,
+}));
 
 // Express アプリケーション作成
 const app = express();
