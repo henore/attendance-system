@@ -10,6 +10,12 @@ yarn-error.log
 *.sqlite
 *.db
 *.sqlite3
+db/*.db
+db/
+*.sqlite3
+database/
+*.sqlite3
+
 
 # IDE系の設定
 .vscode/
