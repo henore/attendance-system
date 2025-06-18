@@ -18,7 +18,7 @@ export class StaffReportNotification {
 
   /**
    * 監視を開始
-   */
+ 
   startMonitoring() {
     // 5分ごとに新しい日報をチェック
     this.checkInterval = setInterval(() => {
@@ -33,14 +33,14 @@ export class StaffReportNotification {
 
   /**
    * 監視を停止
-   */
+
   stopMonitoring() {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
     }
   }
-
+  */
   /**
    * 新しい日報をチェック
    */
