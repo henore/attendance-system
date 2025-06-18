@@ -1,4 +1,2 @@
 # DBファイルを無視
-database/attendance.db
-database/session.db
 database/*.db

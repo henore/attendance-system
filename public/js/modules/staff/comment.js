@@ -26,7 +26,7 @@ export class StaffCommentHandler {
     
     try {
       // 前回のモーダルとデータを確実にクリア
-      this.clearPreviousModal();
+      await this.clearPreviousModal();
       
       const response = await this.apiCall(API_ENDPOINTS.STAFF.REPORT(userId, today));
       
@@ -55,11 +55,11 @@ export class StaffCommentHandler {
         date: today 
       };
 
-      // 一意のモーダルIDを生成
-      this.currentModalId = `staffCommentInputModal_${userId}_${Date.now()}`;
+      // 一意のモーダルIDを生成（ユーザーIDと時刻でユニーク性を保証）
+      this.currentModalId = `staffCommentModal_${userId}_${Date.now()}`;
 
       // モーダルの内容を生成
-      const modalContent = this.generateModalContent(response);
+      const modalContent = this.generateModalContent(response, this.currentModalId);
       
       // モーダルを作成
       modalManager.create({
@@ -85,8 +85,8 @@ export class StaffCommentHandler {
         }, { once: true });
       }
 
-      // 文字数カウント設定
-      this.setupCharacterCount();
+      // 文字数カウント設定（一意IDを使用）
+      this.setupCharacterCount(this.currentModalId);
 
     } catch (error) {
       console.error('コメントモーダル表示エラー:', error);
@@ -95,13 +95,35 @@ export class StaffCommentHandler {
   }
 
   /**
-   * 前回のモーダルとデータをクリア
+   * 前回のモーダルとデータを確実にクリア（修正版）
    */
-  clearPreviousModal() {
+  async clearPreviousModal() {
     // 既存のモーダルがあれば破棄
     if (this.currentModalId) {
       try {
+        // モーダルを非表示にしてから破棄
+        modalManager.hide(this.currentModalId);
+        
+        // DOM削除を確実に行うため少し待機
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         modalManager.destroy(this.currentModalId);
+        
+        // 残存する可能性のあるDOM要素を手動削除
+        const existingModal = document.getElementById(this.currentModalId);
+        if (existingModal) {
+          existingModal.remove();
+        }
+        
+        // backdrop要素も削除
+        document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+          backdrop.remove();
+        });
+        
+        // body要素のクラスをクリア
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        
       } catch (error) {
         console.warn('前回モーダル破棄エラー:', error);
       }
@@ -127,10 +149,14 @@ export class StaffCommentHandler {
   }
 
   /**
-   * モーダルコンテンツを生成
+   * モーダルコンテンツを生成（修正版 - 一意IDを使用）
    */
-  generateModalContent(data) {
+  generateModalContent(data, modalId) {
     const { user, attendance, report, comment } = data;
+    
+    // 一意のID生成
+    const textareaId = `staffCommentText_${modalId}`;
+    const charCountId = `charCount_${modalId}`;
     
     // 既存コメントの編集権限チェック
     const canEdit = !comment || comment.staff_id === this.currentUser.id;
@@ -154,13 +180,13 @@ export class StaffCommentHandler {
         ${editWarning}
         
         <div class="mb-3">
-          <textarea class="form-control" id="staffCommentInputText" rows="4" 
+          <textarea class="form-control staff-comment-textarea" id="${textareaId}" rows="4" 
                     placeholder="利用者への返信、アドバイス、気づいた点などを記入してください..."
                     ${!canEdit ? 'readonly' : ''}
                     maxlength="500">${comment ? comment.comment : ''}</textarea>
           <div class="comment-char-count">
             <small class="text-muted">
-              <span id="commentInputCharCount">${comment ? comment.comment.length : 0}</span>/500文字
+              <span id="${charCountId}">${comment ? comment.comment.length : 0}</span>/500文字
             </small>
           </div>
         </div>
@@ -259,17 +285,19 @@ export class StaffCommentHandler {
   }
 
   /**
-   * コメントを保存（修正版）
+   * コメントを保存（修正版 - 一意IDを使用）
    */
   async saveComment() {
     try {
       // 現在のコメントデータを確認
-      if (!this.currentCommentData) {
+      if (!this.currentCommentData || !this.currentModalId) {
         this.showNotification('コメントデータが設定されていません', 'danger');
         return;
       }
 
-      const textarea = document.getElementById('staffCommentInputText');
+      // 現在のモーダルの一意IDを使用してtextareaを取得
+      const textareaId = `staffCommentText_${this.currentModalId}`;
+      const textarea = document.getElementById(textareaId);
       const comment = textarea ? textarea.value.trim() : '';
       
       if (!comment) {
@@ -278,6 +306,8 @@ export class StaffCommentHandler {
       }
 
       const { userId, userName, date } = this.currentCommentData;
+      
+      console.log(`[コメント保存] ${userName}(ID:${userId}) - コメント: "${comment}"`);
       
       await this.apiCall(API_ENDPOINTS.STAFF.COMMENT, {
         method: 'POST',
@@ -310,16 +340,24 @@ export class StaffCommentHandler {
   }
 
   /**
-   * 文字数カウントを設定
+   * 文字数カウントを設定（修正版 - 一意IDを使用）
    */
-  setupCharacterCount() {
-    const textarea = document.getElementById('staffCommentInputText');
-    const charCount = document.getElementById('commentInputCharCount');
+  setupCharacterCount(modalId) {
+    const textareaId = `staffCommentText_${modalId}`;
+    const charCountId = `charCount_${modalId}`;
+    
+    const textarea = document.getElementById(textareaId);
+    const charCount = document.getElementById(charCountId);
     
     if (textarea && charCount) {
-      textarea.addEventListener('input', () => {
+      // 既存のイベントリスナーを削除してから新しいものを追加
+      textarea.removeEventListener('input', this.characterCountHandler);
+      
+      this.characterCountHandler = () => {
         charCount.textContent = textarea.value.length;
-      });
+      };
+      
+      textarea.addEventListener('input', this.characterCountHandler);
     }
   }
 
