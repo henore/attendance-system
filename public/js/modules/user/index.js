@@ -7,6 +7,7 @@ import { UserReportHandler } from './report.js';
 import { UserBreakHandler } from './break.js';
 import { UserAttendanceCalendar } from './calendar.js';
 import { modalManager } from '../shared/modal-manager.js';
+import { TermsModal } from './terms-modal.js'; 
 import { LastReportModal } from './last-report-modal.js';
 import { MESSAGES } from '../../constants/labels.js';
 

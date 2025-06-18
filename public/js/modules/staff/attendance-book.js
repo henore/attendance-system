@@ -135,70 +135,86 @@ export class StaffAttendanceBook {
   /**
    * カレンダーグリッドを生成（修正版）
    */
+/**
+ * カレンダーグリッドを生成（修正版）
+ */
   async generateCalendarGrid() {
-    const year = this.currentDate.getFullYear();
-    const month = this.currentDate.getMonth();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // 時刻をリセット
-    
-    // 月の最初の日と最後の日
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
-    // カレンダーの開始日（前月の日曜日から）
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
-
-    let html = '';
-
-    // 曜日ヘッダー
-    const dayHeaders = ['日', '月', '火', '水', '木', '金', '土'];
-    dayHeaders.forEach((day, index) => {
-      let headerClass = 'calendar-day-header';
-      if (index === 0) headerClass += ' sunday-header';
-      if (index === 6) headerClass += ' saturday-header';
-      html += `<div class="${headerClass}">${day}</div>`;
-    });
-
-    // 日付セル
-    const current = new Date(startDate);
-    for (let i = 0; i < 42; i++) { // 6週間分
-      const isCurrentMonth = current.getMonth() === month;
-      const currentDateReset = new Date(current);
-      currentDateReset.setHours(0, 0, 0, 0);
-      const isToday = currentDateReset.getTime() === today.getTime();
-      const dateStr = this.formatDateString(current);
-      const dayOfWeek = current.getDay();
-      const attendanceData = this.getAttendanceData(dateStr);
+      const year = this.currentDate.getFullYear();
+      const month = this.currentDate.getMonth();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       
-      let classes = ['calendar-day'];
-      if (!isCurrentMonth) classes.push('other-month');
-      if (isToday) classes.push('today');
-      
-      // 土日の色分け
-      if (dayOfWeek === 0) classes.push('sunday');
-      if (dayOfWeek === 6) classes.push('saturday');
-      
-      // 出勤状況による色分け
-      if (attendanceData && isCurrentMonth) {
-        if (attendanceData.clock_out) {
-          classes.push('has-work'); // 正常勤務完了（緑）
-        } else if (attendanceData.clock_in) {
-          classes.push('has-attendance'); // 出勤中または未退勤（黄）
-        }
+      const firstDay = new Date(year, month, 1);
+      const startDate = new Date(firstDay);
+      startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+      let html = '';
+
+      // 曜日ヘッダー
+      const dayHeaders = ['日', '月', '火', '水', '木', '金', '土'];
+      dayHeaders.forEach((day, index) => {
+          let headerClass = 'calendar-day-header';
+          if (index === 0) headerClass += ' sunday-header';
+          if (index === 6) headerClass += ' saturday-header';
+          html += `<div class="${headerClass}">${day}</div>`;
+      });
+
+      // 日付セル
+      const current = new Date(startDate);
+      for (let i = 0; i < 42; i++) {
+          const isCurrentMonth = current.getMonth() === month;
+          const currentDateReset = new Date(current);
+          currentDateReset.setHours(0, 0, 0, 0);
+          const isToday = currentDateReset.getTime() === today.getTime();
+          const dateStr = this.formatDateString(current);
+          const dayOfWeek = current.getDay();
+          const attendanceData = this.getAttendanceData(dateStr);
+          
+          let classes = ['calendar-day'];
+          if (!isCurrentMonth) classes.push('other-month');
+          if (isToday) classes.push('today');
+          
+          // 土日の色分け
+          if (dayOfWeek === 0) classes.push('sunday');
+          if (dayOfWeek === 6) classes.push('saturday');
+          
+          // 出勤状況による色分け
+          if (attendanceData && isCurrentMonth) {
+              if (attendanceData.clock_out) {
+                  classes.push('has-work'); // 正常勤務完了（緑）
+              } else if (attendanceData.clock_in) {
+                  classes.push('has-attendance'); // 出勤中または未退勤（黄）
+              }
+              
+              // 休憩がある場合の追加スタイル
+              if (attendanceData.breakRecord) {
+                  classes.push('has-break');
+              }
+          }
+
+          // ツールチップ情報を追加
+          let tooltipText = '';
+          if (attendanceData && attendanceData.clock_in) {
+              tooltipText = `出勤: ${attendanceData.clock_in}`;
+              if (attendanceData.clock_out) {
+                  tooltipText += ` | 退勤: ${attendanceData.clock_out}`;
+              }
+              if (attendanceData.breakRecord) {
+                  tooltipText += ` | 休憩: ${attendanceData.breakRecord.duration || 60}分`;
+              }
+          }
+
+          html += `
+              <div class="${classes.join(' ')}" data-date="${dateStr}" ${tooltipText ? `title="${tooltipText}"` : ''}>
+                  <div class="calendar-day-number">${current.getDate()}</div>
+                  ${this.generateWorkIndicators(attendanceData)}
+              </div>
+          `;
+
+          current.setDate(current.getDate() + 1);
       }
 
-      html += `
-        <div class="${classes.join(' ')}" data-date="${dateStr}">
-          <div class="calendar-day-number">${current.getDate()}</div>
-          ${this.generateWorkIndicators(attendanceData)}
-        </div>
-      `;
-
-      current.setDate(current.getDate() + 1);
-    }
-
-    return html;
+      return html;
   }
 
   /**
@@ -213,25 +229,25 @@ export class StaffAttendanceBook {
     return `${year}-${month}-${day}`;
   }
 
-  /**
-   * 作業インジケーターを生成
-   */
+ /**
+ * 作業インジケーターを生成
+ */
   generateWorkIndicators(attendanceData) {
-    if (!attendanceData || !attendanceData.clock_in) return '';
+      if (!attendanceData || !attendanceData.clock_in) return '';
 
-    let html = '<div class="calendar-day-indicators">';
-    
-    // 出勤マーク
-    html += '<span class="calendar-indicator indicator-work" title="出勤記録あり"></span>';
-    
-    // 休憩マーク
-    if (attendanceData.break_time > 0) {
-      html += '<span class="calendar-indicator indicator-break" title="休憩記録あり"></span>';
-    }
-    
-    html += '</div>';
+      let html = '<div class="calendar-day-indicators">';
+      
+      // 出勤マーク
+      html += '<span class="calendar-indicator indicator-work" title="出勤記録あり"></span>';
+      
+      // 休憩マーク（休憩記録がある場合）
+      if (attendanceData.breakRecord) {
+          html += '<span class="calendar-indicator indicator-break" title="休憩記録あり"></span>';
+      }
+      
+      html += '</div>';
 
-    return html;
+      return html;
   }
 
   /**
@@ -242,38 +258,38 @@ export class StaffAttendanceBook {
   }
 
   /**
-   * 出勤キャッシュを読み込み（修正版）
-   */
+ * 出勤キャッシュを読み込み（修正版）
+ */
   async loadAttendanceCache() {
-    // 現在月の出勤データを取得
-    const year = this.currentDate.getFullYear();
-    const month = this.currentDate.getMonth();
-    const daysInMonth = getDaysInMonth(year, month + 1);
-    
-    // キャッシュクリア
-    this.attendanceCache.clear();
-    
-    // 各日付のデータを取得
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const dateStr = this.formatDateString(date);
+      // 現在月の出勤データを取得
+      const year = this.currentDate.getFullYear();
+      const month = this.currentDate.getMonth();
+      const daysInMonth = getDaysInMonth(year, month + 1);
       
-      try {
-        // スタッフ自身の出勤記録を取得
-        const attendance = await this.apiCall(`/api/staff/attendance/${dateStr}`);
-        if (attendance.attendance) {
-          // 休憩記録も取得
-          const breakData = await this.apiCall(`/api/user/break/status/${dateStr}`);
-          const attendanceData = {
-            ...attendance.attendance,
-            break_time: breakData.breakRecord ? 60 : 0
-          };
-          this.attendanceCache.set(dateStr, attendanceData);
-        }
-      } catch (error) {
-        console.error(`出勤データ取得エラー (${dateStr}):`, error);
+      // キャッシュクリア
+      this.attendanceCache.clear();
+      
+      // 各日付のデータを取得
+      for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(year, month, day);
+          const dateStr = this.formatDateString(date);
+          
+          try {
+              // スタッフ自身の出勤記録を取得
+              const attendance = await this.apiCall(`/api/staff/attendance/${dateStr}`);
+              if (attendance.attendance) {
+                  // 休憩記録も取得
+                  const breakData = await this.apiCall(`/api/user/break/status/${dateStr}`);
+                  const attendanceData = {
+                      ...attendance.attendance,
+                      breakRecord: breakData.breakRecord || null
+                  };
+                  this.attendanceCache.set(dateStr, attendanceData);
+              }
+          } catch (error) {
+              console.error(`出勤データ取得エラー (${dateStr}):`, error);
+          }
       }
-    }
   }
 
   /**
@@ -339,74 +355,125 @@ export class StaffAttendanceBook {
   /**
    * 出勤詳細コンテンツを生成
    */
+  /**
+ * 出勤詳細コンテンツを生成
+ */
   generateAttendanceDetailContent(attendanceData) {
-    let html = '<div class="staff-attendance-detail">';
+      let html = '<div class="staff-attendance-detail">';
 
-    // 基本的な出勤情報
-    html += `
-      <div class="row mb-3">
-        <div class="col-6">
-          <div class="detail-section">
-            <h6><i class="fas fa-clock text-success"></i> 出勤時間</h6>
-            <div class="detail-value h4 text-success">${attendanceData.clock_in}</div>
-          </div>
-        </div>
-        <div class="col-6">
-          <div class="detail-section">
-            <h6><i class="fas fa-clock text-info"></i> 退勤時間</h6>
-            <div class="detail-value h4 ${attendanceData.clock_out ? 'text-info' : 'text-muted'}">${attendanceData.clock_out || '未退勤'}</div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // 勤務時間計算
-    if (attendanceData.clock_out) {
-      const workDuration = this.calculateWorkDuration(attendanceData.clock_in, attendanceData.clock_out);
+      // 基本的な出勤情報
       html += `
-        <div class="row mb-3">
-          <div class="col-12">
-            <div class="detail-section bg-light">
-              <h6><i class="fas fa-stopwatch text-primary"></i> 勤務時間</h6>
-              <div class="detail-value h4 text-primary">${workDuration}</div>
-            </div>
+          <div class="row mb-3">
+              <div class="col-6">
+                  <div class="detail-section">
+                      <h6><i class="fas fa-clock text-success"></i> 出勤時間</h6>
+                      <div class="detail-value h4 text-success">${attendanceData.clock_in}</div>
+                  </div>
+              </div>
+              <div class="col-6">
+                  <div class="detail-section">
+                      <h6><i class="fas fa-clock text-info"></i> 退勤時間</h6>
+                      <div class="detail-value h4 ${attendanceData.clock_out ? 'text-info' : 'text-muted'}">${attendanceData.clock_out || '未退勤'}</div>
+                  </div>
+              </div>
           </div>
-        </div>
       `;
-    }
 
-    // 休憩記録
-    if (attendanceData.break_time > 0) {
-      html += `
-        <div class="detail-section">
-          <h6><i class="fas fa-coffee text-warning"></i> 休憩記録</h6>
-          <p>休憩時間: ${attendanceData.break_time}分</p>
-        </div>
-      `;
-    }
+      // 休憩記録（詳細版）
+      if (attendanceData.breakRecord) {
+          const breakRecord = attendanceData.breakRecord;
+          const breakDuration = breakRecord.duration || 60; // デフォルト60分
+          
+          html += `
+              <div class="row mb-3">
+                  <div class="col-12">
+                      <div class="detail-section bg-warning bg-opacity-10">
+                          <h6><i class="fas fa-coffee text-warning"></i> 休憩記録</h6>
+                          <div class="row">
+                              <div class="col-4 text-center">
+                                  <label class="text-muted small">開始時刻</label>
+                                  <div class="detail-value h5 text-warning">${breakRecord.start_time}</div>
+                              </div>
+                              <div class="col-4 text-center">
+                                  <label class="text-muted small">終了時刻</label>
+                                  <div class="detail-value h5 text-warning">${breakRecord.end_time || '進行中'}</div>
+                              </div>
+                              <div class="col-4 text-center">
+                                  <label class="text-muted small">休憩時間</label>
+                                  <div class="detail-value h5 text-warning">${breakDuration}分</div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          `;
+      } else {
+          html += `
+              <div class="row mb-3">
+                  <div class="col-12">
+                      <div class="detail-section bg-light">
+                          <h6><i class="fas fa-coffee text-muted"></i> 休憩記録</h6>
+                          <p class="text-muted text-center mb-0">休憩記録なし</p>
+                      </div>
+                  </div>
+              </div>
+          `;
+      }
 
-    html += '</div>';
-    return html;
+      // 勤務時間計算（休憩時間を考慮）
+      if (attendanceData.clock_out) {
+          const breakMinutes = attendanceData.breakRecord ? (attendanceData.breakRecord.duration || 60) : 0;
+          const workDuration = this.calculateNetWorkDuration(attendanceData.clock_in, attendanceData.clock_out, breakMinutes);
+          
+          html += `
+              <div class="row mb-3">
+                  <div class="col-12">
+                      <div class="detail-section bg-primary bg-opacity-10">
+                          <h6><i class="fas fa-stopwatch text-primary"></i> 勤務時間</h6>
+                          <div class="row">
+                              <div class="col-4 text-center">
+                                  <label class="text-muted small">総労働時間</label>
+                                  <div class="detail-value h5 text-primary">${this.calculateWorkDuration(attendanceData.clock_in, attendanceData.clock_out)}</div>
+                              </div>
+                              <div class="col-4 text-center">
+                                  <label class="text-muted small">休憩時間</label>
+                                  <div class="detail-value h5 text-warning">-${breakMinutes}分</div>
+                              </div>
+                              <div class="col-4 text-center">
+                                  <label class="text-muted small">実働時間</label>
+                                  <div class="detail-value h5 text-success">${workDuration}</div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          `;
+      }
+
+      html += '</div>';
+      return html;
   }
 
   /**
-   * 勤務時間を計算
+   * 実働時間を計算（休憩時間を差し引いた時間）
    */
-  calculateWorkDuration(clockIn, clockOut) {
-    try {
-      const startTime = new Date(`1970-01-01 ${clockIn}`);
-      const endTime = new Date(`1970-01-01 ${clockOut}`);
-      const durationMs = endTime - startTime;
-      const hours = durationMs / (1000 * 60 * 60);
-      
-      if (hours > 0) {
-        return `${hours.toFixed(1)}時間`;
+  calculateNetWorkDuration(clockIn, clockOut, breakMinutes = 0) {
+      try {
+          const startTime = new Date(`1970-01-01 ${clockIn}`);
+          const endTime = new Date(`1970-01-01 ${clockOut}`);
+          const durationMs = endTime - startTime;
+          const totalMinutes = durationMs / (1000 * 60);
+          const netMinutes = totalMinutes - breakMinutes;
+          const netHours = netMinutes / 60;
+          
+          if (netHours > 0) {
+              return `${netHours.toFixed(1)}時間`;
+          }
+      } catch (error) {
+          console.error('実働時間計算エラー:', error);
       }
-    } catch (error) {
-      console.error('勤務時間計算エラー:', error);
-    }
-    
-    return '計算不可';
+      
+      return '計算不可';
   }
 
   /**
