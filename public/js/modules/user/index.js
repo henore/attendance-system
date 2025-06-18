@@ -40,6 +40,11 @@ export default class UserModule extends BaseModule {
       this.attendanceHandler.updateClockInButtonState.bind(this.attendanceHandler),
       this.app.showNotification.bind(this.app)
     );
+
+    this.termsModal = new TermsModal(
+      this.attendanceHandler.updateClockInButtonState.bind(this.attendanceHandler),
+      this.app.showNotification.bind(this.app)
+    );
     
     // 状態管理
     this.state = {
@@ -47,8 +52,9 @@ export default class UserModule extends BaseModule {
       isWorking: false,
       hasTodayReport: false,
       hasConfirmedLastReport: false,
+      hasAcceptedTerms: false,  // 追加
       lastReportData: null,
-      hasClockInToday: false  // 今日出勤したかのフラグ
+      hasClockInToday: false
     };
     
     // ページ離脱警告用
@@ -281,6 +287,12 @@ export default class UserModule extends BaseModule {
             return;
         }
 
+            // 利用規約の確認チェック
+        if (!this.state.hasAcceptedTerms) {
+        this.app.showNotification('利用規約に同意してください', 'warning');
+        return;
+        }
+
         const result = await this.attendanceHandler.clockIn();
         if (result.success) {
             this.state.currentAttendance = result.attendance;
@@ -363,17 +375,22 @@ export default class UserModule extends BaseModule {
    */
   async checkAndShowLastReportModal() {
     if (this.state.currentAttendance && this.state.currentAttendance.clock_in) {
-      return;
+        return;
     }
 
     const lastReport = await this.attendanceHandler.getLastReport();
     if (lastReport) {
-      this.state.lastReportData = lastReport;
-      this.lastReportModal.show(lastReport, () => {
-        this.state.hasConfirmedLastReport = true;
-      });
+        this.state.lastReportData = lastReport;
+        this.lastReportModal.show(lastReport, () => {
+            this.state.hasConfirmedLastReport = true;
+            // 前回記録確認後、利用規約を表示
+            this.showTermsModal();
+        });
+    } else {
+        // 前回記録がない場合は直接利用規約を表示
+        this.showTermsModal();
     }
-  }
+}
 
   /**
    * 未読コメントチェック
@@ -407,6 +424,13 @@ export default class UserModule extends BaseModule {
     } catch (error) {
       console.error('コメント既読エラー:', error);
     }
+  }
+
+  // 利用規約メソッド
+    showTermsModal() {
+    this.termsModal.show(() => {
+        this.state.hasAcceptedTerms = true;
+    });
   }
 
   /**

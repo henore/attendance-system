@@ -142,3 +142,35 @@
 .indicator-break {
   background: #17a2b8;
 }
+
+/* 休憩がある日の追加スタイル */
+.calendar-day.has-break {
+    position: relative;
+}
+
+.calendar-day.has-break::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 6px;
+    height: 6px;
+    background-color: #ffc107;
+    border-radius: 50%;
+}
+
+/* 詳細モーダルの休憩セクション */
+.staff-attendance-detail .detail-section.bg-warning.bg-opacity-10 {
+    border: 1px solid #ffc107;
+    border-radius: 0.375rem;
+    padding: 1rem;
+}
+
+.staff-attendance-detail .detail-value {
+    margin-bottom: 0;
+}
+
+.staff-attendance-detail label.text-muted {
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}

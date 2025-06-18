@@ -367,76 +367,110 @@ export class UserAttendanceCalendar {
    * @returns {string}
    */
   generateAttendanceDetailContent(data) {
-    const { attendance, report, staffComment } = data;
+    const { attendance, report, staffComment, breakRecord } = data;
     
     if (!attendance && !report) {
-      return '<p class="text-muted text-center">この日の記録はありません</p>';
+        return '<p class="text-muted text-center">この日の記録はありません</p>';
     }
 
     let html = '';
     
     // 出勤記録
     if (attendance) {
-      html += `
-        <div class="past-work-times mb-3">
-          <div class="row">
-            <div class="col-6 text-center">
-              <div class="past-work-time-label">出勤時間</div>
-              <div class="past-work-time-value">${attendance.clock_in || '-'}</div>
+        html += `
+            <div class="past-work-times mb-3">
+                <div class="row">
+                    <div class="col-6 text-center">
+                        <div class="past-work-time-label">出勤時間</div>
+                        <div class="past-work-time-value">${attendance.clock_in || '-'}</div>
+                    </div>
+                    <div class="col-6 text-center">
+                        <div class="past-work-time-label">退勤時間</div>
+                        <div class="past-work-time-value">${attendance.clock_out || '-'}</div>
+                    </div>
+                </div>
             </div>
-            <div class="col-6 text-center">
-              <div class="past-work-time-label">退勤時間</div>
-              <div class="past-work-time-value">${attendance.clock_out || '-'}</div>
-            </div>
-          </div>
-        </div>
-      `;
+        `;
+        
+        // 休憩記録を追加
+        if (breakRecord) {
+            html += `
+                <div class="past-work-times mb-3">
+                    <div class="row">
+                        <div class="col-12 text-center">
+                            <div class="past-work-time-label">
+                                <i class="fas fa-coffee text-warning"></i> 休憩時間
+                            </div>
+                            <div class="past-work-time-value text-warning">
+                                ${breakRecord.start_time}〜${breakRecord.end_time || '進行中'} 
+                                ${breakRecord.duration ? `（${breakRecord.duration}分）` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
     }
     
-    // 日報内容
+    // 日報内容（既存のコード）
     if (report) {
-      html += `
-        <div class="past-form-section">
-          <label class="past-form-label">作業内容</label>
-          <div class="past-form-textarea">${report.work_content || ''}</div>
-        </div>
-        
-        <div class="row mb-3">
-          <div class="col-4">
-            <label class="past-form-label">体温</label>
-            <div class="past-form-value">${report.temperature}℃</div>
-          </div>
-          <div class="col-4">
-            <label class="past-form-label">食欲</label>
-            <div class="past-form-value">${this.formatAppetite(report.appetite)}</div>
-          </div>
-          <div class="col-4">
-            <label class="past-form-label">頓服服用</label>
-            <div class="past-form-value">${report.medication_time ? report.medication_time + '時頃' : 'なし'}</div>
-          </div>
-        </div>
-        
-        <div class="past-form-section">
-          <label class="past-form-label">振り返り・感想</label>
-          <div class="past-form-textarea">${report.reflection || ''}</div>
-        </div>
-      `;
+        html += `
+            <div class="past-form-section">
+                <label class="past-form-label">作業内容</label>
+                <div class="past-form-textarea">${report.work_content || ''}</div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-4">
+                    <label class="past-form-label">体温</label>
+                    <div class="past-form-value">${report.temperature}℃</div>
+                </div>
+                <div class="col-4">
+                    <label class="past-form-label">食欲</label>
+                    <div class="past-form-value">${this.formatAppetite(report.appetite)}</div>
+                </div>
+                <div class="col-4">
+                    <label class="past-form-label">頓服服用</label>
+                    <div class="past-form-value">${report.medication_time ? report.medication_time + '時頃' : 'なし'}</div>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-4">
+                    <label class="past-form-label">就寝時間</label>
+                    <div class="past-form-value">${report.bedtime || '-'}</div>
+                </div>
+                <div class="col-4">
+                    <label class="past-form-label">起床時間</label>
+                    <div class="past-form-value">${report.wakeup_time || '-'}</div>
+                </div>
+                <div class="col-4">
+                    <label class="past-form-label">睡眠状態</label>
+                    <div class="past-form-value">${this.formatSleepQuality(report.sleep_quality)}</div>
+                </div>
+            </div>
+            
+            <div class="past-form-section">
+                <label class="past-form-label">振り返り・感想</label>
+                <div class="past-form-textarea">${report.reflection || ''}</div>
+            </div>
+        `;
     }
     
-    // スタッフコメント
+    // スタッフコメント（既存のコード）
     if (staffComment) {
-      html += `
-        <hr>
-        <div class="staff-comment-display">
-          <div class="staff-comment-title">
-            <i class="fas fa-comment"></i> スタッフからのコメント
-          </div>
-          <div class="comment-box">${staffComment.comment}</div>
-          <small class="text-muted">
-            記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
-          </small>
-        </div>
-      `;
+        html += `
+            <hr>
+            <div class="staff-comment-display">
+                <div class="staff-comment-title">
+                    <i class="fas fa-comment"></i> スタッフからのコメント
+                </div>
+                <div class="comment-box">${staffComment.comment}</div>
+                <small class="text-muted">
+                    記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
+                </small>
+            </div>
+        `;
     }
     
     return html;

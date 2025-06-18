@@ -48,52 +48,78 @@ class AttendanceManagementSystem {
     }
 
     showLoginForm() {
-        const app = document.getElementById('app');
-        app.innerHTML = `
-            <div class="login-container">
-                <div class="card login-card">
-                    <div class="card-header bg-primary text-white text-center">
-                        <h3><i class="fas fa-clock"></i> 勤怠管理システム</h3>
+    const app = document.getElementById('app');
+    app.innerHTML = `
+        <div class="login-container">
+            <div class="card login-card">
+                <div class="card-header bg-primary text-white text-center">
+                    <h3><i class="fas fa-clock"></i> 勤怠管理システム</h3>
+                </div>
+                <div class="card-body">
+                    <!-- 時刻表示（大きめ） -->
+                    <div class="login-clock-display text-center mb-4">
+                        <div id="loginClock" class="display-4 text-primary">
+                            <i class="far fa-clock"></i> --:--:--
+                        </div>
+                        <div id="loginDate" class="h5 text-muted mt-2">
+                            ----年--月--日（-）
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <!-- 時刻表示（大きめ） -->
-                        <div class="login-clock-display text-center mb-4">
-                            <div id="loginClock" class="display-4 text-primary">
-                                <i class="far fa-clock"></i> --:--:--
-                            </div>
-                            <div id="loginDate" class="h5 text-muted mt-2">
-                                ----年--月--日（-）
+                    
+                    <hr class="my-4">
+                    
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">ユーザーID</label>
+                            <input type="text" class="form-control" id="username" required autofocus>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">パスワード</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="password" required>
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                                </button>
                             </div>
                         </div>
-                        
-                        <hr class="my-4">
-                        
-                        <form id="loginForm">
-                            <div class="mb-3">
-                                <label for="username" class="form-label">ユーザーID</label>
-                                <input type="text" class="form-control" id="username" required autofocus>
-                            </div>
-                            <div class="mb-3">
-                                <label for="password" class="form-label">パスワード</label>
-                                <input type="password" class="form-control" id="password" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-sign-in-alt"></i> ログイン
-                            </button>
-                        </form>
-                    </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-sign-in-alt"></i> ログイン
+                        </button>
+                    </form>
                 </div>
             </div>
-        `;
+        </div>
+    `;
 
-        // ログインフォームのイベントリスナー
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
-        }
-        
-        // ログイン画面の時計を開始
-        this.startLoginClock();
+    // ログインフォームのイベントリスナー
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+    }
+    
+    // パスワード表示/非表示トグル
+    const togglePasswordBtn = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const toggleIcon = document.getElementById('togglePasswordIcon');
+    
+    if (togglePasswordBtn && passwordInput && toggleIcon) {
+        togglePasswordBtn.addEventListener('click', () => {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // アイコンを切り替え
+            if (type === 'text') {
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        });
+    }
+    
+    // ログイン画面の時計を開始
+    this.startLoginClock();
     }
 
         // ログイン画面の時計機能（修正版）
