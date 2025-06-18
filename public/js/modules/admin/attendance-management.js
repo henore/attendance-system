@@ -336,26 +336,26 @@ export default class AdminAttendanceManagement {
     }
 
     async searchAttendanceRecords() {
-        try {
-            const searchDate = this.container.querySelector('#searchDate').value;
-            const searchRole = this.container.querySelector('#searchRole').value;
-            const searchUser = this.container.querySelector('#searchUser').value;
+    try {
+        const searchDate = this.container.querySelector('#searchDate').value;
+        const searchRole = this.container.querySelector('#searchRole').value;
+        const searchUser = this.container.querySelector('#searchUser').value;
 
-            const params = new URLSearchParams({ date: searchDate });
-            if (searchRole) params.append('role', searchRole);
-            if (searchUser) params.append('userId', searchUser);
+        const params = new URLSearchParams({ date: searchDate });
+        if (searchRole) params.append('role', searchRole);
+        if (searchUser) params.append('userId', searchUser);
 
-            const response = await this.parent.callApi(`${API_ENDPOINTS.ADMIN.ATTENDANCE_SEARCH}?${params}`);
-            this.currentRecords = response.records || [];
-            
-            this.updateSearchSummary(this.currentRecords, searchDate);
-            this.updateRecordsList(this.currentRecords);
-            
-        } catch (error) {
-            console.error('出勤記録検索エラー:', error);
-            this.showRecordsError('出勤記録の検索に失敗しました');
-        }
+        const response = await this.parent.callApi(`${API_ENDPOINTS.ADMIN.ATTENDANCE_SEARCH}?${params}`);
+        this.currentRecords = response.records || [];
+        
+        this.updateSearchSummary(this.currentRecords, searchDate);
+        this.updateRecordsList(this.currentRecords);
+        
+    } catch (error) {
+        console.error('出勤記録検索エラー:', error);
+        this.showRecordsError('出勤記録の検索に失敗しました');
     }
+}
 
     updateSearchSummary(records, searchDate) {
         const summaryContainer = this.container.querySelector('#searchSummary');
