@@ -65,35 +65,33 @@ export default class UserModule extends BaseModule {
   }
 
   async getLastReport() {
-    try {
-      const today = new Date();
-      let lastReportFound = null;
-      
-      // 過去30日間をチェック
-      for (let i = 1; i <= 30; i++) {
-        const checkDate = new Date(today);
-        checkDate.setDate(today.getDate() - i);
-        const dateStr = checkDate.toISOString().split('T')[0];
-        
-        const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
-        
-        if (response.attendance && response.report) {
-          lastReportFound = {
-            date: dateStr,
-            attendance: response.attendance,
-            report: response.report,
-            staffComment: response.staffComment || null
-          };
-          break;
-        }
+  try {
+    const serverTimeRes = await this.apiCall('/api/server-date');
+    const serverToday = new Date(serverTimeRes.serverDate);
+
+    for (let i = 1; i <= 30; i++) {
+      const checkDate = new Date(serverToday);
+      checkDate.setDate(serverToday.getDate() - i);
+      const dateStr = checkDate.toISOString().split('T')[0];
+
+      const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
+      if (response.attendance && response.report) {
+        return {
+          date: dateStr,
+          attendance: response.attendance,
+          report: response.report,
+          staffComment: response.staffComment || null
+        };
       }
-      
-      return lastReportFound;
-    } catch (error) {
-      console.error('前回記録取得エラー:', error);
-      return null;
     }
+
+    return null;
+  } catch (error) {
+    console.error('前回記録取得エラー:', error);
+    return null;
   }
+}
+
 
   render() {
     const content = document.getElementById('app-content');
