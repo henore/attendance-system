@@ -195,6 +195,7 @@ export default class UserModule extends BaseModule {
     `;
 
     this.setupEventListeners();
+    this.checkAndShowLastReportModal(); 
   }
 
   setupEventListeners() {
