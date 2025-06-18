@@ -215,7 +215,7 @@ export class UserAttendanceCalendar {
     return html;
   }
 
-  /**
+   /**
    * 出勤データを取得
    * @param {string} dateStr 
    * @returns {Object|null}
@@ -229,13 +229,18 @@ export class UserAttendanceCalendar {
     try {
       const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
       
+      // 休憩記録も取得
+      const breakResponse = await this.apiCall(API_ENDPOINTS.USER.BREAK_STATUS(dateStr));
+      
       const data = {
         hasAttendance: !!(response.attendance && response.attendance.clock_in),
         hasReport: !!response.report,
         hasComment: !!response.staffComment,
+        hasBreak: !!breakResponse.breakRecord,
         attendance: response.attendance,
         report: response.report,
-        staffComment: response.staffComment
+        staffComment: response.staffComment,
+        breakRecord: breakResponse.breakRecord
       };
       
       this.attendanceCache.set(dateStr, data);

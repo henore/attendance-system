@@ -208,7 +208,7 @@ export class StaffCommentHandler {
     `;
   }
 
-  /**
+ /**
    * コメントを保存
    */
   async saveComment(userId, userName) {
@@ -235,7 +235,12 @@ export class StaffCommentHandler {
       this.showNotification(`${userName}さんの日報にコメントを記入しました`, 'success');
 
       // モーダルを閉じる
-      modalManager.hide('staffCommentInputModal');
+      if (this.currentModalId) {
+        modalManager.hide(this.currentModalId);
+      }
+      
+      // currentCommentDataをクリア（重要）
+      this.currentCommentData = null;
       
       // コールバック実行
       if (this.onSave) {
