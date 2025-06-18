@@ -1,5 +1,5 @@
 // modules/user/calendar.js
-// 利用者の出勤履歴カレンダー（モーダル修正版）
+// 利用者の出勤履歴カレンダー（修正版 - 休憩時間表示対応・モーダル一意性修正）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { formatDate, getDaysInMonth } from '../../utils/date-time.js';
@@ -12,6 +12,7 @@ export class UserAttendanceCalendar {
     this.currentDate = new Date();
     this.attendanceCache = new Map();
     this.currentModalId = null; // 現在開いているモーダルのID
+    this.modalCounter = 0; // モーダル一意性確保用カウンター
   }
 
   /**
@@ -90,6 +91,9 @@ export class UserAttendanceCalendar {
       });
     }
 
+    // 既存のモーダルを全て破棄
+    this.destroyAllModals();
+
     // カレンダーグリッド更新
     gridElement.innerHTML = await this.generateCalendarGrid();
     this.setupDateClickHandlers();
@@ -153,17 +157,35 @@ export class UserAttendanceCalendar {
       if (dayOfWeek === 0) classes.push('sunday');
       if (dayOfWeek === 6) classes.push('saturday');
       
-      // 出勤状況による色分け
+      // 出勤状況による色分け（修正版）
       if (attendanceData && isCurrentMonth) {
         if (attendanceData.hasReport) {
-          classes.push('has-report');
+          classes.push('has-report'); // 日報提出済み（緑）
         } else if (attendanceData.hasAttendance) {
-          classes.push('has-attendance');
+          classes.push('has-attendance'); // 出勤記録あり（黄）
+        }
+        
+        // 休憩がある場合の追加スタイル
+        if (attendanceData.hasBreak) {
+          classes.push('has-break');
+        }
+      }
+
+      // ツールチップ情報追加
+      let tooltipText = '';
+      if (attendanceData && attendanceData.hasAttendance) {
+        const attendance = attendanceData.attendance;
+        tooltipText = `出勤: ${attendance.clock_in || '-'}`;
+        if (attendance.clock_out) {
+          tooltipText += ` | 退勤: ${attendance.clock_out}`;
+        }
+        if (attendanceData.hasBreak && attendanceData.breakRecord) {
+          tooltipText += ` | 休憩: ${attendanceData.breakRecord.duration || 60}分`;
         }
       }
 
       html += `
-        <div class="${classes.join(' ')}" data-date="${dateStr}">
+        <div class="${classes.join(' ')}" data-date="${dateStr}" ${tooltipText ? `title="${tooltipText}"` : ''}>
           <div class="calendar-day-number">${current.getDate()}</div>
           ${this.generateWorkIndicators(attendanceData)}
         </div>
@@ -210,13 +232,18 @@ export class UserAttendanceCalendar {
       html += '<span class="calendar-indicator indicator-comment" title="スタッフコメントあり"></span>';
     }
     
+    // 休憩マーク
+    if (attendanceData.hasBreak) {
+      html += '<span class="calendar-indicator indicator-break" title="休憩記録あり"></span>';
+    }
+    
     html += '</div>';
 
     return html;
   }
 
-   /**
-   * 出勤データを取得
+  /**
+   * 出勤データを取得（修正版 - 休憩記録対応）
    * @param {string} dateStr 
    * @returns {Object|null}
    */
@@ -281,15 +308,18 @@ export class UserAttendanceCalendar {
       } else {
         // キャッシュにない場合は再取得
         const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
+        const breakResponse = await this.apiCall(API_ENDPOINTS.USER.BREAK_STATUS(dateStr));
         
         if (response.attendance || response.report) {
           const data = {
             hasAttendance: !!(response.attendance && response.attendance.clock_in),
             hasReport: !!response.report,
             hasComment: !!response.staffComment,
+            hasBreak: !!breakResponse.breakRecord,
             attendance: response.attendance,
             report: response.report,
-            staffComment: response.staffComment
+            staffComment: response.staffComment,
+            breakRecord: breakResponse.breakRecord
           };
           
           this.attendanceCache.set(dateStr, data);
@@ -305,7 +335,7 @@ export class UserAttendanceCalendar {
   }
 
   /**
-   * 出勤詳細を表示（修正版）
+   * 出勤詳細を表示（修正版 - 一意性確保）
    * @param {string} dateStr 
    * @param {Object} data 
    */
@@ -320,8 +350,9 @@ export class UserAttendanceCalendar {
       weekday: 'long'
     });
 
-    // 一意のモーダルIDを生成
-    this.currentModalId = `userAttendanceDetailModal_${Date.now()}`;
+    // 一意のモーダルIDを生成（日付 + カウンター）
+    this.modalCounter++;
+    this.currentModalId = `userAttendanceDetailModal_${dateStr.replace(/-/g, '_')}_${this.modalCounter}`;
     
     // 日付に対応したコンテンツを生成
     const content = this.generateAttendanceDetailContent(data);
@@ -356,13 +387,35 @@ export class UserAttendanceCalendar {
         modalManager.destroy(this.currentModalId);
       } catch (error) {
         // モーダルが既に削除されている場合は無視
+        console.warn('モーダル破棄警告:', error);
       }
       this.currentModalId = null;
     }
   }
 
   /**
-   * 出勤詳細コンテンツを生成
+   * 全てのモーダルを破棄
+   */
+  destroyAllModals() {
+    this.destroyCurrentModal();
+    
+    // 残存するモーダル要素を強制削除
+    document.querySelectorAll('[id^="userAttendanceDetailModal_"]').forEach(modal => {
+      modal.remove();
+    });
+    
+    // backdrop要素も削除
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+      backdrop.remove();
+    });
+    
+    // body要素のクラスをクリア
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+  }
+
+  /**
+   * 出勤詳細コンテンツを生成（修正版 - 休憩時間表示対応）
    * @param {Object} data 
    * @returns {string}
    */
@@ -370,107 +423,114 @@ export class UserAttendanceCalendar {
     const { attendance, report, staffComment, breakRecord } = data;
     
     if (!attendance && !report) {
-        return '<p class="text-muted text-center">この日の記録はありません</p>';
+      return '<p class="text-muted text-center">この日の記録はありません</p>';
     }
 
     let html = '';
     
     // 出勤記録
     if (attendance) {
-        html += `
-            <div class="past-work-times mb-3">
-                <div class="row">
-                    <div class="col-6 text-center">
-                        <div class="past-work-time-label">出勤時間</div>
-                        <div class="past-work-time-value">${attendance.clock_in || '-'}</div>
-                    </div>
-                    <div class="col-6 text-center">
-                        <div class="past-work-time-label">退勤時間</div>
-                        <div class="past-work-time-value">${attendance.clock_out || '-'}</div>
-                    </div>
-                </div>
+      html += `
+        <div class="past-work-times mb-3">
+          <div class="row">
+            <div class="col-6 text-center">
+              <div class="past-work-time-label">出勤時間</div>
+              <div class="past-work-time-value">${attendance.clock_in || '-'}</div>
             </div>
-        `;
-        
-        // 休憩記録を追加
-        if (breakRecord) {
-            html += `
-                <div class="past-work-times mb-3">
-                    <div class="row">
-                        <div class="col-12 text-center">
-                            <div class="past-work-time-label">
-                                <i class="fas fa-coffee text-warning"></i> 休憩時間
-                            </div>
-                            <div class="past-work-time-value text-warning">
-                                ${breakRecord.start_time}〜${breakRecord.end_time || '進行中'} 
-                                ${breakRecord.duration ? `（${breakRecord.duration}分）` : ''}
-                            </div>
-                        </div>
-                    </div>
+            <div class="col-6 text-center">
+              <div class="past-work-time-label">退勤時間</div>
+              <div class="past-work-time-value">${attendance.clock_out || '-'}</div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // 休憩記録を追加（修正版 - エラー対策）
+      if (breakRecord && breakRecord.start_time) {
+        html += `
+          <div class="past-work-times mb-3">
+            <div class="row">
+              <div class="col-12 text-center">
+                <div class="past-work-time-label">
+                  <i class="fas fa-coffee text-warning"></i> 休憩時間
                 </div>
-            `;
-        }
+                <div class="past-work-time-value text-warning">
+                  ${breakRecord.start_time}〜${breakRecord.end_time || '進行中'} 
+                  ${breakRecord.duration ? `（${breakRecord.duration}分）` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
     }
     
-    // 日報内容（既存のコード）
+    // 日報内容
     if (report) {
-        html += `
-            <div class="past-form-section">
-                <label class="past-form-label">作業内容</label>
-                <div class="past-form-textarea">${report.work_content || ''}</div>
-            </div>
-            
-            <div class="row mb-3">
-                <div class="col-4">
-                    <label class="past-form-label">体温</label>
-                    <div class="past-form-value">${report.temperature}℃</div>
-                </div>
-                <div class="col-4">
-                    <label class="past-form-label">食欲</label>
-                    <div class="past-form-value">${this.formatAppetite(report.appetite)}</div>
-                </div>
-                <div class="col-4">
-                    <label class="past-form-label">頓服服用</label>
-                    <div class="past-form-value">${report.medication_time ? report.medication_time + '時頃' : 'なし'}</div>
-                </div>
-            </div>
-            
-            <div class="row mb-3">
-                <div class="col-4">
-                    <label class="past-form-label">就寝時間</label>
-                    <div class="past-form-value">${report.bedtime || '-'}</div>
-                </div>
-                <div class="col-4">
-                    <label class="past-form-label">起床時間</label>
-                    <div class="past-form-value">${report.wakeup_time || '-'}</div>
-                </div>
-                <div class="col-4">
-                    <label class="past-form-label">睡眠状態</label>
-                    <div class="past-form-value">${this.formatSleepQuality(report.sleep_quality)}</div>
-                </div>
-            </div>
-            
-            <div class="past-form-section">
-                <label class="past-form-label">振り返り・感想</label>
-                <div class="past-form-textarea">${report.reflection || ''}</div>
-            </div>
-        `;
+      html += `
+        <div class="past-form-section">
+          <label class="past-form-label">作業内容</label>
+          <div class="past-form-textarea">${report.work_content || ''}</div>
+        </div>
+        
+        <div class="row mb-3">
+          <div class="col-4">
+            <label class="past-form-label">体温</label>
+            <div class="past-form-value">${report.temperature}℃</div>
+          </div>
+          <div class="col-4">
+            <label class="past-form-label">食欲</label>
+            <div class="past-form-value">${this.formatAppetite(report.appetite)}</div>
+          </div>
+          <div class="col-4">
+            <label class="past-form-label">頓服服用</label>
+            <div class="past-form-value">${report.medication_time ? report.medication_time + '時頃' : 'なし'}</div>
+          </div>
+        </div>
+        
+        <div class="row mb-3">
+          <div class="col-4">
+            <label class="past-form-label">就寝時間</label>
+            <div class="past-form-value">${report.bedtime || '-'}</div>
+          </div>
+          <div class="col-4">
+            <label class="past-form-label">起床時間</label>
+            <div class="past-form-value">${report.wakeup_time || '-'}</div>
+          </div>
+          <div class="col-4">
+            <label class="past-form-label">睡眠状態</label>
+            <div class="past-form-value">${this.formatSleepQuality(report.sleep_quality)}</div>
+          </div>
+        </div>
+        
+        <div class="past-form-section">
+          <label class="past-form-label">振り返り・感想</label>
+          <div class="past-form-textarea">${report.reflection || ''}</div>
+        </div>
+        
+        ${report.interview_request ? `
+          <div class="past-form-section">
+            <label class="past-form-label">面談希望</label>
+            <div class="past-form-value">${this.formatInterviewRequest(report.interview_request)}</div>
+          </div>
+        ` : ''}
+      `;
     }
     
-    // スタッフコメント（既存のコード）
-    if (staffComment) {
-        html += `
-            <hr>
-            <div class="staff-comment-display">
-                <div class="staff-comment-title">
-                    <i class="fas fa-comment"></i> スタッフからのコメント
-                </div>
-                <div class="comment-box">${staffComment.comment}</div>
-                <small class="text-muted">
-                    記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
-                </small>
-            </div>
-        `;
+    // スタッフコメント
+    if (staffComment && staffComment.comment) {
+      html += `
+        <hr>
+        <div class="staff-comment-display">
+          <div class="staff-comment-title">
+            <i class="fas fa-comment"></i> スタッフからのコメント
+          </div>
+          <div class="comment-box">${staffComment.comment}</div>
+          <small class="text-muted">
+            記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
+          </small>
+        </div>
+      `;
     }
     
     return html;
@@ -484,12 +544,22 @@ export class UserAttendanceCalendar {
     return labels[value] || value;
   }
 
+  formatSleepQuality(value) {
+    const labels = { 'good': '眠れた', 'poor': 'あまり眠れない', 'bad': '眠れない' };
+    return labels[value] || value;
+  }
+
+  formatInterviewRequest(value) {
+    const labels = { 'consultation': '相談がある', 'interview': '面談希望' };
+    return labels[value] || value;
+  }
+
   /**
    * カレンダーをリフレッシュ
    */
   async refresh() {
     // 現在のモーダルを閉じる
-    this.destroyCurrentModal();
+    this.destroyAllModals();
     
     // キャッシュをクリア
     this.attendanceCache.clear();
@@ -509,6 +579,7 @@ export class UserAttendanceCalendar {
     
     let workDays = 0;
     let reportDays = 0;
+    let breakDays = 0;
     
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
@@ -518,12 +589,14 @@ export class UserAttendanceCalendar {
       if (data) {
         if (data.hasAttendance) workDays++;
         if (data.hasReport) reportDays++;
+        if (data.hasBreak) breakDays++;
       }
     }
     
     return {
       workDays,
       reportDays,
+      breakDays,
       totalDays: daysInMonth
     };
   }
@@ -532,7 +605,7 @@ export class UserAttendanceCalendar {
    * クリーンアップ
    */
   destroy() {
-    this.destroyCurrentModal();
+    this.destroyAllModals();
     this.attendanceCache.clear();
   }
 }
