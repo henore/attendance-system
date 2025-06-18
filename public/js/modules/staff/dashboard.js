@@ -240,20 +240,29 @@ export class StaffDashboard {
       `;
   }
   /**
-   * イベントハンドラーを設定
+   * イベントハンドラーを設定（修正版）
    */
   setupEventHandlers() {
+    // 既存のイベントリスナーをクリア
+    document.querySelectorAll('.btn-staff-comment').forEach(btn => {
+      // 複製して既存のイベントリスナーをクリア
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+    });
+
+    // 新しいイベントリスナーを設定
     document.querySelectorAll('.btn-staff-comment').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        e.preventDefault(); // 重複防止
         const userId = e.target.closest('button').getAttribute('data-user-id');
         const userName = e.target.closest('button').getAttribute('data-user-name');
         if (!e.target.closest('button').disabled) {
+          console.log(`[Dashboard] コメント開始: ${userName} (ID: ${userId})`);
           this.openCommentModal(userId, userName);
         }
       });
     });
   }
-
   /**
    * ダッシュボードを更新
    */

@@ -18,29 +18,29 @@ export class StaffReportNotification {
 
   /**
    * 監視を開始
- 
+ */
   startMonitoring() {
     // 5分ごとに新しい日報をチェック
     this.checkInterval = setInterval(() => {
       this.checkForNewReports();
-    }, 5 * 60 * 1000); // 5分
+    }, 1000 * 60 * 1000); // 5分
     
     // 初回チェック
     this.checkForNewReports();
     
-    console.log('📋 日報提出監視を開始しました（5分間隔）');
+    console.log('📋 日報提出監視を開始しました');
   }
 
   /**
    * 監視を停止
-
+*/
   stopMonitoring() {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
     }
   }
-  */
+  
   /**
    * 新しい日報をチェック
    */

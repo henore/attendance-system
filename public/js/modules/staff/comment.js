@@ -1,5 +1,5 @@
 // modules/staff/comment.js
-// スタッフのコメント機能ハンドラー
+// スタッフのコメント機能ハンドラー（バグ修正版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { MESSAGES } from '../../constants/labels.js';
@@ -14,15 +14,20 @@ export class StaffCommentHandler {
     this.currentUser = currentUser;
     this.commentLocks = new Map();
     this.onSave = null; // 保存後のコールバック
+    this.currentModalId = null; // 現在開いているモーダルID
+    this.currentCommentData = null; // 現在のコメントデータ
   }
 
   /**
-   * コメントモーダルを開く
+   * コメントモーダルを開く（修正版）
    */
   async openModal(userId, userName) {
     const today = new Date().toISOString().split('T')[0];
     
     try {
+      // 前回のモーダルとデータを確実にクリア
+      this.clearPreviousModal();
+      
       const response = await this.apiCall(API_ENDPOINTS.STAFF.REPORT(userId, today));
       
       if (!response.report) {
@@ -43,12 +48,22 @@ export class StaffCommentHandler {
       // コメントロックを設定
       this.setCommentLock(userId);
 
+      // 現在のコメントデータを設定（保存時に使用）
+      this.currentCommentData = { 
+        userId: userId, 
+        userName: userName,
+        date: today 
+      };
+
+      // 一意のモーダルIDを生成
+      this.currentModalId = `staffCommentInputModal_${userId}_${Date.now()}`;
+
       // モーダルの内容を生成
       const modalContent = this.generateModalContent(response);
       
       // モーダルを作成
-      const modalId = modalManager.create({
-        id: 'staffCommentInputModal',
+      modalManager.create({
+        id: this.currentModalId,
         title: `<i class="fas fa-comment-plus"></i> ${userName}さんの日報にコメント記入`,
         content: modalContent,
         size: 'modal-lg',
@@ -56,24 +71,59 @@ export class StaffCommentHandler {
         saveButton: true,
         saveButtonText: '保存',
         saveButtonClass: 'btn-primary',
-        onSave: () => this.saveComment(userId, userName)
+        onSave: () => this.saveComment()
       });
 
       // モーダル表示
-      modalManager.show(modalId);
+      modalManager.show(this.currentModalId);
 
       // モーダル閉じた時のクリーンアップ
-      const modal = document.getElementById(modalId);
-      modal.addEventListener('hidden.bs.modal', () => {
-        this.removeCommentLock(userId);
-      }, { once: true });
+      const modal = document.getElementById(this.currentModalId);
+      if (modal) {
+        modal.addEventListener('hidden.bs.modal', () => {
+          this.clearCurrentModal();
+        }, { once: true });
+      }
 
       // 文字数カウント設定
       this.setupCharacterCount();
 
     } catch (error) {
       console.error('コメントモーダル表示エラー:', error);
+      this.clearCurrentModal();
     }
+  }
+
+  /**
+   * 前回のモーダルとデータをクリア
+   */
+  clearPreviousModal() {
+    // 既存のモーダルがあれば破棄
+    if (this.currentModalId) {
+      try {
+        modalManager.destroy(this.currentModalId);
+      } catch (error) {
+        console.warn('前回モーダル破棄エラー:', error);
+      }
+    }
+    
+    // データをクリア
+    this.currentModalId = null;
+    this.currentCommentData = null;
+  }
+
+  /**
+   * 現在のモーダルをクリア
+   */
+  clearCurrentModal() {
+    // コメントロックを解除
+    if (this.currentCommentData && this.currentCommentData.userId) {
+      this.removeCommentLock(this.currentCommentData.userId);
+    }
+    
+    // データをクリア
+    this.currentModalId = null;
+    this.currentCommentData = null;
   }
 
   /**
@@ -208,11 +258,17 @@ export class StaffCommentHandler {
     `;
   }
 
- /**
-   * コメントを保存
+  /**
+   * コメントを保存（修正版）
    */
-  async saveComment(userId, userName) {
+  async saveComment() {
     try {
+      // 現在のコメントデータを確認
+      if (!this.currentCommentData) {
+        this.showNotification('コメントデータが設定されていません', 'danger');
+        return;
+      }
+
       const textarea = document.getElementById('staffCommentInputText');
       const comment = textarea ? textarea.value.trim() : '';
       
@@ -221,13 +277,13 @@ export class StaffCommentHandler {
         return;
       }
 
-      const today = new Date().toISOString().split('T')[0];
+      const { userId, userName, date } = this.currentCommentData;
       
       await this.apiCall(API_ENDPOINTS.STAFF.COMMENT, {
         method: 'POST',
         body: JSON.stringify({
           userId: userId,
-          date: today,
+          date: date,
           comment: comment
         })
       });
@@ -239,8 +295,8 @@ export class StaffCommentHandler {
         modalManager.hide(this.currentModalId);
       }
       
-      // currentCommentDataをクリア（重要）
-      this.currentCommentData = null;
+      // データをクリア
+      this.clearCurrentModal();
       
       // コールバック実行
       if (this.onSave) {
@@ -412,5 +468,13 @@ export class StaffCommentHandler {
    */
   clearCommentLocks() {
     this.commentLocks.clear();
+  }
+
+  /**
+   * クリーンアップ
+   */
+  destroy() {
+    this.clearPreviousModal();
+    this.clearCommentLocks();
   }
 }
