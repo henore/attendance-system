@@ -271,34 +271,32 @@ export default class UserModule extends BaseModule {
     }
   }
 
-    /**
-     * 出勤処理
-     */
-    async handleClockIn() {
-        // 前回記録の確認チェック
-        if (this.state.lastReportData && !this.state.hasConfirmedLastReport) {
-            this.app.showNotification('前回の記録を確認してください', 'warning');
-            return;
-        }
-
-        const result = await this.attendanceHandler.clockIn();
-        if (result.success) {
-            this.state.currentAttendance = result.attendance;
-            this.state.isWorking = true;
-            this.state.hasClockInToday = true;  // 出勤フラグを設定
-            
-            this.breakHandler.resetBreakState();
-            this.updateAttendanceUI();
-            
-            // ログアウトボタンを非表示
-            this.app.hideLogoutButtonForUser();
-            
-            // 出勤後の警告設定を更新
-            this.updatePageLeaveWarning();
-            
-            this.app.showNotification('出勤しました。本日の業務を開始してください。', 'success');
-        }
+  /**
+   * 出勤処理
+   */
+  async handleClockIn() {
+    // 前回記録の確認チェック
+    if (this.state.lastReportData && !this.state.hasConfirmedLastReport) {
+      this.app.showNotification('前回の記録を確認してください', 'warning');
+      return;
     }
+
+    const result = await this.attendanceHandler.clockIn();
+    if (result.success) {
+      this.state.currentAttendance = result.attendance;
+      this.state.isWorking = true;
+      this.state.hasClockInToday = true;  // 出勤フラグを設定
+      
+      this.breakHandler.resetBreakState();
+      this.updateAttendanceUI();
+      this.updateLogoutButtonVisibility();
+      
+      // 出勤後の警告設定を更新
+      this.updatePageLeaveWarning();
+      
+      this.app.showNotification('出勤しました。本日の業務を開始してください。', 'success');
+    }
+  }
 
   /**
    * 退勤処理
@@ -327,18 +325,13 @@ export default class UserModule extends BaseModule {
    * 日報フォームを読み込み
    */
   async loadReportForm() {
-      const container = document.getElementById('reportFormContainer');
-      await this.reportHandler.loadForm(container, this.state.currentAttendance);
-      this.state.hasTodayReport = this.reportHandler.hasTodayReport;
-      
-      // 日報提出済みの場合はログアウトボタンを表示
-      if (this.state.hasTodayReport) {
-          this.app.showLogoutButtonForUser();
-      }
-      
-      // 日報提出状況に応じて警告を更新
-      this.updatePageLeaveWarning();
-    }
+    const container = document.getElementById('reportFormContainer');
+    await this.reportHandler.loadForm(container, this.state.currentAttendance);
+    this.state.hasTodayReport = this.reportHandler.hasTodayReport;
+    
+    // 日報提出状況に応じて警告を更新
+    this.updatePageLeaveWarning();
+  }
 
   /**
    * カレンダーを読み込み
