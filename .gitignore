@@ -1,0 +1,20 @@
+# node_modules やログファイル
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# 環境ファイルや秘密鍵
+.env
+
+# データベースファイル
+*.sqlite
+*.db
+*.sqlite3
+
+# IDE系の設定
+.vscode/
+.idea/
+
+# OSによる不要ファイル
+.DS_Store
+Thumbs.db
