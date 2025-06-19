@@ -1,5 +1,5 @@
 // modules/staff/report-notification.js
-// スタッフの日報提出通知機能ハンドラー
+// スタッフの日報提出通知機能ハンドラー（統合版対応）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from '../shared/modal-manager.js';
@@ -18,12 +18,12 @@ export class StaffReportNotification {
 
   /**
    * 監視を開始
- */
+   */
   startMonitoring() {
     // 5分ごとに新しい日報をチェック
     this.checkInterval = setInterval(() => {
       this.checkForNewReports();
-    }, 1000 * 60 * 1000); // 5分
+    }, 5 * 60 * 1000); // 5分
     
     // 初回チェック
     this.checkForNewReports();
@@ -33,7 +33,7 @@ export class StaffReportNotification {
 
   /**
    * 監視を停止
-*/
+   */
   stopMonitoring() {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
@@ -45,47 +45,50 @@ export class StaffReportNotification {
    * 新しい日報をチェック
    */
   async checkForNewReports() {
-      try {
-          const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS);
-          const currentReports = new Set();
-          const newReports = [];
-          const uncommentedReports = [];  // 追加
+    try {
+      const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS);
+      const currentReports = new Set();
+      const newReports = [];
+      const uncommentedReports = [];
+      
+      response.users.forEach(user => {
+        if (user.report_id) {
+          currentReports.add(user.report_id);
           
-          response.users.forEach(user => {
-              if (user.report_id) {
-                  currentReports.add(user.report_id);
-                  
-                  // コメント未記入の日報をチェック
-                  if (!user.comment_id) {
-                      uncommentedReports.push({
-                          userId: user.id,
-                          userName: user.name,
-                          reportId: user.report_id
-                      });
-                      
-                      // 新規日報の場合
-                      if (!this.lastCheckedReports.has(user.report_id)) {
-                          newReports.push({
-                              userId: user.id,
-                              userName: user.name,
-                              reportId: user.report_id
-                          });
-                      }
-                  }
-              }
-          });
-          
-          // 新しい日報または未コメント日報がある場合は通知
-          if (newReports.length > 0 || uncommentedReports.length > 0) {
-              this.showReportNotification(newReports, uncommentedReports);
+          // コメント未記入の日報をチェック
+          if (!user.comment_id) {
+            uncommentedReports.push({
+              userId: user.id,
+              userName: user.name,
+              reportId: user.report_id
+            });
+            
+            // 新規日報の場合
+            if (!this.lastCheckedReports.has(user.report_id)) {
+              newReports.push({
+                userId: user.id,
+                userName: user.name,
+                reportId: user.report_id
+              });
+            }
           }
-          
-          // チェック済みリストを更新
-          this.lastCheckedReports = currentReports;
-          
-      } catch (error) {
-          console.error('日報チェックエラー:', error);
+        }
+      });
+      
+      // 新しい日報がある場合は通知
+      if (newReports.length > 0) {
+        this.showReportNotification(newReports);
       }
+      
+      // 通知バッジを更新（未コメント数で表示）
+      this.updateNotificationBadge(uncommentedReports.length);
+      
+      // チェック済みリストを更新
+      this.lastCheckedReports = currentReports;
+      
+    } catch (error) {
+      console.error('日報チェックエラー:', error);
+    }
   }
 
   /**
@@ -102,37 +105,47 @@ export class StaffReportNotification {
     this.showNotificationModal(newReports);
     
     // 通知保存（コメント記入へ誘導用）
-    this.pendingNotifications = newReports;
+    this.pendingNotifications = [...this.pendingNotifications, ...newReports];
   }
 
   /**
    * 通知モーダルを表示
    */
   showNotificationModal(newReports) {
-    let content = '<ul class="list-unstyled">';
+    let content = `
+      <div class="alert alert-warning">
+        <i class="fas fa-bell"></i> <strong>新しい日報が提出されました</strong>
+      </div>
+      <ul class="list-unstyled mb-3">
+    `;
     
     newReports.forEach(report => {
       content += `
         <li class="mb-2">
-          <i class="fas fa-user"></i> 
+          <i class="fas fa-user text-primary"></i> 
           <strong>${report.userName}</strong>さんが日報を提出しました
         </li>
       `;
     });
     
-    content += '</ul>';
-    content += '<p class="text-warning mb-0"><i class="fas fa-exclamation-triangle"></i> コメントの記入をお願いします</p>';
+    content += `
+      </ul>
+      <p class="text-info mb-0">
+        <i class="fas fa-comment"></i> 
+        利用者出勤状況画面でコメントを記入してください
+      </p>
+    `;
 
     const modalId = modalManager.create({
       id: 'reportNotificationModal',
-      title: '<i class="fas fa-bell"></i> 新しい日報が提出されました',
+      title: '<i class="fas fa-bell"></i> 日報提出通知',
       content: content,
       size: 'modal-md',
       headerClass: 'bg-warning text-dark',
       saveButton: true,
-      saveButtonText: 'コメントを記入',
+      saveButtonText: 'コメント記入画面へ',
       saveButtonClass: 'btn-primary',
-      onSave: () => this.goToReportFromNotification()
+      onSave: () => this.goToAttendanceManagement()
     });
 
     modalManager.show(modalId);
@@ -143,19 +156,25 @@ export class StaffReportNotification {
    */
   playNotificationSound() {
     try {
-      // Base64エンコードされた短い通知音
-      const soundData = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjiS2Oy9diMFl2+z9N17RwstdWNvuKrc7dVnhkklkqupfkdeUniFlJunqFpOkqOrqJpUTk0';
-      
+      // 簡単な通知音（ビープ音）
       if (!this.notificationSound) {
-        this.notificationSound = new Audio(soundData);
-        this.notificationSound.volume = 0.5;
+        // AudioContextを使用した簡単な通知音
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
       }
-      
-      this.notificationSound.play().catch(e => {
-        console.warn('通知音の再生に失敗:', e);
-      });
     } catch (error) {
-      console.error('音声再生エラー:', error);
+      console.warn('通知音の再生に失敗:', error);
     }
   }
 
@@ -176,34 +195,64 @@ export class StaffReportNotification {
       const title = '新しい日報が提出されました';
       const body = newReports.map(r => r.userName).join('、') + 'さんが日報を提出しました';
       
-      new Notification(title, {
+      const notification = new Notification(title, {
         body: body,
         icon: '/favicon.ico',
         tag: 'report-notification',
         requireInteraction: true
       });
+
+      // 通知クリック時の処理
+      notification.onclick = () => {
+        window.focus();
+        this.goToAttendanceManagement();
+        notification.close();
+      };
     }
   }
 
   /**
-   * 通知からダッシュボードへ遷移
+   * 通知から利用者出勤状況画面へ遷移（修正版）
    */
-  goToReportFromNotification() {
+  goToAttendanceManagement() {
     // モーダルを閉じる
     modalManager.hide('reportNotificationModal');
     
-    // ダッシュボードに切り替え
-    this.switchToSection('dashboardSection');
+    // 利用者出勤状況画面に切り替え（統合版）
+    this.switchToSection('attendanceManagementSection');
     
     // メニューボタンのアクティブ状態を更新
     document.querySelectorAll('.staff-menu-btn').forEach(b => b.classList.remove('active'));
-    const dashboardBtn = document.querySelector('[data-target="dashboardSection"]');
-    if (dashboardBtn) {
-      dashboardBtn.classList.add('active');
+    const attendanceBtn = document.querySelector('[data-target="attendanceManagementSection"]');
+    if (attendanceBtn) {
+      attendanceBtn.classList.add('active');
     }
     
-    // 通知をクリア
+    // 処理済み通知をクリア
     this.pendingNotifications = [];
+    this.updateNotificationBadge(0);
+  }
+
+  /**
+   * 通知バッジを更新（修正版）
+   */
+  updateNotificationBadge(count = null) {
+    const badge = document.getElementById('notificationBadge');
+    
+    if (count === null) {
+      count = this.getPendingNotificationCount();
+    }
+    
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+        badge.className = 'notification-badge animate__animated animate__pulse';
+      } else {
+        badge.style.display = 'none';
+        badge.className = 'notification-badge';
+      }
+    }
   }
 
   /**
@@ -211,23 +260,6 @@ export class StaffReportNotification {
    */
   getPendingNotificationCount() {
     return this.pendingNotifications.length;
-  }
-
-  /**
-   * 通知バッジを更新
-   */
-  updateNotificationBadge() {
-    const count = this.getPendingNotificationCount();
-    const badge = document.getElementById('notificationBadge');
-    
-    if (badge) {
-      if (count > 0) {
-        badge.textContent = count;
-        badge.style.display = 'inline-block';
-      } else {
-        badge.style.display = 'none';
-      }
-    }
   }
 
   /**
@@ -269,12 +301,23 @@ export class StaffReportNotification {
     // 設定に基づいて監視間隔を更新
     if (this.settings.enabled) {
       this.stopMonitoring();
-      this.checkInterval = setInterval(() => {
-        this.checkForNewReports();
-      }, this.settings.checkInterval * 60 * 1000);
+      this.startMonitoring();
     } else {
       this.stopMonitoring();
     }
+  }
+
+  /**
+   * コメント記入完了時の処理
+   */
+  onCommentCompleted(userId) {
+    // 該当する通知を削除
+    this.pendingNotifications = this.pendingNotifications.filter(
+      notification => notification.userId !== userId
+    );
+    
+    // バッジを更新
+    this.updateNotificationBadge();
   }
 
   /**
