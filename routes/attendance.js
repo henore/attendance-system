@@ -115,6 +115,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 success: true,
                 attendance,
                 time: clockInTime,
+                date: today,
                 message: `出勤しました（${clockInTime}）`
             });
             
@@ -176,6 +177,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             res.json({ 
                 success: true,
                 attendance: updatedAttendance,
+                time: clockOutTime,
                 time: clockOutTime,
                 message: `退勤しました（${clockOutTime}）`
             });

@@ -1,6 +1,3 @@
-// modules/user/index.js
-// 利用者機能モジュール - メインクラス（修正版）
-
 import BaseModule from '../../base-module.js';
 import { UserAttendanceHandler } from './attendance.js';
 import { UserReportHandler } from './report.js';
@@ -42,14 +39,20 @@ export default class UserModule extends BaseModule {
       this.app.showNotification.bind(this.app)
     );
     
+    this.termsModal = new TermsModal(
+      this.attendanceHandler.updateClockInButtonState.bind(this.attendanceHandler),
+      this.app.showNotification.bind(this.app)
+    );
+    
     // 状態管理
     this.state = {
       currentAttendance: null,
       isWorking: false,
       hasTodayReport: false,
       hasConfirmedLastReport: false,
+      hasAcceptedTerms: false,  // 利用規約同意フラグ追加
       lastReportData: null,
-      hasClockInToday: false  // 今日出勤したかのフラグ
+      hasClockInToday: false
     };
     
     // ページ離脱警告用
@@ -62,8 +65,78 @@ export default class UserModule extends BaseModule {
     this.render();
     await this.loadInitialData();
     this.setupPageLeaveWarning();
-    await this.checkAndShowLastReportModal();
+    
+    // モーダル表示は出勤前のみ
+    if (!this.state.hasClockInToday) {
+      await this.showInitialModals();
+    }
   }
+
+  /**
+   * 初回モーダル表示（前回記録確認→利用規約）
+   */
+  async showInitialModals() {
+    // 1. 前回記録確認モーダル
+    const lastReport = await this.attendanceHandler.getLastReport();
+    if (lastReport) {
+      this.state.lastReportData = lastReport;
+      
+      // 前回記録確認モーダルを表示し、確認完了を待つ
+      await new Promise((resolve) => {
+        this.lastReportModal.show(lastReport, () => {
+          this.state.hasConfirmedLastReport = true;
+          resolve();
+        });
+      });
+      
+      // モーダルが完全に閉じるまで待機
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } else {
+      this.state.hasConfirmedLastReport = true;
+    }
+    
+    // 2. 利用規約モーダル
+    await new Promise((resolve) => {
+      this.termsModal.show(() => {
+        this.state.hasAcceptedTerms = true;
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * 出勤処理
+   */
+  async handleClockIn() {
+    // 前回記録の確認チェック
+    if (this.state.lastReportData && !this.state.hasConfirmedLastReport) {
+      this.app.showNotification('前回の記録を確認してください', 'warning');
+      return;
+    }
+    
+    // 利用規約の同意チェック
+    if (!this.state.hasAcceptedTerms) {
+      this.app.showNotification('利用規約に同意してください', 'warning');
+      return;
+    }
+
+    const result = await this.attendanceHandler.clockIn();
+    if (result.success) {
+      this.state.currentAttendance = result.attendance;
+      this.state.isWorking = true;
+      this.state.hasClockInToday = true;
+      
+      this.breakHandler.resetBreakState();
+      this.updateAttendanceUI();
+      this.updateLogoutButtonVisibility();
+      
+      // 出勤後の警告設定を更新
+      this.updatePageLeaveWarning();
+      
+      this.app.showNotification('出勤しました。本日の業務を開始してください。', 'success');
+    }
+  }
+
 
   async getLastReport() {
   try {
@@ -81,7 +154,7 @@ export default class UserModule extends BaseModule {
           date: dateStr,
           attendance: response.attendance,
           report: response.report,
-          staffComment: response.staffComment || null
+          stafshowInitialModalsfComment: response.staffComment || null
         };
       }
     }
@@ -231,10 +304,16 @@ export default class UserModule extends BaseModule {
     // 今日出勤したかのフラグを設定
     this.state.hasClockInToday = !!(result.attendance && result.attendance.clock_in);
     
-    if (result.attendance) {
-      await this.breakHandler.loadBreakStatus(this.state.currentAttendance);
+    // 既に出勤している場合は、モーダル確認済みとする
+    if (this.state.hasClockInToday) {
+      this.state.hasConfirmedLastReport = true;
+      this.state.hasAcceptedTerms = true;
     }
     
+    if (result.attendance) {
+    await this.breakHandler.loadBreakStatus(this.state.currentAttendance);
+    }
+
     this.updateAttendanceUI();
     this.updateLogoutButtonVisibility();
   }
@@ -267,33 +346,6 @@ export default class UserModule extends BaseModule {
     } else {
       // 出勤前はログアウトボタンを表示
       this.app.showLogoutButtonForUser();
-    }
-  }
-
-  /**
-   * 出勤処理
-   */
-  async handleClockIn() {
-    // 前回記録の確認チェック
-    if (this.state.lastReportData && !this.state.hasConfirmedLastReport) {
-      this.app.showNotification('前回の記録を確認してください', 'warning');
-      return;
-    }
-
-    const result = await this.attendanceHandler.clockIn();
-    if (result.success) {
-      this.state.currentAttendance = result.attendance;
-      this.state.isWorking = true;
-      this.state.hasClockInToday = true;  // 出勤フラグを設定
-      
-      this.breakHandler.resetBreakState();
-      this.updateAttendanceUI();
-      this.updateLogoutButtonVisibility();
-      
-      // 出勤後の警告設定を更新
-      this.updatePageLeaveWarning();
-      
-      this.app.showNotification('出勤しました。本日の業務を開始してください。', 'success');
     }
   }
 
@@ -352,7 +404,7 @@ export default class UserModule extends BaseModule {
 
   /**
    * 前回出勤記録の確認
-   */
+ 
   async checkAndShowLastReportModal() {
     if (this.state.currentAttendance && this.state.currentAttendance.clock_in) {
       return;
@@ -366,7 +418,8 @@ export default class UserModule extends BaseModule {
       });
     }
   }
-
+  */
+ 
   /**
    * 未読コメントチェック
    */
