@@ -9,6 +9,7 @@ import { UserAttendanceCalendar } from './calendar.js';
 import { modalManager } from '../shared/modal-manager.js';
 import { LastReportModal } from './last-report-modal.js';
 import { MESSAGES } from '../../constants/labels.js';
+import { TermsModal } from './terms-modal.js';
 
 export default class UserModule extends BaseModule {
   constructor(app) {
