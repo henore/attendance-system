@@ -44,25 +44,45 @@ export class StaffDashboard {
     }
   }
 
-  /**
-   * データを読み込み（修正版 - 既存APIレスポンスから休憩データを取得）
-   */
-  async loadData() {
-    try {
-      const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS);
-      const userStatusContainer = document.getElementById('userStatusList');
-      
-      if (userStatusContainer && response.users) {
-        userStatusContainer.innerHTML = this.generateUserStatusList(response.users);
-        this.setupEventHandlers();
+    /**
+     * データを読み込み（修正版 - 休憩データを別途取得）
+     */
+    async loadData() {
+      try {
+        const response = await this.apiCall(API_ENDPOINTS.STAFF.USERS);
+        const userStatusContainer = document.getElementById('userStatusList');
+        
+        if (userStatusContainer && response.users) {
+          // 各ユーザーの休憩データを取得
+          const today = new Date().toISOString().split('T')[0];
+          const usersWithBreaks = await Promise.all(response.users.map(async (user) => {
+            try {
+              // 出勤中の利用者のみ休憩データを取得
+              if (user.clock_in && !user.clock_out) {
+                const breakResponse = await this.apiCall(`/api/user/break/status/${today}`.replace('/user/', `/staff/user/${user.id}/`));
+                if (breakResponse.breakRecord) {
+                  return {
+                    ...user,
+                    break_start: breakResponse.breakRecord.start_time,
+                    break_end: breakResponse.breakRecord.end_time
+                  };
+                }
+              }
+            } catch (error) {
+              console.warn(`休憩データ取得エラー (${user.name}):`, error);
+            }
+            return user;
+          }));
+          
+          userStatusContainer.innerHTML = this.generateUserStatusList(usersWithBreaks);
+          this.setupEventHandlers();
+        }
+      } catch (error) {
+        console.error('ダッシュボードデータ読み込みエラー:', error);
+        this.showError('ダッシュボードデータの読み込みに失敗しました');
       }
-    } catch (error) {
-      console.error('ダッシュボードデータ読み込みエラー:', error);
-      this.showError('ダッシュボードデータの読み込みに失敗しました');
     }
-  }
-
-  /**
+    /**
    * エラー表示
    */
   showError(message) {

@@ -336,8 +336,8 @@ export default class AdminAttendanceManagement {
     }
 
     /**
-     * 出勤記録を検索（修正版 - 休憩データ取得追加）
-     */
+ * 出勤記録を検索（修正版 - 休憩データ取得修正）
+ */
     async searchAttendanceRecords() {
     try {
         const searchDate = this.container.querySelector('#searchDate').value;
@@ -355,15 +355,19 @@ export default class AdminAttendanceManagement {
         if (records.length > 0) {
         records = await Promise.all(records.map(async (record) => {
             try {
-            // 休憩データを取得
-            const breakResponse = await this.parent.callApi(API_ENDPOINTS.USER.BREAK_STATUS(record.date).replace('/user/', `/admin/user/${record.user_id}/`));
-            return {
+            // 利用者の休憩データのみ取得（スタッフは除外）
+            if (record.user_role === 'user') {
+                const breakResponse = await this.parent.callApi(`/api/admin/user/${record.user_id}/break/status/${record.date}`);
+                return {
                 ...record,
                 breakRecord: breakResponse.breakRecord || null
-            };
+                };
+            }
+            // スタッフの場合は、recordに含まれるbreak_start/break_endを使用
+            return record;
             } catch (error) {
             console.warn(`休憩データ取得エラー (${record.user_name}):`, error);
-            return { ...record, breakRecord: null };
+            return record;
             }
         }));
         }
@@ -377,7 +381,7 @@ export default class AdminAttendanceManagement {
         console.error('出勤記録検索エラー:', error);
         this.showRecordsError('出勤記録の検索に失敗しました');
     }
-   }
+    }
 
     updateSearchSummary(records, searchDate) {
         const summaryContainer = this.container.querySelector('#searchSummary');
@@ -532,41 +536,44 @@ async searchAttendanceRecords() {
         `${this.parent.calculateWorkDuration(record)}時間` : null;
         const statusBadge = this.parent.getStatusBadge(record.status);
 
-        // 休憩時間の表示（修正版）
+        // 休憩時間の表示（修正版 - スタッフ/利用者で処理を分岐）
         let breakTimeDisplay = '-';
-        if (record.breakRecord && record.breakRecord.start_time) {
-        if (record.breakRecord.end_time) {
+        
+        // 利用者の場合
+        if (record.user_role === 'user' && record.breakRecord && record.breakRecord.start_time) {
+          if (record.breakRecord.end_time) {
             breakTimeDisplay = `
-            <div class="break-time-display">
+              <div class="break-time-display">
                 <div class="fw-bold text-info">${record.breakRecord.start_time}〜${record.breakRecord.end_time}</div>
                 <small class="text-muted">(${record.breakRecord.duration || 60}分)</small>
-            </div>
+              </div>
             `;
-        } else {
+          } else {
             breakTimeDisplay = `
-            <div class="break-time-display">
+              <div class="break-time-display">
                 <div class="fw-bold text-warning">${record.breakRecord.start_time}〜</div>
                 <small class="text-warning">(進行中)</small>
-            </div>
+              </div>
             `;
+          }
         }
-        } else if (record.break_start) {
-        // フォールバック: 直接のbreak_startがある場合
-        if (record.break_end) {
+        // スタッフの場合
+        else if ((record.user_role === 'staff' || record.user_role === 'admin') && record.break_start) {
+          if (record.break_end) {
             breakTimeDisplay = `
-            <div class="break-time-display">
+              <div class="break-time-display">
                 <div class="fw-bold text-info">${record.break_start}〜${record.break_end}</div>
                 <small class="text-muted">(60分)</small>
-            </div>
+              </div>
             `;
-        } else {
+          } else {
             breakTimeDisplay = `
-            <div class="break-time-display">
+              <div class="break-time-display">
                 <div class="fw-bold text-warning">${record.break_start}〜</div>
                 <small class="text-warning">(進行中)</small>
-            </div>
+              </div>
             `;
-        }
+          }
         }
 
         // 日報・コメント状況
