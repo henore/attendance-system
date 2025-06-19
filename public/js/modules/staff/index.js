@@ -10,6 +10,7 @@ import { StaffAttendanceBook } from './attendance-book.js';
 import { StaffMonthlyReport } from './monthly-report.js';
 import { StaffReportNotification } from './report-notification.js';
 import { MESSAGES } from '../../constants/labels.js';
+import AttendanceManagement from '../shared/attendance-management.js';
 
 export default class StaffModule extends BaseModule {
   constructor(app) {
