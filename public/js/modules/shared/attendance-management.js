@@ -355,6 +355,52 @@ export class SharedAttendanceManagement {
       const response = await this.parent.callApi(`${endpoint}?${params}`);
       let records = response.records || [];
       
+      // データが取得できない場合、全ユーザーの今日の状況を取得
+      if (records.length === 0 && !searchUser) {
+        // 管理者の場合
+        if (this.userRole === 'admin') {
+          const statusResponse = await this.parent.callApi('/api/admin/status/today');
+          if (statusResponse.users) {
+            records = statusResponse.users.map(user => ({
+              id: user.a_id || null,
+              user_id: user.id,
+              user_name: user.name,
+              user_role: user.role,
+              date: searchDate,
+              clock_in: user.clock_in || null,
+              clock_out: user.clock_out || null,
+              status: user.status || 'normal',
+              report_id: user.report_id || null,
+              comment_id: user.comment || null,
+              break_start: null,
+              break_end: null,
+              break_duration: null
+            }));
+          }
+        }
+        // スタッフの場合
+        else if (this.userRole === 'staff') {
+          const usersResponse = await this.parent.callApi('/api/staff/users');
+          if (usersResponse.users) {
+            records = usersResponse.users.map(user => ({
+              id: user.a_id || null,
+              user_id: user.id,
+              user_name: user.name,
+              user_role: user.role,
+              date: searchDate,
+              clock_in: user.clock_in || null,
+              clock_out: user.clock_out || null,
+              status: user.status || 'normal',
+              report_id: user.report_id || null,
+              comment_id: user.comment_id || null,
+              break_start: null,
+              break_end: null,
+              break_duration: null
+            }));
+          }
+        }
+      }
+      
       // レスポンスに既に休憩データが含まれているかチェック（修正版）
       this.currentRecords = records.map(record => {
         // レスポンスから直接break情報を取得
