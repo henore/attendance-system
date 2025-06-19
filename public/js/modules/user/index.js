@@ -336,21 +336,25 @@ export default class UserModule extends BaseModule {
     }
   }
 
-  /**
-   * ログアウトボタンの表示制御
-   */
   updateLogoutButtonVisibility() {
-    if (this.state.hasClockInToday) {
-      // 今日出勤した場合はログアウトボタンを非表示
-      this.app.hideLogoutButtonForUser();
-    } else {
-      // 出勤前はログアウトボタンを表示
+    // 退勤済みかつ日報提出済みの場合にログアウトボタンを表示
+    const isFinishedWorkAndReport = !this.state.isWorking && 
+                                    this.state.currentAttendance && 
+                                    this.state.currentAttendance.clock_out && 
+                                    this.state.hasTodayReport;
+    
+    // 出勤前の場合もログアウトボタンを表示
+    const isBeforeWork = !this.state.hasClockInToday;
+    
+    if (isFinishedWorkAndReport || isBeforeWork) {
       this.app.showLogoutButtonForUser();
+    } else {
+      this.app.hideLogoutButtonForUser();
     }
   }
 
   /**
-   * 退勤処理
+   * 退勤処理（修正版）
    */
   async handleClockOut() {
     // 休憩中チェック（在宅者のみ）
@@ -368,12 +372,15 @@ export default class UserModule extends BaseModule {
       this.updateAttendanceUI();
       this.loadReportForm();
       
+      // ログアウトボタンの表示状態を更新（追加）
+      this.updateLogoutButtonVisibility();
+      
       this.app.showNotification('退勤しました。日報の入力をお願いします。', 'info');
     }
   }
 
   /**
-   * 日報フォームを読み込み
+   * 日報フォームを読み込み（修正版）
    */
   async loadReportForm() {
     const container = document.getElementById('reportFormContainer');
@@ -382,6 +389,9 @@ export default class UserModule extends BaseModule {
     
     // 日報提出状況に応じて警告を更新
     this.updatePageLeaveWarning();
+    
+    // ログアウトボタンの表示状態を更新（追加）
+    this.updateLogoutButtonVisibility();
   }
 
   /**
@@ -419,7 +429,7 @@ export default class UserModule extends BaseModule {
     }
   }
   */
- 
+
   /**
    * 未読コメントチェック
    */
