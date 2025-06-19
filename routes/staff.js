@@ -407,6 +407,98 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             });
         }
     });
+
+    // routes/staff.js に追加
+// スタッフ用の出勤記録検索エンドポイント
+
+    // 出勤記録検索（スタッフ用）
+    router.get('/attendance/search', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+        try {
+            const { date, userId } = req.query;
+            
+            if (!date) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '検索日付を指定してください' 
+                });
+            }
+        
+        // スタッフは利用者のみ検索可能
+        let query = `
+            SELECT 
+                a.*,
+                u.name as user_name,
+                u.role as user_role,
+                dr.id as report_id,
+                sc.id as comment_id
+            FROM attendance a
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
+            LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
+            WHERE u.is_active = 1 AND a.date = ? AND u.role = 'user'
+        `;
+        
+        const params = [date];
+        
+        if (userId) {
+            query += ' AND a.user_id = ?';
+            params.push(userId);
+        }
+        
+        query += ' ORDER BY u.name';
+        
+        const records = await dbAll(query, params);
+        res.json({ 
+            success: true,
+            records, 
+            searchDate: date 
+        });
+        
+    } catch (error) {
+        console.error('出退勤記録検索エラー:', error);
+        res.status(500).json({ 
+            success: false,
+            error: '出退勤記録の検索に失敗しました' 
+        });
+    }
+});
+
+    // 利用者の休憩ステータス取得（スタッフ用）
+    router.get('/user/:userId/break/status/:date', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+        try {
+            const { userId, date } = req.params;
+            
+            // ユーザーが利用者かチェック
+            const user = await dbGet(
+                'SELECT * FROM users WHERE id = ? AND role = "user" AND is_active = 1',
+                [userId]
+            );
+            
+            if (!user) {
+                return res.status(404).json({ 
+                    success: false,
+                    error: '利用者が見つかりません' 
+                });
+            }
+            
+            const breakRecord = await dbGet(
+                'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
+                [userId, date]
+            );
+            
+            res.json({
+                success: true,
+                breakRecord: breakRecord || null
+            });
+            
+        } catch (error) {
+            console.error('休憩ステータス取得エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: '休憩ステータスの取得に失敗しました' 
+            });
+        }
+    });
     
     return router;
 };

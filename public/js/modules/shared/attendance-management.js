@@ -1,5 +1,5 @@
 // modules/shared/attendance-management.js
-// スタッフ・管理者共通の出勤記録管理モジュール
+// スタッフ・管理者共通の出勤記録管理モジュール（完成版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from '../shared/modal-manager.js';
@@ -11,6 +11,7 @@ export class SharedAttendanceManagement {
     this.container = null;
     this.currentRecords = [];
     this.userRole = app.currentUser.role; // 'staff' or 'admin'
+    this.currentCommentData = null;
   }
 
   async init(containerElement) {
@@ -68,9 +69,7 @@ export class SharedAttendanceManagement {
           </div>
           
           <!-- 検索結果サマリー -->
-          <div id="searchSummary" class="mb-3" style="display: none;">
-            <!-- 検索結果の統計情報 -->
-          </div>
+          <div id="searchSummary" class="mb-3" style="display: none;"></div>
           
           <!-- 出勤記録一覧 -->
           <div id="attendanceRecordsList">
@@ -91,9 +90,7 @@ export class SharedAttendanceManagement {
               </h5>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="dailyReportDetailContent">
-              <!-- 日報詳細がここに表示される -->
-            </div>
+            <div class="modal-body" id="dailyReportDetailContent"></div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                 <i class="fas fa-times"></i> 閉じる
@@ -113,9 +110,7 @@ export class SharedAttendanceManagement {
               </h5>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="commentModalContent">
-              <!-- 動的にコンテンツが挿入される -->
-            </div>
+            <div class="modal-body" id="commentModalContent"></div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                 <i class="fas fa-times"></i> キャンセル
@@ -172,6 +167,29 @@ export class SharedAttendanceManagement {
                   </div>
                 </div>
 
+                <div class="row mb-3">
+                  <div class="col-6">
+                    <label for="editStatus" class="form-label">ステータス</label>
+                    <select class="form-control" id="editStatus">
+                      <option value="normal">正常</option>
+                      <option value="late">遅刻</option>
+                      <option value="early">早退</option>
+                      <option value="absence">欠勤</option>
+                      <option value="paid_leave">有給欠勤</option>
+                    </select>
+                  </div>
+                  <div class="col-6" id="absenceTypeGroup" style="display: none;">
+                    <label class="form-label">欠勤種別（スタッフのみ）</label>
+                    <div class="btn-group w-100" role="group">
+                      <input type="radio" class="btn-check" name="absenceType" id="normalAbsence" value="absence">
+                      <label class="btn btn-outline-secondary" for="normalAbsence">通常欠勤</label>
+                      
+                      <input type="radio" class="btn-check" name="absenceType" id="paidLeave" value="paid_leave">
+                      <label class="btn btn-outline-primary" for="paidLeave">有給欠勤</label>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="mb-3">
                   <label for="editReason" class="form-label">変更理由</label>
                   <textarea class="form-control" id="editReason" rows="3" 
@@ -198,27 +216,29 @@ export class SharedAttendanceManagement {
     const searchBtn = this.container.querySelector('#searchAttendanceBtn');
     const refreshBtn = this.container.querySelector('#refreshAttendanceBtn');
     
-    if (searchBtn) {
-      searchBtn.addEventListener('click', () => this.searchAttendanceRecords());
-    }
-    
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => this.refresh());
-    }
+    searchBtn?.addEventListener('click', () => this.searchAttendanceRecords());
+    refreshBtn?.addEventListener('click', () => this.refresh());
 
     // コメント保存
     const saveCommentBtn = this.container.querySelector('#saveCommentBtn');
-    if (saveCommentBtn) {
-      saveCommentBtn.addEventListener('click', () => this.saveComment());
-    }
+    saveCommentBtn?.addEventListener('click', () => this.saveComment());
 
     // 管理者のみの機能
     if (this.userRole === 'admin') {
+      const editStatusSelect = this.container.querySelector('#editStatus');
+      editStatusSelect?.addEventListener('change', () => this.toggleAbsenceTypeField());
+
       const saveEditBtn = this.container.querySelector('#saveAttendanceEditBtn');
-      if (saveEditBtn) {
-        saveEditBtn.addEventListener('click', () => this.saveAttendanceEdit());
-      }
+      saveEditBtn?.addEventListener('click', () => this.saveAttendanceEdit());
     }
+
+    // 日付変更時の自動検索
+    const dateInput = this.container.querySelector('#searchDate');
+    dateInput?.addEventListener('change', () => {
+      if (this.currentRecords.length > 0) {
+        this.searchAttendanceRecords();
+      }
+    });
 
     // イベント委譲で動的ボタンを処理
     this.container.addEventListener('click', (e) => {
@@ -250,10 +270,23 @@ export class SharedAttendanceManagement {
   async show() {
     this.container.style.display = 'block';
     await this.loadData();
+    this.registerModals();
   }
 
   hide() {
     this.container.style.display = 'none';
+  }
+
+  registerModals() {
+    try {
+      modalManager.register('dailyReportDetailModal');
+      modalManager.register('commentModal');
+      if (this.userRole === 'admin') {
+        modalManager.register('attendanceEditModal');
+      }
+    } catch (error) {
+      console.error('モーダル登録エラー:', error);
+    }
   }
 
   async loadData() {
@@ -498,7 +531,7 @@ export class SharedAttendanceManagement {
       html += `
         <tr>
           <td><strong>${record.user_name}</strong></td>
-          <td><span class="badge bg-${roleClass}">${this.parent.getRoleDisplayName(record.user_role)}</span></td>
+          <td><span class="badge bg-${roleClass}">${this.getRoleDisplayName(record.user_role)}</span></td>
           <td>${record.clock_in || '-'}</td>
           <td>${breakTimeDisplay}</td>
           <td>${record.clock_out || '-'}</td>
@@ -556,6 +589,7 @@ export class SharedAttendanceManagement {
                 data-date="${record.date}"
                 data-clock-in="${record.clock_in || ''}"
                 data-clock-out="${record.clock_out || ''}"
+                data-status="${record.status || 'normal'}"
                 title="編集">
           <i class="fas fa-edit"></i>
         </button>
@@ -568,10 +602,23 @@ export class SharedAttendanceManagement {
   getRoleColor(role) {
     const colors = {
       'user': 'primary',
-      'staff': 'success',
+      'staff': 'success', 
       'admin': 'danger'
     };
     return colors[role] || 'secondary';
+  }
+
+  getRoleDisplayName(role) {
+    if (this.parent.getRoleDisplayName) {
+      return this.parent.getRoleDisplayName(role);
+    }
+    
+    const names = {
+      'user': '利用者',
+      'staff': 'スタッフ',
+      'admin': '管理者'
+    };
+    return names[role] || role;
   }
 
   calculateWorkDuration(record) {
@@ -584,7 +631,7 @@ export class SharedAttendanceManagement {
       const hours = durationMs / (1000 * 60 * 60);
       
       // 休憩時間を差し引く
-      const breakMinutes = record.break ? (record.break.duration || 60) : 0;
+      const breakMinutes = record.break && record.break.duration ? record.break.duration : 60;
       const netHours = hours - (breakMinutes / 60);
       
       return netHours > 0 ? netHours.toFixed(1) : 0;
@@ -616,8 +663,7 @@ export class SharedAttendanceManagement {
       title.innerHTML = `<i class="fas fa-file-alt"></i> ${userName}さんの日報詳細 - ${formattedDate}`;
       content.innerHTML = this.generateDailyReportDetailContent(response);
 
-      const modal = new bootstrap.Modal(this.container.querySelector('#dailyReportDetailModal'));
-      modal.show();
+      modalManager.show('dailyReportDetailModal');
 
     } catch (error) {
       console.error('日報詳細取得エラー:', error);
@@ -678,6 +724,14 @@ export class SharedAttendanceManagement {
           <label class="past-form-label"><i class="fas fa-lightbulb"></i> 振り返り・感想</label>
           <div class="text-content">${report.reflection || ''}</div>
         </div>
+
+        <!-- 面談希望 -->
+        ${report.interview_request ? `
+          <div class="mb-3">
+            <label class="past-form-label"><i class="fas fa-comments"></i> 面談希望</label>
+            <div class="past-form-value text-info">${this.getInterviewRequestLabel(report.interview_request)}</div>
+          </div>
+        ` : ''}
       </div>
 
       <!-- スタッフコメント -->
@@ -735,8 +789,7 @@ export class SharedAttendanceManagement {
       this.currentCommentData = { userId, userName };
 
       // モーダル表示
-      const modal = new bootstrap.Modal(this.container.querySelector('#commentModal'));
-      modal.show();
+      modalManager.show('commentModal');
 
     } catch (error) {
       console.error('コメントモーダル表示エラー:', error);
@@ -779,6 +832,15 @@ export class SharedAttendanceManagement {
             </small>
           </div>
         </div>
+
+        ${comment ? `
+          <div class="existing-comment-info">
+            <small class="text-muted">
+              <i class="fas fa-info-circle"></i> 
+              記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
+            </small>
+          </div>
+        ` : ''}
       </div>
     `;
   }
@@ -812,7 +874,7 @@ export class SharedAttendanceManagement {
       this.parent.showNotification(`${this.currentCommentData.userName}さんの日報にコメントを記入しました`, 'success');
 
       // モーダルを閉じる
-      bootstrap.Modal.getInstance(this.container.querySelector('#commentModal')).hide();
+      modalManager.hide('commentModal');
       
       // 記録一覧を更新
       await this.searchAttendanceRecords();
@@ -824,6 +886,26 @@ export class SharedAttendanceManagement {
   }
 
   // 管理者のみのメソッド
+  toggleAbsenceTypeField() {
+    if (this.userRole !== 'admin') return;
+    
+    const statusSelect = this.container.querySelector('#editStatus');
+    const absenceTypeGroup = this.container.querySelector('#absenceTypeGroup');
+    const userRole = this.container.querySelector('#editUserRole').value;
+    
+    if (userRole === 'staff' && (statusSelect.value === 'absence' || statusSelect.value === 'paid_leave')) {
+      absenceTypeGroup.style.display = 'block';
+      // ラジオボタンの選択状態を更新
+      if (statusSelect.value === 'absence') {
+        this.container.querySelector('#normalAbsence').checked = true;
+      } else if (statusSelect.value === 'paid_leave') {
+        this.container.querySelector('#paidLeave').checked = true;
+      }
+    } else {
+      absenceTypeGroup.style.display = 'none';
+    }
+  }
+
   async editAttendance(data) {
     if (this.userRole !== 'admin') return;
 
@@ -835,11 +917,20 @@ export class SharedAttendanceManagement {
     this.container.querySelector('#editDate').value = data.date;
     this.container.querySelector('#editClockIn').value = data.clockIn || '';
     this.container.querySelector('#editClockOut').value = data.clockOut || '';
+    this.container.querySelector('#editStatus').value = data.status || 'normal';
     this.container.querySelector('#editReason').value = '';
 
+    // スタッフの場合のみ欠勤種別表示
+    const absenceTypeGroup = this.container.querySelector('#absenceTypeGroup');
+    if (data.userRole === 'staff') {
+      absenceTypeGroup.style.display = 'block';
+      this.toggleAbsenceTypeField();
+    } else {
+      absenceTypeGroup.style.display = 'none';
+    }
+
     // モーダル表示
-    const modal = new bootstrap.Modal(this.container.querySelector('#attendanceEditModal'));
-    modal.show();
+    modalManager.show('attendanceEditModal');
   }
 
   async saveAttendanceEdit() {
@@ -849,7 +940,18 @@ export class SharedAttendanceManagement {
       const recordId = this.container.querySelector('#editRecordId').value;
       const clockIn = this.container.querySelector('#editClockIn').value;
       const clockOut = this.container.querySelector('#editClockOut').value;
+      const status = this.container.querySelector('#editStatus').value;
       const reason = this.container.querySelector('#editReason').value;
+      const userRole = this.container.querySelector('#editUserRole').value;
+
+      // 欠勤種別の確認（スタッフの場合）
+      let finalStatus = status;
+      if (userRole === 'staff') {
+        const selectedAbsenceType = this.container.querySelector('input[name="absenceType"]:checked');
+        if (selectedAbsenceType) {
+          finalStatus = selectedAbsenceType.value;
+        }
+      }
 
       if (!reason.trim()) {
         this.parent.showNotification('変更理由を入力してください', 'warning');
@@ -860,6 +962,7 @@ export class SharedAttendanceManagement {
         recordId: recordId,
         newClockIn: clockIn,
         newClockOut: clockOut,
+        status: finalStatus,
         reason: reason
       };
 
@@ -871,7 +974,7 @@ export class SharedAttendanceManagement {
       this.parent.showNotification('出勤記録を更新しました', 'success');
       
       // モーダルを閉じる
-      bootstrap.Modal.getInstance(this.container.querySelector('#attendanceEditModal')).hide();
+      modalManager.hide('attendanceEditModal');
       
       // 記録一覧を更新
       await this.searchAttendanceRecords();
@@ -898,6 +1001,11 @@ export class SharedAttendanceManagement {
 
   getAppetiteLabel(value) {
     const labels = { 'good': 'あり', 'none': 'なし' };
+    return labels[value] || value;
+  }
+
+  getInterviewRequestLabel(value) {
+    const labels = { 'consultation': '相談がある', 'interview': '面談希望' };
     return labels[value] || value;
   }
 

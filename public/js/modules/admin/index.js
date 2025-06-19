@@ -1,10 +1,10 @@
 // modules/admin/index.js
-// 管理者モジュール - メイン制御（修正版）
+// 管理者モジュール - 統合版（共通出勤管理使用）
 
 import BaseModule from '../../base-module.js';
 import { modalManager } from '../shared/modal-manager.js';
+import { SharedAttendanceManagement } from '../shared/attendance-management.js';
 import AdminUserManagement from './user-management.js';
-import AdminAttendanceManagement from './attendance-management.js';
 import AdminMonthlyReport from './monthly-report.js';
 import AdminHandover from './handover.js';
 import AdminAuditLog from './audit-log.js';
@@ -20,10 +20,13 @@ export default class AdminModule extends BaseModule {
         this.selectedYear = new Date().getFullYear();
         this.selectedMonth = new Date().getMonth() + 1;
         this.selectedUserId = null;
+        
+        // 共通出勤管理モジュール
+        this.attendanceManagement = null; // 遅延初期化
     }
 
     async init() {
-        console.log('🔧 管理者モジュール初期化');
+        console.log('🔧 管理者モジュール初期化（統合版）');
         
         // グローバルに公開（イベントハンドラ用）
         window.adminModule = this;
@@ -38,36 +41,63 @@ export default class AdminModule extends BaseModule {
     render() {
         const content = document.getElementById('app-content');
         content.innerHTML = `
-     <div class="admin-dashboard">
-            <!-- 管理者メニュー（画面切り替え） -->
-            <div class="staff-menu mb-4">
-                <div class="btn-group w-100" role="group">
-                    <button class="btn btn-outline-primary admin-menu-btn active" data-target="attendanceManagement">
-                        <i class="fas fa-clock"></i> 出勤管理
-                    </button>
-                    <button class="btn btn-outline-primary admin-menu-btn" data-target="userManagement">
-                        <i class="fas fa-users-cog"></i> ユーザー管理
-                    </button>
-                    <button class="btn btn-outline-primary admin-menu-btn" data-target="handoverSection">
-                        <i class="fas fa-exchange-alt"></i> 申し送り
-                    </button>
-                    <button class="btn btn-outline-primary admin-menu-btn" data-target="monthlyReport">
-                        <i class="fas fa-calendar-alt"></i> 月別出勤簿
-                    </button>
-                    <button class="btn btn-outline-primary admin-menu-btn" data-target="auditLog">
-                        <i class="fas fa-clipboard-list"></i> 監査ログ
-                    </button>
+            <div class="admin-dashboard">
+                <!-- 管理者メニュー（画面切り替え） -->
+                <div class="admin-menu mb-4">
+                    <div class="btn-group w-100" role="group">
+                        <button class="btn btn-outline-primary admin-menu-btn active" data-target="attendanceManagement">
+                            <i class="fas fa-clock"></i> 出勤記録管理
+                        </button>
+                        <button class="btn btn-outline-primary admin-menu-btn" data-target="userManagement">
+                            <i class="fas fa-users-cog"></i> ユーザー管理
+                        </button>
+                        <button class="btn btn-outline-primary admin-menu-btn" data-target="handoverSection">
+                            <i class="fas fa-exchange-alt"></i> 申し送り
+                        </button>
+                        <button class="btn btn-outline-primary admin-menu-btn" data-target="monthlyReport">
+                            <i class="fas fa-calendar-alt"></i> 月別出勤簿
+                        </button>
+                        <button class="btn btn-outline-primary admin-menu-btn" data-target="auditLog">
+                            <i class="fas fa-clipboard-list"></i> 監査ログ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ダッシュボードサマリー -->
+                <div id="dashboardSummary" class="mb-4">
+                    ${this.renderDashboardSummary()}
+                </div>
+
+                <!-- コンテンツエリア -->
+                <div id="adminContentArea">
+                    <!-- 各サブモジュールのコンテンツがここに表示される -->
                 </div>
             </div>
-
-            <!-- コンテンツエリア -->
-            <div id="adminContentArea">
-                <!-- 各サブモジュールのコンテンツがここに表示される -->
-            </div>
-        </div>
         `;
         
         this.setupEventListeners();
+    }
+
+    renderDashboardSummary() {
+        return `
+            <div class="custom-card">
+                <div class="custom-card-header">
+                    <h5><i class="fas fa-tachometer-alt"></i> 本日の状況サマリー</h5>
+                    <button class="btn btn-outline-light btn-sm" id="refreshSummaryBtn">
+                        <i class="fas fa-sync"></i> 更新
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="summaryContent">
+                        <div class="text-center p-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">読み込み中...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     setupEventListeners() {
@@ -82,15 +112,24 @@ export default class AdminModule extends BaseModule {
                 e.target.closest('button').classList.add('active');
             });
         });
+
+        // サマリー更新ボタン
+        const refreshSummaryBtn = document.querySelector('#refreshSummaryBtn');
+        if (refreshSummaryBtn) {
+            this.addEventListener(refreshSummaryBtn, 'click', () => this.updateDashboardSummary());
+        }
     }
 
     async initializeSubModules() {
         const contentArea = document.getElementById('adminContentArea');
         
+        // 共通出勤管理モジュール
+        this.attendanceManagement = new SharedAttendanceManagement(this.app, this);
+        await this.attendanceManagement.init(contentArea);
+
         // 各サブモジュールを初期化
         this.subModules = {
             userManagement: new AdminUserManagement(this.app, this),
-            attendanceManagement: new AdminAttendanceManagement(this.app, this),
             handoverSection: new AdminHandover(this.app, this),
             monthlyReport: new AdminMonthlyReport(this.app, this),
             auditLog: new AdminAuditLog(this.app, this)
@@ -100,12 +139,24 @@ export default class AdminModule extends BaseModule {
         for (const [key, module] of Object.entries(this.subModules)) {
             await module.init(contentArea);
         }
+
+        // 初期データ読み込み
+        await this.updateDashboardSummary();
     }
 
     async switchToView(viewName) {
         console.log(`[AdminModule] 画面切り替え: ${viewName}`);
         
+        // ダッシュボードサマリーの表示制御
+        const dashboardSummary = document.getElementById('dashboardSummary');
+        if (viewName === 'attendanceManagement') {
+            dashboardSummary.style.display = 'block';
+        } else {
+            dashboardSummary.style.display = 'none';
+        }
+
         // 全てのセクションを非表示
+        this.attendanceManagement?.hide();
         Object.values(this.subModules).forEach(module => {
             if (module.hide) {
                 module.hide();
@@ -113,12 +164,212 @@ export default class AdminModule extends BaseModule {
         });
 
         // 新しいビューを表示
-        if (this.subModules[viewName]) {
+        if (viewName === 'attendanceManagement') {
+            await this.attendanceManagement?.show();
+        } else if (this.subModules[viewName]) {
             await this.subModules[viewName].show();
-            this.currentView = viewName;
         } else {
             console.error(`[AdminModule] 未知のビュー: ${viewName}`);
         }
+
+        this.currentView = viewName;
+    }
+
+    async updateDashboardSummary() {
+        try {
+            const summaryContent = document.getElementById('summaryContent');
+            
+            // ローディング表示
+            summaryContent.innerHTML = `
+                <div class="text-center p-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">更新中...</span>
+                    </div>
+                </div>
+            `;
+
+            // 今日の全体状況取得
+            const response = await this.apiCall('/api/admin/status/today');
+            const users = response.users || [];
+            
+            // 統計計算
+            const stats = this.calculateDashboardStats(users);
+            
+            // サマリー表示更新
+            summaryContent.innerHTML = this.generateSummaryHTML(stats);
+
+        } catch (error) {
+            console.error('ダッシュボードサマリー更新エラー:', error);
+            const summaryContent = document.getElementById('summaryContent');
+            summaryContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    サマリーの更新に失敗しました
+                </div>
+            `;
+        }
+    }
+
+    calculateDashboardStats(users) {
+        const stats = {
+            total: users.length,
+            working: 0,
+            finished: 0,
+            notArrived: 0,
+            reportSubmitted: 0,
+            reportPending: 0,
+            commentPending: 0,
+            userStats: { total: 0, working: 0, finished: 0, notArrived: 0 },
+            staffStats: { total: 0, working: 0, finished: 0, notArrived: 0 }
+        };
+
+        users.forEach(user => {
+            const isUser = user.role === 'user';
+            const isStaff = user.role === 'staff' || user.role === 'admin';
+
+            // 全体統計
+            if (user.clock_in) {
+                if (user.clock_out) {
+                    stats.finished++;
+                    if (isUser && !user.report_id) {
+                        stats.reportPending++;
+                    }
+                } else {
+                    stats.working++;
+                }
+            } else {
+                stats.notArrived++;
+            }
+
+            // 日報統計（利用者のみ）
+            if (isUser) {
+                if (user.report_id) {
+                    stats.reportSubmitted++;
+                    if (!user.comment) {
+                        stats.commentPending++;
+                    }
+                }
+                
+                // 利用者別統計
+                stats.userStats.total++;
+                if (user.clock_in) {
+                    if (user.clock_out) {
+                        stats.userStats.finished++;
+                    } else {
+                        stats.userStats.working++;
+                    }
+                } else {
+                    stats.userStats.notArrived++;
+                }
+            }
+
+            // スタッフ別統計
+            if (isStaff) {
+                stats.staffStats.total++;
+                if (user.clock_in) {
+                    if (user.clock_out) {
+                        stats.staffStats.finished++;
+                    } else {
+                        stats.staffStats.working++;
+                    }
+                } else {
+                    stats.staffStats.notArrived++;
+                }
+            }
+        });
+
+        return stats;
+    }
+
+    generateSummaryHTML(stats) {
+        return `
+            <div class="row">
+                <!-- 全体統計 -->
+                <div class="col-md-4">
+                    <h6><i class="fas fa-chart-pie"></i> 全体出勤状況</h6>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value text-success">${stats.working}</div>
+                            <div class="stat-label">出勤中</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value text-info">${stats.finished}</div>
+                            <div class="stat-label">退勤済み</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value text-muted">${stats.notArrived}</div>
+                            <div class="stat-label">未出勤</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 利用者統計 -->
+                <div class="col-md-4">
+                    <h6><i class="fas fa-users"></i> 利用者状況</h6>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value text-primary">${stats.userStats.working}</div>
+                            <div class="stat-label">作業中</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value text-warning">${stats.reportPending}</div>
+                            <div class="stat-label">日報未提出</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value text-danger">${stats.commentPending}</div>
+                            <div class="stat-label">コメント未記入</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- スタッフ統計 -->
+                <div class="col-md-4">
+                    <h6><i class="fas fa-user-tie"></i> スタッフ状況</h6>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value text-success">${stats.staffStats.working}</div>
+                            <div class="stat-label">勤務中</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value text-info">${stats.staffStats.finished}</div>
+                            <div class="stat-label">退勤済み</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value text-muted">${stats.staffStats.notArrived}</div>
+                            <div class="stat-label">未出勤</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 要注意事項 -->
+            ${this.generateAlerts(stats)}
+        `;
+    }
+
+    generateAlerts(stats) {
+        let alerts = '';
+
+        if (stats.commentPending > 0) {
+            alerts += `
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>コメント未記入の日報が${stats.commentPending}件あります</strong>
+                    <br>出勤記録管理画面でコメントを記入してください。
+                </div>
+            `;
+        }
+
+        if (stats.reportPending > 0) {
+            alerts += `
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-file-exclamation"></i>
+                    退勤済みで日報未提出の利用者が${stats.reportPending}名います
+                </div>
+            `;
+        }
+
+        return alerts;
     }
 
     // 以下は既存のメソッドをそのまま使用
@@ -211,6 +462,9 @@ export default class AdminModule extends BaseModule {
     }
 
     destroy() {
+        // 共通出勤管理モジュールのクリーンアップ
+        this.attendanceManagement?.destroy();
+
         // 各サブモジュールをクリーンアップ
         Object.values(this.subModules).forEach(module => {
             if (module.destroy) {
