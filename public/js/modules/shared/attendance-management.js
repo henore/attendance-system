@@ -1,5 +1,5 @@
 // modules/shared/attendance-management.js
-// スタッフ・管理者共通の出勤記録管理モジュール（完全版・バグ修正済み）
+// スタッフ・管理者共通の出勤記録管理モジュール（完全版・休憩データ統合対応）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from '../shared/modal-manager.js';
@@ -355,65 +355,26 @@ export class SharedAttendanceManagement {
       const response = await this.parent.callApi(`${endpoint}?${params}`);
       let records = response.records || [];
       
-      // 休憩データを統一的に処理（バグ修正版）
-      records = await this.enrichRecordsWithBreaks(records);
+      // レスポンスに既に休憩データが含まれているかチェック（修正版）
+      this.currentRecords = records.map(record => {
+        // レスポンスから直接break情報を取得
+        if (record.break_start || record.break_end || record.break_duration) {
+          record.break = {
+            start: record.break_start,
+            end: record.break_end,
+            duration: record.break_duration || (record.break_start && record.break_end ? 60 : null)
+          };
+        }
+        return record;
+      });
       
-      this.currentRecords = records;
-      this.updateSearchSummary(records, searchDate);
-      this.updateRecordsList(records);
+      this.updateSearchSummary(this.currentRecords, searchDate);
+      this.updateRecordsList(this.currentRecords);
       
     } catch (error) {
       console.error('出勤記録検索エラー:', error);
       this.showRecordsError('出勤記録の検索に失敗しました');
     }
-  }
-
-  async enrichRecordsWithBreaks(records) {
-    return await Promise.all(records.map(async (record) => {
-      try {
-        // 利用者の場合は別APIから休憩データを取得
-        if (record.user_role === 'user') {
-          const endpoint = this.userRole === 'admin' ? 
-            `/api/admin/user/${record.user_id}/break/status/${record.date}` :
-            `/api/staff/user/${record.user_id}/break/status/${record.date}`;
-            
-          try {
-            const breakResponse = await this.parent.callApi(endpoint);
-            
-            // 統一されたbreak構造に変換
-            if (breakResponse.breakRecord) {
-              record.break = {
-                start: breakResponse.breakRecord.start_time,
-                end: breakResponse.breakRecord.end_time,
-                duration: breakResponse.breakRecord.duration || 60
-              };
-            }
-          } catch (breakError) {
-            console.warn(`休憩データ取得失敗 (${record.user_name}):`, breakError);
-            // 休憩データが取得できない場合は既存データを使用
-            if (record.break_start) {
-              record.break = {
-                start: record.break_start,
-                end: record.break_end,
-                duration: 60
-              };
-            }
-          }
-        } else {
-          // スタッフ・管理者の場合は既存データから変換
-          if (record.break_start) {
-            record.break = {
-              start: record.break_start,
-              end: record.break_end,
-              duration: 60
-            };
-          }
-        }
-      } catch (error) {
-        console.warn(`休憩データ処理エラー (${record.user_name}):`, error);
-      }
-      return record;
-    }));
   }
 
   updateSearchSummary(records, searchDate) {
@@ -519,7 +480,7 @@ export class SharedAttendanceManagement {
         const roleClass = this.getRoleColor(record.user_role);
         const workDuration = this.calculateWorkDuration(record);
         
-        // 統一された休憩時間表示（バグ修正版）
+        // 休憩時間表示（修正版）
         let breakTimeDisplay = '-';
         if (record.break && record.break.start) {
           if (record.break.end) {
