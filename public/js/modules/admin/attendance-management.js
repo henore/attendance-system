@@ -335,6 +335,9 @@ export default class AdminAttendanceManagement {
         }
     }
 
+    /**
+     * 出勤記録を検索（修正版 - 休憩データ取得追加）
+     */
     async searchAttendanceRecords() {
     try {
         const searchDate = this.container.querySelector('#searchDate').value;
@@ -346,7 +349,26 @@ export default class AdminAttendanceManagement {
         if (searchUser) params.append('userId', searchUser);
 
         const response = await this.parent.callApi(`${API_ENDPOINTS.ADMIN.ATTENDANCE_SEARCH}?${params}`);
-        this.currentRecords = response.records || [];
+        let records = response.records || [];
+        
+        // 各記録に休憩データを追加で取得
+        if (records.length > 0) {
+        records = await Promise.all(records.map(async (record) => {
+            try {
+            // 休憩データを取得
+            const breakResponse = await this.parent.callApi(API_ENDPOINTS.USER.BREAK_STATUS(record.date).replace('/user/', `/admin/user/${record.user_id}/`));
+            return {
+                ...record,
+                breakRecord: breakResponse.breakRecord || null
+            };
+            } catch (error) {
+            console.warn(`休憩データ取得エラー (${record.user_name}):`, error);
+            return { ...record, breakRecord: null };
+            }
+        }));
+        }
+        
+        this.currentRecords = records;
         
         this.updateSearchSummary(this.currentRecords, searchDate);
         this.updateRecordsList(this.currentRecords);
@@ -355,7 +377,7 @@ export default class AdminAttendanceManagement {
         console.error('出勤記録検索エラー:', error);
         this.showRecordsError('出勤記録の検索に失敗しました');
     }
-}
+   }
 
     updateSearchSummary(records, searchDate) {
         const summaryContainer = this.container.querySelector('#searchSummary');
@@ -432,121 +454,199 @@ export default class AdminAttendanceManagement {
         recordsList.innerHTML = this.generateAttendanceRecordsList(records);
     }
 
-    // modules/admin/attendance-management.js の修正部分
-// generateAttendanceRecordsList メソッドの修正
+/**
+ * 出勤記録リストを生成（修正版 - 休憩時間表示修正）
+ */
+async searchAttendanceRecords() {
+  try {
+    const searchDate = this.container.querySelector('#searchDate').value;
+    const searchRole = this.container.querySelector('#searchRole').value;
+    const searchUser = this.container.querySelector('#searchUser').value;
 
-generateAttendanceRecordsList(records) {
+    const params = new URLSearchParams({ date: searchDate });
+    if (searchRole) params.append('role', searchRole);
+    if (searchUser) params.append('userId', searchUser);
+
+    const response = await this.parent.callApi(`${API_ENDPOINTS.ADMIN.ATTENDANCE_SEARCH}?${params}`);
+    let records = response.records || [];
+    
+    // 各記録に休憩データを追加で取得
+    if (records.length > 0) {
+      records = await Promise.all(records.map(async (record) => {
+        try {
+          // 休憩データを取得
+          const breakResponse = await this.parent.callApi(API_ENDPOINTS.USER.BREAK_STATUS(record.date).replace('/user/', `/admin/user/${record.user_id}/`));
+          return {
+            ...record,
+            breakRecord: breakResponse.breakRecord || null
+          };
+        } catch (error) {
+          console.warn(`休憩データ取得エラー (${record.user_name}):`, error);
+          return { ...record, breakRecord: null };
+        }
+      }));
+    }
+    
+    this.currentRecords = records;
+    
+    this.updateSearchSummary(this.currentRecords, searchDate);
+    this.updateRecordsList(this.currentRecords);
+    
+  } catch (error) {
+    console.error('出勤記録検索エラー:', error);
+    this.showRecordsError('出勤記録の検索に失敗しました');
+  }
+}
+
+/**
+ * 出勤記録リストを生成（修正版 - 休憩時間表示修正）
+ */
+    generateAttendanceRecordsList(records) {
     if (!records || records.length === 0) {
         return '<p class="text-muted text-center">検索条件に該当する記録がありません</p>';
     }
 
     let html = `
         <div class="table-responsive">
-            <table class="table table-hover">
-                <thead class="table-light">
-                    <tr>
-                        <th>ユーザー</th>
-                        <th>権限</th>
-                        <th>出勤時間</th>
-                        <th>休憩時間</th>
-                        <th>退勤時間</th>
-                        <th>ステータス</th>
-                        <th>勤務時間</th>
-                        <th>日報・コメント</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
+        <table class="table table-hover">
+            <thead class="table-light">
+            <tr>
+                <th>ユーザー</th>
+                <th>権限</th>
+                <th>出勤時間</th>
+                <th>休憩時間</th>
+                <th>退勤時間</th>
+                <th>ステータス</th>
+                <th>勤務時間</th>
+                <th>日報・コメント</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
     `;
 
+    
     records.forEach(record => {
         const roleClass = this.parent.getRoleColor(record.user_role);
         const workDuration = this.parent.calculateWorkDuration(record) ? 
-            `${this.parent.calculateWorkDuration(record)}時間` : null;
+        `${this.parent.calculateWorkDuration(record)}時間` : null;
         const statusBadge = this.parent.getStatusBadge(record.status);
 
-        // 休憩時間の表示
+        // 休憩時間の表示（修正版）
         let breakTimeDisplay = '-';
-        if (record.break_start) {
-            if (record.break_end) {
-                breakTimeDisplay = `${record.break_start}〜${record.break_end}`;
-            } else {
-                breakTimeDisplay = `${record.break_start}〜(進行中)`;
-            }
+        if (record.breakRecord && record.breakRecord.start_time) {
+        if (record.breakRecord.end_time) {
+            breakTimeDisplay = `
+            <div class="break-time-display">
+                <div class="fw-bold text-info">${record.breakRecord.start_time}〜${record.breakRecord.end_time}</div>
+                <small class="text-muted">(${record.breakRecord.duration || 60}分)</small>
+            </div>
+            `;
+        } else {
+            breakTimeDisplay = `
+            <div class="break-time-display">
+                <div class="fw-bold text-warning">${record.breakRecord.start_time}〜</div>
+                <small class="text-warning">(進行中)</small>
+            </div>
+            `;
+        }
+        } else if (record.break_start) {
+        // フォールバック: 直接のbreak_startがある場合
+        if (record.break_end) {
+            breakTimeDisplay = `
+            <div class="break-time-display">
+                <div class="fw-bold text-info">${record.break_start}〜${record.break_end}</div>
+                <small class="text-muted">(60分)</small>
+            </div>
+            `;
+        } else {
+            breakTimeDisplay = `
+            <div class="break-time-display">
+                <div class="fw-bold text-warning">${record.break_start}〜</div>
+                <small class="text-warning">(進行中)</small>
+            </div>
+            `;
+        }
         }
 
         // 日報・コメント状況
         let reportCommentStatus = '';
         if (record.user_role === 'user') {
-            if (record.report_id) {
-                reportCommentStatus = '<span class="badge bg-success me-1"><i class="fas fa-file-check"></i> 日報</span>';
-                if (record.comment_id) {
-                    reportCommentStatus += '<span class="badge bg-info"><i class="fas fa-comment-check"></i> コメント済み</span>';
-                } else {
-                    reportCommentStatus += '<span class="badge bg-warning"><i class="fas fa-comment-exclamation"></i> コメント未記入</span>';
-                }
+        if (record.report_id) {
+            reportCommentStatus = '<span class="badge bg-success me-1"><i class="fas fa-file-check"></i> 日報</span>';
+            if (record.comment_id) {
+            reportCommentStatus += '<span class="badge bg-info"><i class="fas fa-comment-check"></i> コメント済み</span>';
             } else {
-                reportCommentStatus = '<span class="badge bg-secondary"><i class="fas fa-file-times"></i> 日報未提出</span>';
+            reportCommentStatus += '<span class="badge bg-warning"><i class="fas fa-comment-exclamation"></i> コメント未記入</span>';
             }
         } else {
-            reportCommentStatus = '<span class="text-muted">-</span>';
+            reportCommentStatus = '<span class="badge bg-secondary"><i class="fas fa-file-times"></i> 日報未提出</span>';
+        }
+        } else {
+        reportCommentStatus = '<span class="text-muted">-</span>';
         }
 
         html += `
-            <tr>
-                <td>
-                    <strong>${record.user_name}</strong>
-                </td>
-                <td><span class="badge bg-${roleClass}">${this.parent.getRoleDisplayName(record.user_role)}</span></td>
-                <td>${record.clock_in || '-'}</td>
-                <td>${breakTimeDisplay}</td>
-                <td>${record.clock_out || '-'}</td>
-                <td>${statusBadge}</td>
-                <td>${workDuration || '-'}</td>
-                <td>${reportCommentStatus}</td>
-                <td>
-                    <div class="btn-group" role="group">
-                        ${record.user_role === 'user' && record.report_id ? `
-                            <button class="btn btn-sm btn-outline-primary btn-show-report" 
-                                    data-user-id="${record.user_id}"
-                                    data-user-name="${record.user_name}"
-                                    data-date="${record.date}"
-                                    title="日報詳細">
-                                <i class="fas fa-file-alt"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-info btn-admin-comment" 
-                                    data-user-id="${record.user_id}"
-                                    data-user-name="${record.user_name}"
-                                    title="コメント">
-                                <i class="fas fa-comment"></i>
-                            </button>
-                        ` : ''}
-                        <button class="btn btn-sm btn-outline-warning btn-edit-attendance" 
-                                data-user-id="${record.user_id}"
-                                data-user-name="${record.user_name}"
-                                data-user-role="${record.user_role}"
-                                data-record-id="${record.id || ''}"
-                                data-date="${record.date}"
-                                data-clock-in="${record.clock_in || ''}"
-                                data-clock-out="${record.clock_out || ''}"
-                                data-status="${record.status || 'normal'}"
-                                title="編集">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
+        <tr>
+            <td>
+            <strong>${record.user_name}</strong>
+            </td>
+            <td><span class="badge bg-${roleClass}">${this.parent.getRoleDisplayName(record.user_role)}</span></td>
+            <td>
+            <div class="fw-bold ${record.clock_in ? 'text-success' : 'text-muted'}">${record.clock_in || '-'}</div>
+            </td>
+            <td>${breakTimeDisplay}</td>
+            <td>
+            <div class="fw-bold ${record.clock_out ? 'text-info' : 'text-muted'}">${record.clock_out || '-'}</div>
+            </td>
+            <td>${statusBadge}</td>
+            <td>
+            <div class="fw-bold ${workDuration ? 'text-primary' : 'text-muted'}">${workDuration || '-'}</div>
+            </td>
+            <td>${reportCommentStatus}</td>
+            <td>
+            <div class="btn-group" role="group">
+                ${record.user_role === 'user' && record.report_id ? `
+                <button class="btn btn-sm btn-outline-primary btn-show-report" 
+                        data-user-id="${record.user_id}"
+                        data-user-name="${record.user_name}"
+                        data-date="${record.date}"
+                        title="日報詳細">
+                    <i class="fas fa-file-alt"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-info btn-admin-comment" 
+                        data-user-id="${record.user_id}"
+                        data-user-name="${record.user_name}"
+                        title="コメント">
+                    <i class="fas fa-comment"></i>
+                </button>
+                ` : ''}
+                <button class="btn btn-sm btn-outline-warning btn-edit-attendance" 
+                        data-user-id="${record.user_id}"
+                        data-user-name="${record.user_name}"
+                        data-user-role="${record.user_role}"
+                        data-record-id="${record.id || ''}"
+                        data-date="${record.date}"
+                        data-clock-in="${record.clock_in || ''}"
+                        data-clock-out="${record.clock_out || ''}"
+                        data-status="${record.status || 'normal'}"
+                        title="編集">
+                <i class="fas fa-edit"></i>
+                </button>
+            </div>
+            </td>
+        </tr>
         `;
     });
 
     html += `
-                </tbody>
-            </table>
+            </tbody>
+        </table>
         </div>
     `;
 
     return html;
-}
+    }
 
     async editAttendance(userId, userName, userRole, recordId = null, date = null, clockIn = '', clockOut = '', status = 'normal') {
         // フォーム要素に値設定
