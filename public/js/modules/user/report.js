@@ -398,17 +398,80 @@ export class UserReportHandler {
    * @returns {string}
    */
   generateCommentDisplay(comment) {
-    return `
-      <div class="staff-comment-display">
-        <div class="staff-comment-title">
-          <i class="fas fa-comment"></i> スタッフからのコメント
+  return `
+    <div class="staff-comment-display">
+      <div class="staff-comment-title mb-3">
+        <i class="fas fa-comment"></i> スタッフからのコメント
+      </div>
+      <div class="comment-box bg-primary bg-opacity-10 border border-primary rounded p-3">
+        <div class="comment-content mb-3">
+          <p class="mb-0 text-dark">${comment.comment}</p>
         </div>
-        <div class="comment-box">${comment.comment}</div>
-        <small class="text-muted">
-          記入者: ${comment.staff_name} | 
-          記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
-        </small>
+        <div class="comment-author-info border-top border-primary border-opacity-25 pt-2">
+          <div class="row">
+            <div class="col-md-6">
+              <small class="text-muted">
+                <i class="fas fa-user text-primary"></i> 
+                <strong>記入者: ${comment.staff_name || 'スタッフ'}</strong>
+              </small>
+            </div>
+            <div class="col-md-6 text-md-end">
+              <small class="text-muted">
+                <i class="fas fa-clock text-info"></i> 
+                記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+/**
+ * 過去の記録を表示用に生成（修正版 - スタッフコメント記入者情報追加）
+ * @param {Object} data 
+ * @returns {string}
+ */
+generatePastRecordDisplay(data) {
+  const { attendance, report, staffComment } = data;
+  
+  if (!attendance && !report) {
+    return '<p class="text-muted text-center">この日の記録はありません</p>';
+  }
+
+  let html = '';
+  
+  // 出勤記録
+  if (attendance) {
+    html += `
+      <div class="past-work-times mb-3">
+        <div class="row">
+          <div class="col-6 text-center">
+            <div class="past-work-time-label">出勤時間</div>
+            <div class="past-work-time-value">${attendance.clock_in || '-'}</div>
+          </div>
+          <div class="col-6 text-center">
+            <div class="past-work-time-label">退勤時間</div>
+            <div class="past-work-time-value">${attendance.clock_out || '-'}</div>
+          </div>
+        </div>
       </div>
     `;
+  }
+  
+  // 日報内容
+  if (report) {
+    html += this.generateReportDisplay(report);
+  }
+  
+  // スタッフコメント（修正版 - 記入者情報を明確に表示）
+  if (staffComment) {
+    html += `
+      <hr class="my-4">
+      ${this.generateCommentDisplay(staffComment)}
+    `;
+  }
+  
+  return html;
   }
 }

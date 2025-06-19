@@ -93,11 +93,14 @@ export class LastReportModal {
           </div>
           <div class="comment-box bg-white p-3 rounded shadow-sm">
             <strong class="d-block mb-2 text-dark">${staffComment.comment}</strong>
-            <small class="text-muted">
-              <i class="fas fa-user"></i> ${staffComment.staff_name || 'スタッフ'} 
-              <i class="fas fa-clock ms-2"></i> ${new Date(staffComment.created_at).toLocaleDateString('ja-JP')}
-            </small>
-          </div>
+              <small class="text-muted d-block">
+                <i class="fas fa-user text-primary"></i> 
+                <strong>記入者: ${staffComment.staff_name || 'スタッフ'}</strong>
+              </small>
+              <small class="text-muted d-block mt-1">
+                <i class="fas fa-clock text-info"></i> 
+                記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
+              </small>
         </div>
       `;
     } else {

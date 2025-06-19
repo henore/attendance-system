@@ -517,24 +517,39 @@ export class UserAttendanceCalendar {
       `;
     }
     
-    // スタッフコメント
-    if (staffComment && staffComment.comment) {
-      html += `
-        <hr>
-        <div class="staff-comment-display">
-          <div class="staff-comment-title">
-            <i class="fas fa-comment"></i> スタッフからのコメント
-          </div>
-          <div class="comment-box">${staffComment.comment}</div>
-          <small class="text-muted">
-            記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
-          </small>
+   // スタッフコメント（修正版 - 記入者情報を明確に表示）
+   if (staffComment && staffComment.comment) {
+    html += `
+      <hr>
+      <div class="staff-comment-display">
+        <div class="staff-comment-title">
+          <i class="fas fa-comment"></i> スタッフからのコメント
         </div>
-      `;
-    }
-    
-    return html;
+        <div class="comment-box bg-light p-3 rounded">
+          <div class="comment-text mb-2">${staffComment.comment}</div>
+          <div class="comment-meta border-top pt-2 mt-2">
+            <div class="row">
+              <div class="col-6">
+                <small class="text-muted">
+                  <i class="fas fa-user text-primary"></i> 
+                  <strong>記入者: ${staffComment.staff_name || 'スタッフ'}</strong>
+                </small>
+              </div>
+              <div class="col-6 text-end">
+                <small class="text-muted">
+                  <i class="fas fa-clock text-info"></i> 
+                  ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   }
+  
+  return html;
+}
 
   /**
    * フォーマットヘルパー

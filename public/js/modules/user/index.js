@@ -474,20 +474,41 @@ export default class UserModule extends BaseModule {
    * 未読コメントセクションを表示
    */
   showUnreadCommentSection(data) {
-    const section = document.getElementById('staffCommentSection');
-    const content = document.getElementById('staffCommentContent');
-    
-    if (section && content) {
-      section.style.display = 'block';
-      content.innerHTML = `
-        <div class="comment-box">${data.comment.comment}</div>
-        <small class="text-muted">
-          記入者: ${data.comment.staff_name} | 
-          記入日時: ${new Date(data.comment.created_at).toLocaleString('ja-JP')}
-        </small>
-      `;
-    }
+  const section = document.getElementById('staffCommentSection');
+  const content = document.getElementById('staffCommentContent');
+  
+  if (section && content) {
+    section.style.display = 'block';
+    content.innerHTML = `
+      <div class="unread-comment-box bg-info bg-opacity-10 border border-info rounded p-3">
+        <div class="comment-content mb-3">
+          <h6 class="text-info mb-2">
+            <i class="fas fa-bell"></i> 新しいメッセージがあります
+          </h6>
+          <div class="comment-text bg-white p-3 rounded border">
+            ${data.comment.comment}
+          </div>
+        </div>
+        <div class="comment-author-info border-top border-info border-opacity-25 pt-2">
+          <div class="row">
+            <div class="col-md-6">
+              <small class="text-muted">
+                <i class="fas fa-user text-info"></i> 
+                <strong>記入者: ${data.comment.staff_name || 'スタッフ'}</strong>
+              </small>
+            </div>
+            <div class="col-md-6 text-md-end">
+              <small class="text-muted">
+                <i class="fas fa-clock text-secondary"></i> 
+                記入日時: ${new Date(data.comment.created_at).toLocaleString('ja-JP')}
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   }
+}
 
   /**
    * ページ離脱警告設定（修正版）
