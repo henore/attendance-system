@@ -223,84 +223,133 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
-    // 出退勤記録訂正
-    router.post('/attendance/correct', requireAuth, requireRole(['admin']), async (req, res) => {
-        try {
-            const { recordId, newClockIn, newClockOut, status, reason } = req.body;
-            
-            // バリデーション
-            if (!recordId) {
-                return res.status(400).json({ 
-                    success: false,
-                    error: '記録IDが指定されていません' 
-                });
-            }
-            
-            if (!reason || reason.trim() === '') {
-                return res.status(400).json({ 
-                    success: false,
-                    error: '変更理由を入力してください' 
-                });
-            }
-            
-            // 現在の値を取得
-            const oldRecord = await dbGet(
-                'SELECT * FROM attendance WHERE id = ?', 
-                [recordId]
-            );
-            
-            if (!oldRecord) {
-                return res.status(404).json({ 
-                    success: false,
-                    error: '記録が見つかりません' 
-                });
-            }
-            
-            // 更新
-            await dbRun(
-                'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [newClockIn, newClockOut, status, recordId]
-            );
-            
-            // 監査ログ
-            await dbRun(
-                `INSERT INTO audit_log (
-                    admin_id, action_type, target_id, target_type,
-                    old_value, new_value, reason, ip_address
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    req.session.user.id,
-                    'attendance_correction',
-                    recordId,
-                    'attendance',
-                    JSON.stringify({
-                        clock_in: oldRecord.clock_in,
-                        clock_out: oldRecord.clock_out,
-                        status: oldRecord.status
-                    }),
-                    JSON.stringify({
-                        clock_in: newClockIn,
-                        clock_out: newClockOut,
-                        status: status
-                    }),
-                    reason,
-                    req.ip
-                ]
-            );
-            
-            res.json({ 
-                success: true, 
-                message: '出勤記録を正常に更新しました' 
-            });
-            
-        } catch (error) {
-            console.error('出退勤訂正エラー:', error);
-            res.status(500).json({ 
+    // routes/admin.js の出勤記録訂正部分（休憩時間編集対応版）
+
+// 出退勤記録訂正（休憩時間編集対応）
+router.post('/attendance/correct', requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+        const { recordId, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason } = req.body;
+        
+        // バリデーション
+        if (!recordId) {
+            return res.status(400).json({ 
                 success: false,
-                error: '出勤記録の訂正に失敗しました' 
+                error: '記録IDが指定されていません' 
             });
         }
-    });
+        
+        if (!reason || reason.trim() === '') {
+            return res.status(400).json({ 
+                success: false,
+                error: '変更理由を入力してください' 
+            });
+        }
+        
+        // 現在の値を取得
+        const oldRecord = await dbGet(
+            'SELECT * FROM attendance WHERE id = ?', 
+            [recordId]
+        );
+        
+        if (!oldRecord) {
+            return res.status(404).json({ 
+                success: false,
+                error: '記録が見つかりません' 
+            });
+        }
+
+        // ユーザー情報取得
+        const user = await dbGet(
+            'SELECT id, role FROM users WHERE id = ?',
+            [oldRecord.user_id]
+        );
+
+        // 出勤記録を更新
+        await dbRun(
+            'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [newClockIn, newClockOut, status, recordId]
+        );
+
+        // 休憩記録の処理（利用者とスタッフで分岐）
+        if (user.role === 'user') {
+            // 利用者の場合：break_recordsテーブルを更新
+            if (newBreakStart) {
+                const existingBreak = await dbGet(
+                    'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
+                    [oldRecord.user_id, oldRecord.date]
+                );
+
+                if (existingBreak) {
+                    // 既存の休憩記録を更新
+                    await dbRun(
+                        'UPDATE break_records SET start_time = ?, end_time = ?, duration = ? WHERE id = ?',
+                        [newBreakStart, newBreakEnd, newBreakEnd ? 60 : null, existingBreak.id]
+                    );
+                } else {
+                    // 新しい休憩記録を作成
+                    await dbRun(
+                        'INSERT INTO break_records (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)',
+                        [oldRecord.user_id, oldRecord.date, newBreakStart, newBreakEnd, newBreakEnd ? 60 : null]
+                    );
+                }
+            } else {
+                // 休憩時間が削除された場合
+                await dbRun(
+                    'DELETE FROM break_records WHERE user_id = ? AND date = ?',
+                    [oldRecord.user_id, oldRecord.date]
+                );
+            }
+        } else {
+            // スタッフ・管理者の場合：attendanceテーブルのbreak_start/break_endを更新
+            await dbRun(
+                'UPDATE attendance SET break_start = ?, break_end = ? WHERE id = ?',
+                [newBreakStart, newBreakEnd, recordId]
+            );
+        }
+        
+        // 監査ログ
+        await dbRun(
+            `INSERT INTO audit_log (
+                admin_id, action_type, target_id, target_type,
+                old_value, new_value, reason, ip_address
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                req.session.user.id,
+                'attendance_correction',
+                recordId,
+                'attendance',
+                JSON.stringify({
+                    clock_in: oldRecord.clock_in,
+                    clock_out: oldRecord.clock_out,
+                    status: oldRecord.status,
+                    break_start: oldRecord.break_start,
+                    break_end: oldRecord.break_end
+                }),
+                JSON.stringify({
+                    clock_in: newClockIn,
+                    clock_out: newClockOut,
+                    status: status,
+                    break_start: newBreakStart,
+                    break_end: newBreakEnd
+                }),
+                reason,
+                req.ip
+            ]
+        );
+        
+        res.json({ 
+            success: true, 
+            message: '出勤記録を正常に更新しました' 
+        });
+        
+    } catch (error) {
+        console.error('出退勤訂正エラー:', error);
+        res.status(500).json({ 
+            success: false,
+            error: '出勤記録の訂正に失敗しました' 
+        });
+    }
+});
 
     // 月次出勤簿取得
     router.get('/attendance/:year/:month/:userId', requireAuth, requireRole(['admin']), async (req, res) => {

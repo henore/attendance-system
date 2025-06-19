@@ -1,5 +1,5 @@
 // modules/shared/attendance-management.js
-// スタッフ・管理者共通の出勤記録管理モジュール（完成版）
+// スタッフ・管理者共通の出勤記録管理モジュール（完全版・バグ修正済み）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from '../shared/modal-manager.js';
@@ -164,6 +164,18 @@ export class SharedAttendanceManagement {
                   <div class="col-6">
                     <label for="editClockOut" class="form-label">退勤時間</label>
                     <input type="time" class="form-control" id="editClockOut">
+                  </div>
+                </div>
+
+                <!-- 休憩時間編集（管理者のみ） -->
+                <div class="row mb-3">
+                  <div class="col-6">
+                    <label for="editBreakStart" class="form-label">休憩開始時間</label>
+                    <input type="time" class="form-control" id="editBreakStart">
+                  </div>
+                  <div class="col-6">
+                    <label for="editBreakEnd" class="form-label">休憩終了時間</label>
+                    <input type="time" class="form-control" id="editBreakEnd">
                   </div>
                 </div>
 
@@ -343,7 +355,7 @@ export class SharedAttendanceManagement {
       const response = await this.parent.callApi(`${endpoint}?${params}`);
       let records = response.records || [];
       
-      // 休憩データを統一的に処理
+      // 休憩データを統一的に処理（バグ修正版）
       records = await this.enrichRecordsWithBreaks(records);
       
       this.currentRecords = records;
@@ -365,15 +377,27 @@ export class SharedAttendanceManagement {
             `/api/admin/user/${record.user_id}/break/status/${record.date}` :
             `/api/staff/user/${record.user_id}/break/status/${record.date}`;
             
-          const breakResponse = await this.parent.callApi(endpoint);
-          
-          // 統一されたbreak構造に変換
-          if (breakResponse.breakRecord) {
-            record.break = {
-              start: breakResponse.breakRecord.start_time,
-              end: breakResponse.breakRecord.end_time,
-              duration: breakResponse.breakRecord.duration || 60
-            };
+          try {
+            const breakResponse = await this.parent.callApi(endpoint);
+            
+            // 統一されたbreak構造に変換
+            if (breakResponse.breakRecord) {
+              record.break = {
+                start: breakResponse.breakRecord.start_time,
+                end: breakResponse.breakRecord.end_time,
+                duration: breakResponse.breakRecord.duration || 60
+              };
+            }
+          } catch (breakError) {
+            console.warn(`休憩データ取得失敗 (${record.user_name}):`, breakError);
+            // 休憩データが取得できない場合は既存データを使用
+            if (record.break_start) {
+              record.break = {
+                start: record.break_start,
+                end: record.break_end,
+                duration: 60
+              };
+            }
           }
         } else {
           // スタッフ・管理者の場合は既存データから変換
@@ -386,7 +410,7 @@ export class SharedAttendanceManagement {
           }
         }
       } catch (error) {
-        console.warn(`休憩データ取得エラー (${record.user_name}):`, error);
+        console.warn(`休憩データ処理エラー (${record.user_name}):`, error);
       }
       return record;
     }));
@@ -491,55 +515,70 @@ export class SharedAttendanceManagement {
     `;
 
     records.forEach(record => {
-      const roleClass = this.getRoleColor(record.user_role);
-      const workDuration = this.calculateWorkDuration(record);
-      
-      // 統一された休憩時間表示
-      let breakTimeDisplay = '-';
-      if (record.break) {
-        if (record.break.end) {
-          breakTimeDisplay = `
-            <div class="text-info fw-bold">${record.break.start}〜${record.break.end}</div>
-            <small class="text-muted">(${record.break.duration}分)</small>
-          `;
-        } else {
-          breakTimeDisplay = `
-            <div class="text-warning fw-bold">${record.break.start}〜</div>
-            <small class="text-warning">(進行中)</small>
-          `;
-        }
-      }
-
-      // 日報・コメント状況
-      let reportCommentStatus = '';
-      if (record.user_role === 'user') {
-        if (record.report_id) {
-          reportCommentStatus = '<span class="badge bg-success me-1">日報</span>';
-          if (record.comment_id) {
-            reportCommentStatus += '<span class="badge bg-info">コメント済み</span>';
+      try {
+        const roleClass = this.getRoleColor(record.user_role);
+        const workDuration = this.calculateWorkDuration(record);
+        
+        // 統一された休憩時間表示（バグ修正版）
+        let breakTimeDisplay = '-';
+        if (record.break && record.break.start) {
+          if (record.break.end) {
+            breakTimeDisplay = `
+              <div class="text-info fw-bold">${record.break.start}〜${record.break.end}</div>
+              <small class="text-muted">(${record.break.duration || 60}分)</small>
+            `;
           } else {
-            reportCommentStatus += '<span class="badge bg-warning">コメント未記入</span>';
+            breakTimeDisplay = `
+              <div class="text-warning fw-bold">${record.break.start}〜</div>
+              <small class="text-warning">(進行中)</small>
+            `;
           }
-        } else if (record.clock_out) {
-          reportCommentStatus = '<span class="badge bg-danger">日報未提出</span>';
         }
+
+        // 日報・コメント状況
+        let reportCommentStatus = '';
+        if (record.user_role === 'user') {
+          if (record.report_id) {
+            reportCommentStatus = '<span class="badge bg-success me-1">日報</span>';
+            if (record.comment_id) {
+              reportCommentStatus += '<span class="badge bg-info">コメント済み</span>';
+            } else {
+              reportCommentStatus += '<span class="badge bg-warning">コメント未記入</span>';
+            }
+          } else if (record.clock_out) {
+            reportCommentStatus = '<span class="badge bg-danger">日報未提出</span>';
+          }
+        } else {
+          reportCommentStatus = '<span class="text-muted">-</span>';
+        }
+
+        // 操作ボタン（権限による制御）
+        const actionButtons = this.generateActionButtons(record);
+
+        html += `
+          <tr>
+            <td><strong>${record.user_name || 'Unknown'}</strong></td>
+            <td><span class="badge bg-${roleClass}">${this.getRoleDisplayName(record.user_role)}</span></td>
+            <td>${record.clock_in || '-'}</td>
+            <td>${breakTimeDisplay}</td>
+            <td>${record.clock_out || '-'}</td>
+            <td>${workDuration ? workDuration + '時間' : '-'}</td>
+            <td>${reportCommentStatus}</td>
+            <td>${actionButtons}</td>
+          </tr>
+        `;
+      } catch (error) {
+        console.error('レコード生成エラー:', error, record);
+        // エラーが発生した場合でも表示を続ける
+        html += `
+          <tr>
+            <td colspan="8" class="text-danger">
+              <i class="fas fa-exclamation-triangle"></i> 
+              データ表示エラー: ${record.user_name || 'Unknown'}
+            </td>
+          </tr>
+        `;
       }
-
-      // 操作ボタン（権限による制御）
-      const actionButtons = this.generateActionButtons(record);
-
-      html += `
-        <tr>
-          <td><strong>${record.user_name}</strong></td>
-          <td><span class="badge bg-${roleClass}">${this.getRoleDisplayName(record.user_role)}</span></td>
-          <td>${record.clock_in || '-'}</td>
-          <td>${breakTimeDisplay}</td>
-          <td>${record.clock_out || '-'}</td>
-          <td>${workDuration ? workDuration + '時間' : '-'}</td>
-          <td>${reportCommentStatus}</td>
-          <td>${actionButtons}</td>
-        </tr>
-      `;
     });
 
     html += `
@@ -590,6 +629,8 @@ export class SharedAttendanceManagement {
                 data-clock-in="${record.clock_in || ''}"
                 data-clock-out="${record.clock_out || ''}"
                 data-status="${record.status || 'normal'}"
+                data-break-start="${record.break ? record.break.start || '' : ''}"
+                data-break-end="${record.break ? record.break.end || '' : ''}"
                 title="編集">
           <i class="fas fa-edit"></i>
         </button>
@@ -767,7 +808,6 @@ export class SharedAttendanceManagement {
         return;
       }
 
-      // モーダルの内容を生成
       const modalContent = this.generateCommentModalContent(response);
       
       const title = this.container.querySelector('#commentModalTitle');
@@ -785,10 +825,7 @@ export class SharedAttendanceManagement {
         });
       }
 
-      // データを保存（保存時に使用）
       this.currentCommentData = { userId, userName };
-
-      // モーダル表示
       modalManager.show('commentModal');
 
     } catch (error) {
@@ -873,10 +910,7 @@ export class SharedAttendanceManagement {
 
       this.parent.showNotification(`${this.currentCommentData.userName}さんの日報にコメントを記入しました`, 'success');
 
-      // モーダルを閉じる
       modalManager.hide('commentModal');
-      
-      // 記録一覧を更新
       await this.searchAttendanceRecords();
 
     } catch (error) {
@@ -895,7 +929,6 @@ export class SharedAttendanceManagement {
     
     if (userRole === 'staff' && (statusSelect.value === 'absence' || statusSelect.value === 'paid_leave')) {
       absenceTypeGroup.style.display = 'block';
-      // ラジオボタンの選択状態を更新
       if (statusSelect.value === 'absence') {
         this.container.querySelector('#normalAbsence').checked = true;
       } else if (statusSelect.value === 'paid_leave') {
@@ -909,7 +942,7 @@ export class SharedAttendanceManagement {
   async editAttendance(data) {
     if (this.userRole !== 'admin') return;
 
-    // フォーム要素に値設定
+    // フォーム要素に値設定（休憩時間追加）
     this.container.querySelector('#editRecordId').value = data.recordId || '';
     this.container.querySelector('#editUserId').value = data.userId;
     this.container.querySelector('#editUserRole').value = data.userRole;
@@ -917,6 +950,8 @@ export class SharedAttendanceManagement {
     this.container.querySelector('#editDate').value = data.date;
     this.container.querySelector('#editClockIn').value = data.clockIn || '';
     this.container.querySelector('#editClockOut').value = data.clockOut || '';
+    this.container.querySelector('#editBreakStart').value = data.breakStart || '';
+    this.container.querySelector('#editBreakEnd').value = data.breakEnd || '';
     this.container.querySelector('#editStatus').value = data.status || 'normal';
     this.container.querySelector('#editReason').value = '';
 
@@ -929,7 +964,6 @@ export class SharedAttendanceManagement {
       absenceTypeGroup.style.display = 'none';
     }
 
-    // モーダル表示
     modalManager.show('attendanceEditModal');
   }
 
@@ -940,6 +974,8 @@ export class SharedAttendanceManagement {
       const recordId = this.container.querySelector('#editRecordId').value;
       const clockIn = this.container.querySelector('#editClockIn').value;
       const clockOut = this.container.querySelector('#editClockOut').value;
+      const breakStart = this.container.querySelector('#editBreakStart').value;
+      const breakEnd = this.container.querySelector('#editBreakEnd').value;
       const status = this.container.querySelector('#editStatus').value;
       const reason = this.container.querySelector('#editReason').value;
       const userRole = this.container.querySelector('#editUserRole').value;
@@ -962,6 +998,8 @@ export class SharedAttendanceManagement {
         recordId: recordId,
         newClockIn: clockIn,
         newClockOut: clockOut,
+        newBreakStart: breakStart,
+        newBreakEnd: breakEnd,
         status: finalStatus,
         reason: reason
       };
@@ -973,10 +1011,7 @@ export class SharedAttendanceManagement {
 
       this.parent.showNotification('出勤記録を更新しました', 'success');
       
-      // モーダルを閉じる
       modalManager.hide('attendanceEditModal');
-      
-      // 記録一覧を更新
       await this.searchAttendanceRecords();
       
     } catch (error) {

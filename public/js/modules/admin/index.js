@@ -63,11 +63,6 @@ export default class AdminModule extends BaseModule {
                     </div>
                 </div>
 
-                <!-- ダッシュボードサマリー -->
-                <div id="dashboardSummary" class="mb-4">
-                    ${this.renderDashboardSummary()}
-                </div>
-
                 <!-- コンテンツエリア -->
                 <div id="adminContentArea">
                     <!-- 各サブモジュールのコンテンツがここに表示される -->
@@ -112,12 +107,6 @@ export default class AdminModule extends BaseModule {
                 e.target.closest('button').classList.add('active');
             });
         });
-
-        // サマリー更新ボタン
-        const refreshSummaryBtn = document.querySelector('#refreshSummaryBtn');
-        if (refreshSummaryBtn) {
-            this.addEventListener(refreshSummaryBtn, 'click', () => this.updateDashboardSummary());
-        }
     }
 
     async initializeSubModules() {
@@ -139,22 +128,11 @@ export default class AdminModule extends BaseModule {
         for (const [key, module] of Object.entries(this.subModules)) {
             await module.init(contentArea);
         }
-
-        // 初期データ読み込み
-        await this.updateDashboardSummary();
     }
 
     async switchToView(viewName) {
         console.log(`[AdminModule] 画面切り替え: ${viewName}`);
         
-        // ダッシュボードサマリーの表示制御
-        const dashboardSummary = document.getElementById('dashboardSummary');
-        if (viewName === 'attendanceManagement') {
-            dashboardSummary.style.display = 'block';
-        } else {
-            dashboardSummary.style.display = 'none';
-        }
-
         // 全てのセクションを非表示
         this.attendanceManagement?.hide();
         Object.values(this.subModules).forEach(module => {
