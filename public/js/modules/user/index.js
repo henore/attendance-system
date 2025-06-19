@@ -115,10 +115,10 @@ export default class UserModule extends BaseModule {
     }
     
     // 利用規約の同意チェック
-    if (!this.state.hasAcceptedTerms) {
-      this.app.showNotification('利用規約に同意してください', 'warning');
-      return;
-    }
+  if (!this.state.hasAcceptedTerms) {
+    this.app.showNotification('利用規約に同意してください', 'warning');
+    return;
+  }
 
     const result = await this.attendanceHandler.clockIn();
     if (result.success) {
@@ -129,6 +129,12 @@ export default class UserModule extends BaseModule {
       this.breakHandler.resetBreakState();
       this.updateAttendanceUI();
       this.updateLogoutButtonVisibility();
+      
+      // 日報提出時のコールバックを設定（追加）
+      this.reportHandler.onReportSubmit = () => {
+        this.state.hasTodayReport = true;
+        this.updateLogoutButtonVisibility();
+      };
       
       // 出勤後の警告設定を更新
       this.updatePageLeaveWarning();

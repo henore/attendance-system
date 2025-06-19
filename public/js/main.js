@@ -322,7 +322,7 @@ class AttendanceManagementSystem {
             this.performLogoutCleanup();
             
         } catch (error) {
-            console.error('ログアウトエラー:', error);
+            console.error('ログアウトエラー:', error);UserModule.loadReportForm
             // エラーが発生してもクリーンアップは実行
             this.showNotification('ログアウト処理でエラーが発生しましたが、セッションをクリアします', 'warning');
             this.performLogoutCleanup();

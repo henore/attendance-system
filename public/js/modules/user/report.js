@@ -405,6 +405,7 @@ export class UserReportHandler {
         </div>
         <div class="comment-box">${comment.comment}</div>
         <small class="text-muted">
+          記入者: ${comment.staff_name} | 
           記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
         </small>
       </div>
