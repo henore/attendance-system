@@ -1,14 +1,20 @@
-// routes/handover.js
-// 申し送り事項のルーティング
-
+// routes/handover.js（権限チェック修正版）
 const express = require('express');
 const router = express.Router();
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
   
-  // 申し送り事項取得
-  router.get('/handover', async (req, res) => {
+  // 申し送り事項取得（スタッフ・管理者のみ）
+  router.get('/handover', requireAuth, async (req, res) => {
     try {
+      // 権限チェック
+      if (!['staff', 'admin'].includes(req.session.user.role)) {
+        return res.status(403).json({ 
+          success: false, 
+          error: '権限がありません' 
+        });
+      }
+
       const handover = await dbGet(
         'SELECT * FROM handover_notes ORDER BY id DESC LIMIT 1'
       );
@@ -27,7 +33,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
   });
 
   // 申し送り事項更新（スタッフ・管理者のみ）
-  router.post('/handover', async (req, res) => {
+  router.post('/handover', requireAuth, async (req, res) => {
     try {
       // 権限チェック
       if (!['staff', 'admin'].includes(req.session.user.role)) {
