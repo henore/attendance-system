@@ -14,7 +14,7 @@ export default class AdminModule extends BaseModule {
     constructor(app) {
         super(app);
 
-                // APIコールメソッドの確認
+        // APIコールメソッドの確認
         if (!this.apiCall) {
             console.error('apiCallメソッドが見つかりません');
             this.apiCall = this.app.apiCall.bind(this.app);
