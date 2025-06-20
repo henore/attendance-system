@@ -523,7 +523,7 @@ export default class StaffModule extends BaseModule {
           break;
         case 'handoverSection':
           this.attendanceManagement?.hide();
-          await this.handoverHandler.show();
+          await this.handoverHandler.loadData();
           break;
         case 'monthlyAttendanceSection':
           this.attendanceManagement?.hide();
