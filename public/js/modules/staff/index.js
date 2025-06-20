@@ -197,7 +197,7 @@ export default class StaffModule extends BaseModule {
       <!-- 申し送り事項（常時表示） -->
       <div class="row mt-4">
         <div class="col-12">
-          ${this.handoverHandler.renderQuick()}
+          ${this.handoverHandler.render()}
         </div>
       </div>
     `;
@@ -523,7 +523,7 @@ export default class StaffModule extends BaseModule {
           break;
         case 'handoverSection':
           this.attendanceManagement?.hide();
-          await this.handoverHandler.loadData();
+          await this.handoverHandler.show();
           break;
         case 'monthlyAttendanceSection':
           this.attendanceManagement?.hide();

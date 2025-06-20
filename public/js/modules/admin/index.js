@@ -23,9 +23,6 @@ export default class AdminModule extends BaseModule {
         
         // 共通出勤管理モジュール
         this.attendanceManagement = null; // 遅延初期化
-
-        //申し送り
-        this.handoverSection = null;
     }
 
     async init() {
@@ -120,10 +117,9 @@ export default class AdminModule extends BaseModule {
         //出勤者管理
         this.attendanceManagement = new SharedAttendanceManagement(this.app, this);
         await this.attendanceManagement.init(contentArea);
-        
+
         //申し送り
         this.handoverSection = new SharedHandover(this.app, this);
-        await this.handoverSection.init(contentArea);
 
         // 各サブモジュールを初期化
         this.subModules = {
