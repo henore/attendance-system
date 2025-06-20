@@ -1,9 +1,7 @@
-// modules/admin/handover.js
+// modules/shared/handover.js
 // 管理者申し送り機能
 
-import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-
-export default class AdminHandover {
+export default class SharedHandover {
     constructor(app, parentModule) {
         this.app = app;
         this.parent = parentModule;

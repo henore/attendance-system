@@ -5,12 +5,12 @@ import BaseModule from '../../base-module.js';
 import { StaffAttendanceHandler } from './attendance.js';
 import { SharedAttendanceManagement } from '../shared/attendance-management.js';
 import { StaffCommentHandler } from './comment.js';
-import { StaffHandoverHandler } from './handover.js';
 import { StaffAttendanceBook } from './attendance-book.js';
 import { StaffMonthlyReport } from './monthly-report.js';
 import { StaffReportNotification } from './report-notification.js';
 import { StaffLastReportModal } from './last-report-modal.js';
 import { modalManager } from '../shared/modal-manager.js';
+import { SharedHandover }  from '../shared/handover.js';
 
 export default class StaffModule extends BaseModule {
   constructor(app) {
@@ -24,17 +24,15 @@ export default class StaffModule extends BaseModule {
     
     // 共通出勤管理（ダッシュボード置き換え）
     this.attendanceManagement = null; // 遅延初期化
-    
+
+    //共通申し送り
+    this.handoverSection = null;
+   
     // その他のハンドラー
     this.commentHandler = new StaffCommentHandler(
       this.apiCall.bind(this),
       this.app.showNotification.bind(this.app),
       this.currentUser
-    );
-    
-    this.handoverHandler = new StaffHandoverHandler(
-      this.apiCall.bind(this),
-      this.app.showNotification.bind(this.app)
     );
     
     this.attendanceBook = new StaffAttendanceBook(
@@ -146,6 +144,10 @@ export default class StaffModule extends BaseModule {
     // 共通出勤管理モジュール初期化
     this.attendanceManagement = new SharedAttendanceManagement(this.app, this);
     await this.attendanceManagement.init(contentArea);
+
+   // 共通申し送りモジュール初期化
+    this.handoverSection = new SharedHandover(this.app, this);
+    await this.handoverSection.init(contentArea);
   }
 
   renderAttendanceSection() {
@@ -248,42 +250,20 @@ export default class StaffModule extends BaseModule {
   }
 
   async loadTodayAttendance() {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    // スタッフ用のエンドポイントを使用
-    const response = await this.apiCall(`/api/attendance/today`);
-    
-    if (response.attendance) {
-      this.state.currentAttendance = response.attendance;
-      this.state.isWorking = response.attendance.clock_in && !response.attendance.clock_out;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const response = await this.apiCall(`/api/staff/attendance/${today}`);
       
-      // 休憩状態も更新
-      if (response.attendance.break_start) {
-        this.state.breakStatus = {
-          start_time: response.attendance.break_start,
-          end_time: response.attendance.break_end,
-          duration: response.attendance.break_end ? 60 : null
-        };
-      }
-    } else {
-      // 出勤記録がない場合
-      this.state.currentAttendance = null;
-      this.state.isWorking = false;
-      this.state.breakStatus = null;
+      this.state.currentAttendance = response.attendance;
+      this.state.isWorking = response.attendance && response.attendance.clock_in && !response.attendance.clock_out;
+      
+      this.updateAttendanceDisplay();
+      this.updateButtonStates();
+      
+    } catch (error) {
+      console.error('今日の出勤状況取得エラー:', error);
     }
-    
-    this.updateAttendanceDisplay();
-    this.updateButtonStates();
-    
-  } catch (error) {
-    console.error('今日の出勤状況取得エラー:', error);
-    // エラーの場合も表示を更新
-    this.state.currentAttendance = null;
-    this.state.isWorking = false;
-    this.updateAttendanceDisplay();
-    this.updateButtonStates();
   }
-}
 
   async checkLastRecord() {
     try {
@@ -667,11 +647,40 @@ export default class StaffModule extends BaseModule {
       const durationMs = end - start;
       const hours = durationMs / (1000 * 60 * 60);
       
-      // 休憩時間を差し引く（デフォルト60分）
-      const breakMinutes = record.break_duration || 60;
+      // 休憩時間の計算（修正版）
+      let breakMinutes = 0;
+      
+      // スタッフ・管理者の場合
+      if (record.user_role === 'staff' || record.user_role === 'admin') {
+        // 実際に休憩を取った場合のみ（break_startが存在する場合）
+        if (record.break_start && record.break_end) {
+          breakMinutes = 60; // 固定60分
+        }
+        // break_startのみある場合（休憩中）は計算しない
+      }
+      // 利用者の場合
+      else if (record.user_role === 'user') {
+        // 在宅勤務（service_type='home'）の場合は休憩時間を引かない
+        if (record.service_type === 'home') {
+          breakMinutes = 0;
+        }
+        // 通所の場合
+        else {
+          // breakRecordが存在し、実際に休憩を取った場合のみ
+          if (record.breakRecord && record.breakRecord.start_time && record.breakRecord.end_time) {
+            breakMinutes = record.breakRecord.duration || 60;
+          }
+          // 古いデータ用：breakフィールドを確認
+          else if (record.break && record.break.start && record.break.end) {
+            breakMinutes = record.break.duration || 60;
+          }
+          // 休憩中または休憩を取っていない場合は引かない
+        }
+      }
+      
       const netHours = hours - (breakMinutes / 60);
       
-      return netHours > 0 ? netHours.toFixed(1) : 0;
+      return netHours > 0 ? netHours.toFixed(1) : hours.toFixed(1);
     } catch (error) {
       console.error('勤務時間計算エラー:', error);
       return null;
