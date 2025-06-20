@@ -60,7 +60,33 @@ export const API_ENDPOINTS = {
     MONTHLY_REPORT: '/api/admin/monthly-report',
     EXPORT_CSV: '/api/admin/export/csv',
     AUDIT_LOG: '/api/admin/audit-log'
-  }
+  },
 
+      ADMIN: {
+        REGISTER: '/api/admin/register',
+        USERS: '/api/admin/users',
+        STATUS_TODAY: '/api/admin/status/today',
+        ATTENDANCE_SEARCH: '/api/admin/attendance/search',
+        ATTENDANCE_CORRECT: '/api/admin/attendance/correct',
+        ATTENDANCE_MONTHLY: (year, month, userId) => 
+            `/api/admin/attendance/${year}/${month}/${userId}`,
+        USER_UPDATE: '/api/admin/user/update',
+        USER_RETIRE: (userId) => `/api/admin/retire/${userId}`,
+        AUDIT_LOG: '/api/admin/audit-log',
+        BREAK_STATUS: (userId, date) => 
+            `/api/admin/user/${userId}/break/status/${date}`
+    },
+    
+    STAFF: {
+        CLOCK_OUT: '/api/staff/clock-out',
+        USERS_LIST: '/api/staff/users',
+        ATTENDANCE_SEARCH: '/api/staff/attendance/search',
+        REPORT: (userId, date) => `/api/staff/reports/${userId}/${date}`,
+        COMMENT: '/api/staff/comment',
+        MONTHLY_ATTENDANCE: (year, month, userId) => 
+            `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`,
+        BREAK_START: '/api/staff/break/start',
+        BREAK_END: '/api/staff/break/end'
+    }
   
 };
