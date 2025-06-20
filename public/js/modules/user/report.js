@@ -1,5 +1,5 @@
 // modules/user/report.js
-// 利用者の日報機能ハンドラー（完全修正版）
+// 利用者の日報機能ハンドラー（日付変更対応修正版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { MESSAGES } from '../../constants/labels.js';
@@ -11,10 +11,20 @@ export class UserReportHandler {
     this.showNotification = showNotification;
     this.hasTodayReport = false;
     this.currentAttendance = null;
-    this.onReportSubmit = null; // コールバック追加
+    this.onReportSubmit = null;
   }
 
-    /**
+  /**
+   * 今日の日付を取得（日本時間）
+   * @returns {string} YYYY-MM-DD形式
+   */
+  getTodayDate() {
+    const now = new Date();
+    const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    return japanTime.toISOString().split('T')[0];
+  }
+
+  /**
    * 未出勤時のメッセージを生成
    * @returns {string}
    */
@@ -28,67 +38,105 @@ export class UserReportHandler {
   }
 
   /**
- * 日報フォームを読み込み
- * @param {HTMLElement} container 
- * @param {Object} attendance - 現在の出勤情報
- */
+   * 日報フォームを読み込み（修正版）
+   * @param {HTMLElement} container 
+   * @param {Object} attendance - 現在の出勤情報
+   */
   async loadForm(container, attendance) {
-      if (!container) return;
+    if (!container) return;
 
-      try {
-          const today = new Date().toISOString().split('T')[0];
-          const response = await this.apiCall(`${API_ENDPOINTS.USER.REPORT_BY_DATE(today)}`);
-          
-          console.log('[日報フォーム] APIレスポンス:', response);
-          console.log('[日報フォーム] 引数attendance:', attendance);
-          console.log('[日報フォーム] 今日の日付:', today);
-          
-          // 再ログイン時などはAPIレスポンスの出勤情報を優先
-          // ただし、日付が今日のものかチェック
-          if (response.attendance) {
-              // 出勤記録の日付が今日かどうか確認
-              if (response.attendance.date === today) {
-                  this.currentAttendance = response.attendance;
-              } else {
-                  // 日付が異なる場合は出勤記録なしとして扱う
-                  this.currentAttendance = null;
-                  console.log('[日報フォーム] 取得した出勤記録の日付が今日ではありません');
-              }
-          } else if (attendance && attendance.date === today) {
-              // 引数のattendanceも日付チェック
-              this.currentAttendance = attendance;
-          } else {
-              this.currentAttendance = null;
-          }
-          
-          console.log('[日報フォーム] 使用するattendance:', this.currentAttendance);
-          
-          // 出勤記録がない場合
-          if (!this.currentAttendance) {
-              container.innerHTML = this.generateNotYetMessage();
-              return;
-          }
-          
-          // 退勤後のみ日報入力可能
-          if (this.currentAttendance.clock_out) {
-              this.hasTodayReport = response.report !== null;
-              container.innerHTML = this.generateReportForm(response.report);
-              
-              // フォームにイベントリスナーを追加（index.jsの委譲と重複しないように）
-              const form = document.getElementById('reportForm');
-              if (form) {
-                  form.dataset.attendance = JSON.stringify(this.currentAttendance);
-              }
-          } else {
-              container.innerHTML = this.generateWaitingMessage();
-          }
-      } catch (error) {
-          console.error('日報フォーム読み込みエラー:', error);
-          container.innerHTML = this.generateErrorMessage();
+    try {
+      const today = this.getTodayDate();
+      
+      console.log('[日報フォーム] 今日の日付:', today);
+      console.log('[日報フォーム] 引数attendance:', attendance);
+      
+      // 今日の記録を取得
+      const response = await this.apiCall(`${API_ENDPOINTS.USER.REPORT_BY_DATE(today)}`);
+      console.log('[日報フォーム] APIレスポンス:', response);
+      
+      // 今日の出勤記録を確定
+      this.currentAttendance = this.determineTodayAttendance(response, attendance, today);
+      
+      console.log('[日報フォーム] 確定した出勤記録:', this.currentAttendance);
+      
+      // 出勤記録がない場合
+      if (!this.currentAttendance) {
+        container.innerHTML = this.generateNotYetMessage();
+        this.hasTodayReport = false;
+        return;
       }
+      
+      // 退勤していない場合は待機メッセージ
+      if (!this.currentAttendance.clock_out) {
+        container.innerHTML = this.generateWaitingMessage();
+        this.hasTodayReport = false;
+        return;
+      }
+      
+      // 退勤済みの場合は日報フォーム表示
+      this.hasTodayReport = response.report !== null;
+      container.innerHTML = this.generateReportForm(response.report);
+      
+      // フォームにデータを保存
+      const form = document.getElementById('reportForm');
+      if (form) {
+        form.dataset.attendance = JSON.stringify(this.currentAttendance);
+      }
+      
+    } catch (error) {
+      console.error('日報フォーム読み込みエラー:', error);
+      container.innerHTML = this.generateErrorMessage();
+      this.hasTodayReport = false;
+    }
   }
 
-   /**
+  /**
+   * 今日の出勤記録を確定する
+   * @param {Object} response - API応答
+   * @param {Object} attendance - 引数の出勤記録
+   * @param {string} today - 今日の日付
+   * @returns {Object|null}
+   */
+  determineTodayAttendance(response, attendance, today) {
+    // 1. APIレスポンスの出勤記録をチェック（日付確認必須）
+    if (response.attendance && this.isValidTodayRecord(response.attendance, today)) {
+      console.log('[日報フォーム] APIから今日の出勤記録を使用');
+      return response.attendance;
+    }
+    
+    // 2. 引数の出勤記録をチェック（日付確認必須）
+    if (attendance && this.isValidTodayRecord(attendance, today)) {
+      console.log('[日報フォーム] 引数から今日の出勤記録を使用');
+      return attendance;
+    }
+    
+    // 3. どちらも今日の記録でない場合はnull
+    console.log('[日報フォーム] 今日の出勤記録が見つかりません');
+    return null;
+  }
+
+  /**
+   * 出勤記録が今日の有効な記録かチェック
+   * @param {Object} record - 出勤記録
+   * @param {string} today - 今日の日付
+   * @returns {boolean}
+   */
+  isValidTodayRecord(record, today) {
+    if (!record) return false;
+    if (!record.date) return false;
+    if (record.date !== today) {
+      console.log(`[日報フォーム] 日付不一致: ${record.date} !== ${today}`);
+      return false;
+    }
+    if (!record.clock_in) {
+      console.log('[日報フォーム] 出勤時間がありません');
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * 日報フォームを生成
    * @param {Object} existingReport 
    * @returns {string}
@@ -219,45 +267,48 @@ export class UserReportHandler {
   }
 
   /**
-   * 日報を提出（修正版）
+   * 日報を提出（エラーハンドリング強化版）
    * @param {Event} event 
    */
   async submitReport(event) {
     event.preventDefault();
     
+    console.log('[日報提出] 開始');
     console.log('[日報提出] currentAttendance:', this.currentAttendance);
     
-    // 出勤情報の再確認
+    // 出勤情報の再確認・復元
     if (!this.currentAttendance) {
-      // フォームのdata属性から復元を試みる
       const form = event.target;
       if (form.dataset.attendance) {
         try {
           this.currentAttendance = JSON.parse(form.dataset.attendance);
+          console.log('[日報提出] フォームから出勤情報を復元:', this.currentAttendance);
         } catch (e) {
-          console.error('出勤情報の復元エラー:', e);
+          console.error('[日報提出] 出勤情報の復元エラー:', e);
         }
       }
     }
     
-    if (!this.currentAttendance || !this.currentAttendance.clock_out) {
-      console.error('[日報提出] 出勤情報エラー:', this.currentAttendance);
-      this.showNotification(MESSAGES.REPORT.REQUIRED_CLOCK_OUT, 'warning');
+    // 出勤情報の検証
+    if (!this.validateAttendanceForReport()) {
       return;
     }
 
     const formData = this.collectFormData();
+    console.log('[日報提出] フォームデータ:', formData);
     
     try {
-      await this.apiCall(API_ENDPOINTS.USER.REPORT, {
+      const response = await this.apiCall(API_ENDPOINTS.USER.REPORT, {
         method: 'POST',
         body: JSON.stringify(formData)
       });
 
+      console.log('[日報提出] 成功レスポンス:', response);
+      
       this.hasTodayReport = true;
       this.showNotification(MESSAGES.REPORT.SUBMIT_SUCCESS, 'success');
 
-            // コールバックを実行（追加）
+      // コールバックを実行
       if (this.onReportSubmit) {
         this.onReportSubmit();
       }
@@ -267,10 +318,42 @@ export class UserReportHandler {
       if (container) {
         await this.loadForm(container, this.currentAttendance);
       }
+      
     } catch (error) {
-      console.error('日報提出エラー:', error);
-      this.showNotification(MESSAGES.REPORT.SUBMIT_ERROR, 'danger');
+      console.error('[日報提出] エラー:', error);
+      this.showNotification(
+        error.message || MESSAGES.REPORT.SUBMIT_ERROR, 
+        'danger'
+      );
     }
+  }
+
+  /**
+   * 日報提出時の出勤情報検証
+   * @returns {boolean}
+   */
+  validateAttendanceForReport() {
+    if (!this.currentAttendance) {
+      console.error('[日報提出] 出勤情報なし');
+      this.showNotification(MESSAGES.REPORT.REQUIRED_CLOCK_OUT, 'warning');
+      return false;
+    }
+    
+    if (!this.currentAttendance.clock_out) {
+      console.error('[日報提出] 退勤未完了');
+      this.showNotification(MESSAGES.REPORT.REQUIRED_CLOCK_OUT, 'warning');
+      return false;
+    }
+    
+    // 日付チェック
+    const today = this.getTodayDate();
+    if (this.currentAttendance.date !== today) {
+      console.error('[日報提出] 日付不一致:', this.currentAttendance.date, '!==', today);
+      this.showNotification('出勤記録の日付が正しくありません', 'warning');
+      return false;
+    }
+    
+    return true;
   }
 
   /**
@@ -330,7 +413,10 @@ export class UserReportHandler {
     
     // スタッフコメント
     if (staffComment) {
-      html += this.generateCommentDisplay(staffComment);
+      html += `
+        <hr class="my-4">
+        ${this.generateCommentDisplay(staffComment)}
+      `;
     }
     
     return html;
@@ -398,80 +484,33 @@ export class UserReportHandler {
    * @returns {string}
    */
   generateCommentDisplay(comment) {
-  return `
-    <div class="staff-comment-display">
-      <div class="staff-comment-title mb-3">
-        <i class="fas fa-comment"></i> スタッフからのコメント
-      </div>
-      <div class="comment-box bg-primary bg-opacity-10 border border-primary rounded p-3">
-        <div class="comment-content mb-3">
-          <p class="mb-0 text-dark">${comment.comment}</p>
+    return `
+      <div class="staff-comment-display">
+        <div class="staff-comment-title mb-3">
+          <i class="fas fa-comment"></i> スタッフからのコメント
         </div>
-        <div class="comment-author-info border-top border-primary border-opacity-25 pt-2">
-          <div class="row">
-            <div class="col-md-6">
-              <small class="text-muted">
-                <i class="fas fa-user text-primary"></i> 
-                <strong>記入者: ${comment.staff_name || 'スタッフ'}</strong>
-              </small>
-            </div>
-            <div class="col-md-6 text-md-end">
-              <small class="text-muted">
-                <i class="fas fa-clock text-info"></i> 
-                記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
-              </small>
-            </div>
+        <div class="comment-box bg-primary bg-opacity-10 border border-primary rounded p-3">
+          <div class="comment-content mb-3">
+            <p class="mb-0 text-dark">${comment.comment}</p>
           </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-/**
- * 過去の記録を表示用に生成（修正版 - スタッフコメント記入者情報追加）
- * @param {Object} data 
- * @returns {string}
- */
-generatePastRecordDisplay(data) {
-  const { attendance, report, staffComment } = data;
-  
-  if (!attendance && !report) {
-    return '<p class="text-muted text-center">この日の記録はありません</p>';
-  }
-
-  let html = '';
-  
-  // 出勤記録
-  if (attendance) {
-    html += `
-      <div class="past-work-times mb-3">
-        <div class="row">
-          <div class="col-6 text-center">
-            <div class="past-work-time-label">出勤時間</div>
-            <div class="past-work-time-value">${attendance.clock_in || '-'}</div>
-          </div>
-          <div class="col-6 text-center">
-            <div class="past-work-time-label">退勤時間</div>
-            <div class="past-work-time-value">${attendance.clock_out || '-'}</div>
+          <div class="comment-author-info border-top border-primary border-opacity-25 pt-2">
+            <div class="row">
+              <div class="col-md-6">
+                <small class="text-muted">
+                  <i class="fas fa-user text-primary"></i> 
+                  <strong>記入者: ${comment.staff_name || 'スタッフ'}</strong>
+                </small>
+              </div>
+              <div class="col-md-6 text-md-end">
+                <small class="text-muted">
+                  <i class="fas fa-clock text-info"></i> 
+                  記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
+                </small>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     `;
-  }
-  
-  // 日報内容
-  if (report) {
-    html += this.generateReportDisplay(report);
-  }
-  
-  // スタッフコメント（修正版 - 記入者情報を明確に表示）
-  if (staffComment) {
-    html += `
-      <hr class="my-4">
-      ${this.generateCommentDisplay(staffComment)}
-    `;
-  }
-  
-  return html;
   }
 }
