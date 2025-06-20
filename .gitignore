@@ -1,7 +1,2 @@
-# node_modules やログファイル
-node_modules/
 
-# データベースファイル
-*.sqlite3
-database/*db
 
