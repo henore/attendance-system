@@ -388,12 +388,12 @@ export default class AdminModule extends BaseModule {
         return roleNames[role] || role;
     }
 
-    getServiceTypeDisplayName(serviceType) {
-        const serviceTypes = {
-            'commute': '通所',
-            'home': '在宅'
-        };
-        return serviceTypes[serviceType] || serviceType;
+    getServiceTypeDisplayName(type) {
+    const types = {
+        'commute': '通所',
+        'home': '在宅'
+    };
+    return types[type] || type;
     }
 
     getRoleColor(role) {
@@ -427,16 +427,14 @@ export default class AdminModule extends BaseModule {
     }
 
     getStatusBadge(status) {
-        const statusConfig = {
-            'normal': { class: 'bg-success', text: '正常' },
-            'late': { class: 'bg-warning text-dark', text: '遅刻' },
-            'early': { class: 'bg-info', text: '早退' },
-            'absence': { class: 'bg-danger', text: '欠勤' },
-            'paid_leave': { class: 'bg-primary', text: '有給欠勤' }
-        };
-        
-        const config = statusConfig[status] || statusConfig['normal'];
-        return `<span class="badge ${config.class}">${config.text}</span>`;
+    const badges = {
+        'normal': '<span class="badge bg-success">正常</span>',
+        'late': '<span class="badge bg-warning text-dark">遅刻</span>',
+        'early': '<span class="badge bg-info">早退</span>',
+        'absence': '<span class="badge bg-danger">欠勤</span>',
+        'paid_leave': '<span class="badge bg-primary">有給</span>'
+    };
+    return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
     }
 
     destroy() {

@@ -1,5 +1,5 @@
 // routes/staff.js
-// スタッフAPI - 修正版（休憩データ対応）
+// スタッフAPI - 修正版（利用者のみ表示対応）
 
 const express = require('express');
 const router = express.Router();
@@ -53,7 +53,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
     
-    // 休憩開始（スタッフ用）を修正
+    // 休憩開始（スタッフ用）
     router.post('/break/start', requireAuth, async (req, res) => {
         try {
             const staffId = req.session.user.id;
@@ -107,7 +107,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
     
-    // 休憩終了（スタッフ用）- 修正版
+    // 休憩終了（スタッフ用）
     router.post('/break/end', requireAuth, async (req, res) => {
         try {
             const staffId = req.session.user.id;
@@ -191,13 +191,24 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
     
-    // 利用者リスト取得（選択用）- 管理者も含める
+    // 利用者リスト取得（選択用）- 修正版：スタッフは利用者のみ表示
     router.get('/users/list', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
         try {
-            const users = await dbAll(`
+            // リクエスト元のユーザー権限を確認
+            const userRole = req.session.user.role;
+            
+            let query = `
                 SELECT id, name, role, service_type
                 FROM users
                 WHERE is_active = 1
+            `;
+            
+            // スタッフの場合は利用者のみ表示
+            if (userRole === 'staff') {
+                query += ` AND role = 'user'`;
+            }
+            
+            query += `
                 ORDER BY 
                     CASE role 
                         WHEN 'user' THEN 1 
@@ -205,7 +216,9 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                         WHEN 'admin' THEN 3 
                     END, 
                     name
-            `);
+            `;
+            
+            const users = await dbAll(query);
             
             res.json({
                 success: true,

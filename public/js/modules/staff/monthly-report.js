@@ -137,8 +137,10 @@ export class StaffMonthlyReport {
             if (userSelect && response.users) {
                 let html = '<option value="">利用者を選択してください</option>';
                 
-                // 利用者のみ表示（roleチェックは不要、APIが既に利用者のみ返す）
-                response.users.forEach(user => {
+                // 利用者のみフィルタリング（二重チェック）
+                const users = response.users.filter(user => user.role === 'user');
+                
+                users.forEach(user => {
                     const serviceDisplay = user.service_type ? ` (${formatServiceType(user.service_type)})` : '';
                     html += `<option value="${user.id}">${user.name}${serviceDisplay}</option>`;
                 });

@@ -243,16 +243,9 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // 出勤記録訂正（休憩時間編集対応）- 修正版
     router.post('/attendance/correct', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { recordId, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason } = req.body;
+            const { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason } = req.body;
             
             // バリデーション
-            if (!recordId) {
-                return res.status(400).json({ 
-                    success: false,
-                    error: '記録IDが指定されていません' 
-                });
-            }
-            
             if (!reason || reason.trim() === '') {
                 return res.status(400).json({ 
                     success: false,
@@ -260,97 +253,171 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 });
             }
             
-            // 現在の値を取得
-            const oldRecord = await dbGet(
-                'SELECT * FROM attendance WHERE id = ?', 
-                [recordId]
-            );
-            
-            if (!oldRecord) {
-                return res.status(404).json({ 
-                    success: false,
-                    error: '記録が見つかりません' 
-                });
-            }
+            // recordIdがある場合は既存記録の更新
+            if (recordId) {
+                // 現在の値を取得
+                const oldRecord = await dbGet(
+                    'SELECT * FROM attendance WHERE id = ?', 
+                    [recordId]
+                );
+                
+                if (!oldRecord) {
+                    return res.status(404).json({ 
+                        success: false,
+                        error: '記録が見つかりません' 
+                    });
+                }
 
-            // ユーザー情報取得
-            const user = await dbGet(
-                'SELECT id, role FROM users WHERE id = ?',
-                [oldRecord.user_id]
-            );
+                // ユーザー情報取得
+                const user = await dbGet(
+                    'SELECT id, role FROM users WHERE id = ?',
+                    [oldRecord.user_id]
+                );
 
-            // 出勤記録を更新
-            await dbRun(
-                'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [newClockIn, newClockOut, status, recordId]
-            );
+                // 出勤記録を更新
+                await dbRun(
+                    'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                    [newClockIn, newClockOut, status, recordId]
+                );
 
-            // 休憩記録の処理（利用者とスタッフで分岐）
-            if (user.role === 'user') {
-                // 利用者の場合：break_recordsテーブルを更新
-                if (newBreakStart) {
-                    const existingBreak = await dbGet(
-                        'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
-                        [oldRecord.user_id, oldRecord.date]
-                    );
-
-                    if (existingBreak) {
-                        // 既存の休憩記録を更新
-                        await dbRun(
-                            'UPDATE break_records SET start_time = ?, end_time = ?, duration = ? WHERE id = ?',
-                            [newBreakStart, newBreakEnd, newBreakEnd ? 60 : null, existingBreak.id]
+                // 休憩記録の処理（利用者とスタッフで分岐）
+                if (user.role === 'user') {
+                    // 利用者の場合：break_recordsテーブルを更新
+                    if (newBreakStart) {
+                        const existingBreak = await dbGet(
+                            'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
+                            [oldRecord.user_id, oldRecord.date]
                         );
+
+                        if (existingBreak) {
+                            // 既存の休憩記録を更新
+                            await dbRun(
+                                'UPDATE break_records SET start_time = ?, end_time = ?, duration = ? WHERE id = ?',
+                                [newBreakStart, newBreakEnd, newBreakEnd ? 60 : null, existingBreak.id]
+                            );
+                        } else {
+                            // 新しい休憩記録を作成
+                            await dbRun(
+                                'INSERT INTO break_records (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)',
+                                [oldRecord.user_id, oldRecord.date, newBreakStart, newBreakEnd, newBreakEnd ? 60 : null]
+                            );
+                        }
                     } else {
-                        // 新しい休憩記録を作成
+                        // 休憩時間が削除された場合
                         await dbRun(
-                            'INSERT INTO break_records (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)',
-                            [oldRecord.user_id, oldRecord.date, newBreakStart, newBreakEnd, newBreakEnd ? 60 : null]
+                            'DELETE FROM break_records WHERE user_id = ? AND date = ?',
+                            [oldRecord.user_id, oldRecord.date]
                         );
                     }
                 } else {
-                    // 休憩時間が削除された場合
+                    // スタッフ・管理者の場合：attendanceテーブルのbreak_start/break_endを更新
                     await dbRun(
-                        'DELETE FROM break_records WHERE user_id = ? AND date = ?',
-                        [oldRecord.user_id, oldRecord.date]
+                        'UPDATE attendance SET break_start = ?, break_end = ? WHERE id = ?',
+                        [newBreakStart, newBreakEnd, recordId]
                     );
                 }
-            } else {
-                // スタッフ・管理者の場合：attendanceテーブルのbreak_start/break_endを更新
+                
+                // 監査ログ
                 await dbRun(
-                    'UPDATE attendance SET break_start = ?, break_end = ? WHERE id = ?',
-                    [newBreakStart, newBreakEnd, recordId]
+                    `INSERT INTO audit_log (
+                        admin_id, action_type, target_id, target_type,
+                        old_value, new_value, reason, ip_address
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        req.session.user.id,
+                        'attendance_correction',
+                        recordId,
+                        'attendance',
+                        JSON.stringify({
+                            clock_in: oldRecord.clock_in,
+                            clock_out: oldRecord.clock_out,
+                            status: oldRecord.status,
+                            break_start: oldRecord.break_start,
+                            break_end: oldRecord.break_end
+                        }),
+                        JSON.stringify({
+                            clock_in: newClockIn,
+                            clock_out: newClockOut,
+                            status: status,
+                            break_start: newBreakStart,
+                            break_end: newBreakEnd
+                        }),
+                        reason,
+                        req.ip
+                    ]
                 );
             }
-            
-            // 監査ログ
-            await dbRun(
-                `INSERT INTO audit_log (
-                    admin_id, action_type, target_id, target_type,
-                    old_value, new_value, reason, ip_address
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    req.session.user.id,
-                    'attendance_correction',
-                    recordId,
-                    'attendance',
-                    JSON.stringify({
-                        clock_in: oldRecord.clock_in,
-                        clock_out: oldRecord.clock_out,
-                        status: oldRecord.status,
-                        break_start: oldRecord.break_start,
-                        break_end: oldRecord.break_end
-                    }),
-                    JSON.stringify({
-                        clock_in: newClockIn,
-                        clock_out: newClockOut,
-                        status: status,
-                        break_start: newBreakStart,
-                        break_end: newBreakEnd
-                    }),
-                    reason,
-                    req.ip
-                ]
-            );
+            // recordIdがない場合は新規記録の作成
+            else if (userId && date && newClockIn) {
+                // ユーザー情報取得
+                const user = await dbGet(
+                    'SELECT id, role FROM users WHERE id = ?',
+                    [userId]
+                );
+                
+                if (!user) {
+                    return res.status(404).json({ 
+                        success: false,
+                        error: 'ユーザーが見つかりません' 
+                    });
+                }
+                
+                // 新規出勤記録を作成
+                const result = await dbRun(
+                    `INSERT INTO attendance (user_id, date, clock_in, clock_out, status) 
+                     VALUES (?, ?, ?, ?, ?)
+                     ON CONFLICT(user_id, date) DO UPDATE SET
+                        clock_in = excluded.clock_in,
+                        clock_out = excluded.clock_out,
+                        status = excluded.status,
+                        updated_at = CURRENT_TIMESTAMP`,
+                    [userId, date, newClockIn, newClockOut, status || 'normal']
+                );
+                
+                // 休憩記録の処理
+                if (newBreakStart && user.role === 'user') {
+                    await dbRun(
+                        `INSERT OR REPLACE INTO break_records (user_id, date, start_time, end_time, duration) 
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [userId, date, newBreakStart, newBreakEnd, newBreakEnd ? 60 : null]
+                    );
+                } else if (newBreakStart && user.role !== 'user') {
+                    await dbRun(
+                        'UPDATE attendance SET break_start = ?, break_end = ? WHERE user_id = ? AND date = ?',
+                        [newBreakStart, newBreakEnd, userId, date]
+                    );
+                }
+                
+                // 監査ログ
+                await dbRun(
+                    `INSERT INTO audit_log (
+                        admin_id, action_type, target_id, target_type,
+                        new_value, reason, ip_address
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        req.session.user.id,
+                        'attendance_creation',
+                        result.lastID || result.id,
+                        'attendance',
+                        JSON.stringify({
+                            user_id: userId,
+                            date: date,
+                            clock_in: newClockIn,
+                            clock_out: newClockOut,
+                            status: status || 'normal',
+                            break_start: newBreakStart,
+                            break_end: newBreakEnd
+                        }),
+                        reason,
+                        req.ip
+                    ]
+                );
+            } else {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '必要なパラメータが不足しています' 
+                });
+            }
             
             res.json({ 
                 success: true, 

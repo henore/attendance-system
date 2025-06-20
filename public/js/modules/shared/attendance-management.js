@@ -350,20 +350,20 @@ export class SharedAttendanceManagement {
       // 権限に応じてAPIを使い分け
       const endpoint = this.userRole === 'admin' ? 
         API_ENDPOINTS.ADMIN.ATTENDANCE_SEARCH : 
-        '/api/staff/attendance/search';
+        API_ENDPOINTS.STAFF.ATTENDANCE_SEARCH;
         
       const response = await this.parent.callApi(`${endpoint}?${params}`);
       let records = response.records || [];
       
       // データが取得できない場合、全ユーザーの今日の状況を取得
-      if (records.length === 0 && !searchUser) {
+      if (records.length === 0 && !searchUser && searchDate === new Date().toISOString().split('T')[0]) {
         // 管理者の場合
         if (this.userRole === 'admin') {
-          const statusResponse = await this.parent.callApi('/api/admin/status/today');
+          const statusResponse = await this.parent.callApi(API_ENDPOINTS.ADMIN.STATUS_TODAY);
           if (statusResponse.users) {
             records = statusResponse.users.map(user => ({
               id: user.a_id || null,
-              user_id: user.id,
+              user_id: user.id, 
               user_name: user.name,
               user_role: user.role,
               date: searchDate,
@@ -380,7 +380,7 @@ export class SharedAttendanceManagement {
         }
         // スタッフの場合
         else if (this.userRole === 'staff') {
-          const usersResponse = await this.parent.callApi('/api/staff/users');
+          const usersResponse = await this.parent.callApi(API_ENDPOINTS.STAFF.USERS);
           if (usersResponse.users) {
             records = usersResponse.users.map(user => ({
               id: user.a_id || null,

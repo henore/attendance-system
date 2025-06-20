@@ -46,6 +46,8 @@ db.serialize(() => {
             date DATE NOT NULL,
             clock_in TIME,
             clock_out TIME,
+            break_start TIME,
+            break_end TIME,
             status TEXT DEFAULT 'normal' CHECK(status IN ('normal', 'late', 'early', 'absence', 'paid_leave')),
             has_report INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

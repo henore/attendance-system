@@ -379,9 +379,9 @@ export default class AdminMonthlyReport {
     async loadUsersForMonthlyReport() {
         try {
             // 管理者用APIで全ユーザーを取得
-            const response = await this.parent.callApi(API_ENDPOINTS.ADMIN.USERS);
-            const userSelect = this.container.querySelector('#monthlyUserSelect');
-            
+             const response = await this.parent.callApi(
+                API_ENDPOINTS.ADMIN.MONTHLY_ATTENDANCE(year, String(month).padStart(2, '0'), userId)
+            );
             if (userSelect && response.users) {
                 let html = '<option value="">ユーザーを選択してください</option>';
                 
