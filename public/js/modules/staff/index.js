@@ -248,20 +248,42 @@ export default class StaffModule extends BaseModule {
   }
 
   async loadTodayAttendance() {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await this.apiCall(`/api/staff/attendance/${today}`);
-      
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    // スタッフ用のエンドポイントを使用
+    const response = await this.apiCall(`/api/attendance/today`);
+    
+    if (response.attendance) {
       this.state.currentAttendance = response.attendance;
-      this.state.isWorking = response.attendance && response.attendance.clock_in && !response.attendance.clock_out;
+      this.state.isWorking = response.attendance.clock_in && !response.attendance.clock_out;
       
-      this.updateAttendanceDisplay();
-      this.updateButtonStates();
-      
-    } catch (error) {
-      console.error('今日の出勤状況取得エラー:', error);
+      // 休憩状態も更新
+      if (response.attendance.break_start) {
+        this.state.breakStatus = {
+          start_time: response.attendance.break_start,
+          end_time: response.attendance.break_end,
+          duration: response.attendance.break_end ? 60 : null
+        };
+      }
+    } else {
+      // 出勤記録がない場合
+      this.state.currentAttendance = null;
+      this.state.isWorking = false;
+      this.state.breakStatus = null;
     }
+    
+    this.updateAttendanceDisplay();
+    this.updateButtonStates();
+    
+  } catch (error) {
+    console.error('今日の出勤状況取得エラー:', error);
+    // エラーの場合も表示を更新
+    this.state.currentAttendance = null;
+    this.state.isWorking = false;
+    this.updateAttendanceDisplay();
+    this.updateButtonStates();
   }
+}
 
   async checkLastRecord() {
     try {

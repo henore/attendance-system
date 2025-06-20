@@ -669,6 +669,13 @@ export class SharedAttendanceManagement {
     return names[role] || role;
   }
 
+
+
+// modules/shared/attendance-management.js（休憩時間計算部分のみ）
+// 勤務時間計算メソッドを修正
+
+// modules/shared/attendance-management.js（calculateWorkDurationメソッドの修正版）
+
   calculateWorkDuration(record) {
     if (!record.clock_in || !record.clock_out) return null;
     
@@ -678,11 +685,34 @@ export class SharedAttendanceManagement {
       const durationMs = end - start;
       const hours = durationMs / (1000 * 60 * 60);
       
-      // 休憩時間を差し引く
-      const breakMinutes = record.break && record.break.duration ? record.break.duration : 60;
+      // 休憩時間の計算（実際の休憩記録に基づく）
+      let breakMinutes = 0;
+      
+      // スタッフ・管理者の場合
+      if (record.user_role === 'staff' || record.user_role === 'admin') {
+        // 実際に休憩を取った場合のみ（break_startとbreak_endの両方が存在する場合）
+        if (record.break_start && record.break_end) {
+          breakMinutes = 60; // 固定60分
+        }
+        // break_startのみある場合（休憩中）は計算しない
+      }
+      // 利用者の場合（在宅・通所問わず）
+      else if (record.user_role === 'user') {
+        // breakRecordが存在し、実際に休憩を取った場合のみ
+        if (record.breakRecord && record.breakRecord.start_time && record.breakRecord.end_time) {
+          breakMinutes = record.breakRecord.duration || 60;
+        }
+        // 古いデータ用：breakフィールドを確認
+        else if (record.break && record.break.start && record.break.end) {
+          breakMinutes = record.break.duration || 60;
+        }
+        // 休憩中（end_timeがない）または休憩を取っていない場合は差し引かない
+      }
+      
       const netHours = hours - (breakMinutes / 60);
       
-      return netHours > 0 ? netHours.toFixed(1) : 0;
+      // 計算結果が負にならないようにする
+      return netHours > 0 ? netHours.toFixed(1) : hours.toFixed(1);
     } catch (error) {
       console.error('勤務時間計算エラー:', error);
       return null;

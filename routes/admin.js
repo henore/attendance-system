@@ -167,79 +167,87 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
-    // 出退勤記録検索（修正版 - 休憩データ統合対応）
-    router.get('/attendance/search', requireAuth, requireRole(['admin']), async (req, res) => {
-        try {
-            const { date, userId, role } = req.query;
-            
-            if (!date) {
-                return res.status(400).json({ 
-                    success: false,
-                    error: '検索日付を指定してください' 
-                });
-            }
-            
-            let query = `
-                SELECT 
-                    a.*,
-                    u.name as user_name,
-                    u.role as user_role,
-                    dr.id as report_id,
-                    sc.id as comment_id,
-                    CASE 
-                        WHEN u.role = 'user' THEN br.start_time
-                        ELSE a.break_start
-                    END as break_start,
-                    CASE 
-                        WHEN u.role = 'user' THEN br.end_time
-                        ELSE a.break_end
-                    END as break_end,
-                    CASE 
-                        WHEN u.role = 'user' THEN br.duration
-                        ELSE CASE 
-                            WHEN a.break_start IS NOT NULL AND a.break_end IS NOT NULL 
-                            THEN 60 
-                            ELSE NULL 
-                        END
-                    END as break_duration
-                FROM attendance a
-                JOIN users u ON a.user_id = u.id
-                LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
-                LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
-                LEFT JOIN break_records br ON a.user_id = br.user_id AND a.date = br.date AND u.role = 'user'
-                WHERE u.is_active = 1 AND a.date = ?
-            `;
-            
-            const params = [date];
-            
-            if (userId) {
-                query += ' AND a.user_id = ?';
-                params.push(userId);
-            }
-            
-            if (role) {
-                query += ' AND u.role = ?';
-                params.push(role);
-            }
-            
-            query += ' ORDER BY u.role, u.name';
-            
-            const records = await dbAll(query, params);
-            res.json({ 
-                success: true,
-                records, 
-                searchDate: date 
-            });
-            
-        } catch (error) {
-            console.error('出退勤記録検索エラー:', error);
-            res.status(500).json({ 
-                success: false,
-                error: '出退勤記録の検索に失敗しました' 
-            });
+    router.get('/attendance/search', async (req, res) => {
+  try {
+    const { date, role, userId } = req.query;
+    
+    if (!date) {
+      return res.status(400).json({ success: false, error: '日付が指定されていません' });
+    }
+    
+    let query = `
+      SELECT 
+        a.id, a.user_id, a.date, a.clock_in, a.clock_out, a.status,
+        a.break_start, a.break_end,
+        u.name as user_name, u.role as user_role, u.service_type,
+        dr.id as report_id,
+        sc.id as comment_id,
+        br.start_time as br_start, br.end_time as br_end, br.duration as br_duration
+      FROM users u
+      LEFT JOIN attendance a ON u.id = a.user_id AND a.date = ?
+      LEFT JOIN daily_reports dr ON u.id = dr.user_id AND dr.date = ?
+      LEFT JOIN staff_comments sc ON u.id = sc.user_id AND sc.date = ?
+      LEFT JOIN break_records br ON u.id = br.user_id AND br.date = ?
+      WHERE u.is_active = 1
+    `;
+    
+    const params = [date, date, date, date];
+    
+    if (role) {
+      query += ' AND u.role = ?';
+      params.push(role);
+    }
+    
+    if (userId) {
+      query += ' AND u.id = ?';
+      params.push(userId);
+    }
+    
+    query += ' ORDER BY u.role, u.name';
+    
+    const records = await dbAll(query, params);
+    
+    // 休憩記録を統合
+    const processedRecords = records.map(record => {
+      const processed = {
+        id: record.id,
+        user_id: record.user_id,
+        user_name: record.user_name,
+        user_role: record.user_role,
+        service_type: record.service_type,
+        date: date,
+        clock_in: record.clock_in,
+        clock_out: record.clock_out,
+        status: record.status || 'normal',
+        report_id: record.report_id,
+        comment_id: record.comment_id
+      };
+      
+      // スタッフ・管理者の休憩情報
+      if (record.user_role === 'staff' || record.user_role === 'admin') {
+        processed.break_start = record.break_start;
+        processed.break_end = record.break_end;
+      }
+      // 利用者の休憩情報
+      else if (record.user_role === 'user' && record.service_type !== 'home') {
+        if (record.br_start) {
+          processed.breakRecord = {
+            start_time: record.br_start,
+            end_time: record.br_end,
+            duration: record.br_duration
+          };
         }
+      }
+      
+      return processed;
     });
-
+    
+    res.json({ success: true, records: processedRecords });
+  } catch (error) {
+    console.error('出勤記録検索エラー:', error);
+    res.status(500).json({ success: false, error: '出勤記録の検索に失敗しました' });
+  }
+});
     // 出勤記録訂正（休憩時間編集対応）- 修正版
     router.post('/attendance/correct', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
