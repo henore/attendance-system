@@ -43,7 +43,6 @@ export const API_ENDPOINTS = {
     USER_STATUS: (userId) => `/api/staff/users/${userId}/status`,
     REPORT: (userId, date) => `/api/staff/reports/${userId}/${date}`,
     COMMENT: '/api/staff/comment',
-    HANDOVER: '/api/handover', // 修正
     ATTENDANCE_BOOK: '/api/staff/attendance-book',
     MONTHLY_ATTENDANCE: (year, month, userId) => 
         `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`
