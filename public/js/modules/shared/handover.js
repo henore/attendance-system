@@ -75,12 +75,12 @@ export default class SharedHandover {
 
     async refresh() {
         await this.loadData();
-        this.parent.showNotification('申し送り事項を更新しました', 'info');
+        this.app.showNotification('申し送り事項を更新しました', 'info');
     }
 
     async loadData() {
         try {
-            const response = await this.parent.callApi('/api/handover');
+            const response = await this.app.apiCall('/api/handover');
             
             if (response.handover) {
                 this.currentContent = response.handover.content || '';
@@ -130,7 +130,7 @@ export default class SharedHandover {
         }
         
         try {
-            await this.parent.callApi('/api/handover', {
+            await this.app.apiCall('/api/handover', {
                 method: 'POST',
                 body: JSON.stringify({ content })
             });

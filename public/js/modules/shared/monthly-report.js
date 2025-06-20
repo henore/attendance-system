@@ -433,11 +433,11 @@ export default class SharedMonthlyReport {
             
             if (this.isStaff) {
                 // スタッフは利用者のみ
-                const response = await this.parent.callApi(API_ENDPOINTS.STAFF.USERS_LIST);
+                const response = await this.app.apiCall(API_ENDPOINTS.STAFF.USERS_LIST);
                 users = response.users || [];
             } else if (this.isAdmin) {
                 // 管理者は全ユーザー
-                const response = await this.parent.callApi(API_ENDPOINTS.ADMIN.USERS);
+                const response = await this.app.apiCall(API_ENDPOINTS.ADMIN.USERS);
                 users = response.users || [];
             }
             
@@ -489,7 +489,7 @@ export default class SharedMonthlyReport {
             
         } catch (error) {
             console.error('ユーザー読み込みエラー:', error);
-            this.parent.showNotification('ユーザー一覧の読み込みに失敗しました', 'danger');
+            this.app.showNotification('ユーザー一覧の読み込みに失敗しました', 'danger');
         }
     }
 
@@ -506,7 +506,7 @@ export default class SharedMonthlyReport {
         const userId = userSelect.value;
         
         if (!userId) {
-            this.parent.showNotification('ユーザーを選択してください', 'warning');
+            this.app.showNotification('ユーザーを選択してください', 'warning');
             return;
         }
         
@@ -522,18 +522,18 @@ export default class SharedMonthlyReport {
             
             if (this.isAdmin) {
                 // 管理者APIを使用
-                response = await this.parent.callApi(
+                response = await this.app.apiCall(
                     API_ENDPOINTS.ADMIN.ATTENDANCE_MONTHLY(year, monthPadded, userId)
                 );
             } else {
                 // スタッフAPIを使用
-                response = await this.parent.callApi(
+                response = await this.app.apiCall(
                     API_ENDPOINTS.STAFF.MONTHLY_ATTENDANCE(year, monthPadded, userId)
                 );
             }
             
             if (!response || !response.user) {
-                this.parent.showNotification('データが見つかりません', 'danger');
+                this.app.showNotification('データが見つかりません', 'danger');
                 return;
             }
             
@@ -551,7 +551,7 @@ export default class SharedMonthlyReport {
             
         } catch (error) {
             console.error('[月別出勤簿] エラー:', error);
-            this.parent.showNotification('月次出勤記録の取得に失敗しました', 'danger');
+            this.app.showNotification('月次出勤記録の取得に失敗しました', 'danger');
         }
     }
 
@@ -825,7 +825,7 @@ export default class SharedMonthlyReport {
             const reason = document.getElementById('monthlyEditReason').value;
             
             if (!reason.trim()) {
-                this.parent.showNotification('変更理由を入力してください', 'warning');
+                this.app.showNotification('変更理由を入力してください', 'warning');
                 return;
             }
             
@@ -841,12 +841,12 @@ export default class SharedMonthlyReport {
                 reason: reason
             };
             
-            await this.parent.callApi(API_ENDPOINTS.ADMIN.ATTENDANCE_CORRECT, {
+            await this.app.apiCall(API_ENDPOINTS.ADMIN.ATTENDANCE_CORRECT, {
                 method: 'POST',
                 body: JSON.stringify(requestData)
             });
             
-            this.parent.showNotification('出勤記録を更新しました', 'success');
+            this.app.showNotification('出勤記録を更新しました', 'success');
             modalManager.hide('monthlyAttendanceEditModal');
             
             // 再表示
@@ -854,7 +854,7 @@ export default class SharedMonthlyReport {
             
         } catch (error) {
             console.error('出勤記録更新エラー:', error);
-            this.parent.showNotification(error.message || '出勤記録の更新に失敗しました', 'danger');
+            this.app.showNotification(error.message || '出勤記録の更新に失敗しました', 'danger');
         }
     }
 
@@ -863,12 +863,12 @@ export default class SharedMonthlyReport {
         
         try {
             // 日報データを取得
-            const response = await this.parent.callApi(
+            const response = await this.app.apiCall(
                 API_ENDPOINTS.STAFF.REPORT(data.userId, data.date)
             );
             
             if (!response.report) {
-                this.parent.showNotification('日報が見つかりません', 'warning');
+                this.app.showNotification('日報が見つかりません', 'warning');
                 return;
             }
             
@@ -898,7 +898,7 @@ export default class SharedMonthlyReport {
             
         } catch (error) {
             console.error('コメント編集エラー:', error);
-            this.parent.showNotification('コメント情報の取得に失敗しました', 'danger');
+            this.app.showNotification('コメント情報の取得に失敗しました', 'danger');
         }
     }
 
@@ -911,11 +911,11 @@ export default class SharedMonthlyReport {
             const comment = document.getElementById('monthlyCommentEditText').value.trim();
             
             if (!comment) {
-                this.parent.showNotification('コメントを入力してください', 'warning');
+                this.app.showNotification('コメントを入力してください', 'warning');
                 return;
             }
             
-            await this.parent.callApi(API_ENDPOINTS.STAFF.COMMENT, {
+            await this.app.apiCall(API_ENDPOINTS.STAFF.COMMENT, {
                 method: 'POST',
                 body: JSON.stringify({
                     userId: userId,
@@ -924,7 +924,7 @@ export default class SharedMonthlyReport {
                 })
             });
             
-            this.parent.showNotification('コメントを更新しました', 'success');
+            this.app.showNotification('コメントを更新しました', 'success');
             modalManager.hide('monthlyCommentEditModal');
             
             // 再表示
@@ -932,17 +932,17 @@ export default class SharedMonthlyReport {
             
         } catch (error) {
             console.error('コメント保存エラー:', error);
-            this.parent.showNotification(error.message || 'コメントの保存に失敗しました', 'danger');
+            this.app.showNotification(error.message || 'コメントの保存に失敗しました', 'danger');
         }
     }
 
     // 日報詳細表示（共通）
     async showReportDetail(userId, userName, date) {
         try {
-            const response = await this.parent.callApi(API_ENDPOINTS.STAFF.REPORT(userId, date));
+            const response = await this.app.apiCall(API_ENDPOINTS.STAFF.REPORT(userId, date));
             
             if (!response.report) {
-                this.parent.showNotification('この日の日報はありません', 'info');
+                this.app.showNotification('この日の日報はありません', 'info');
                 return;
             }
 
@@ -970,7 +970,7 @@ export default class SharedMonthlyReport {
 
         } catch (error) {
             console.error('日報詳細取得エラー:', error);
-            this.parent.showNotification('日報の取得に失敗しました', 'danger');
+            this.app.showNotification('日報の取得に失敗しました', 'danger');
         }
     }
 
@@ -1190,7 +1190,7 @@ export default class SharedMonthlyReport {
         if (!this.canEdit) return;
         
         // Excel出力機能は別途実装が必要
-        this.parent.showNotification('Excel出力機能は準備中です', 'info');
+        this.app.showNotification('Excel出力機能は準備中です', 'info');
     }
 
     destroy() {

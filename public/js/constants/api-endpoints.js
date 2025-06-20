@@ -23,8 +23,9 @@ export const API_ENDPOINTS = {
     BREAK_START: '/api/user/break/start',
     BREAK_END: '/api/user/break/end',
     BREAK_STATUS: (date) => `/api/user/break/status/${date}`,
-    REPORT_SUBMIT: '/api/user/report/submit',
+    REPORT_SUBMIT: '/api/user/report', // 修正：/submitを削除
     REPORT: (date) => `/api/user/report/${date}`,
+    REPORT_BY_DATE: (date) => `/api/user/report/${date}`, // 追加
     REPORTS: '/api/user/reports',
     COMMENT: (date) => `/api/user/comment/${date}`,
     LAST_RECORD: '/api/user/last-record'
@@ -44,7 +45,8 @@ export const API_ENDPOINTS = {
     COMMENT: '/api/staff/comment',
     HANDOVER: '/api/handover', // 修正
     ATTENDANCE_BOOK: '/api/staff/attendance-book',
-    MONTHLY_ATTENDANCE: '/api/staff/monthly-attendance'
+    MONTHLY_ATTENDANCE: (year, month, userId) => 
+        `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`
   },
   
   // 管理者用
@@ -52,41 +54,19 @@ export const API_ENDPOINTS = {
     STATUS_TODAY: '/api/admin/status/today',
     ATTENDANCE_SEARCH: '/api/admin/attendance/search',
     ATTENDANCE_CORRECT: '/api/admin/attendance/correct',
+    ATTENDANCE_MONTHLY: (year, month, userId) => 
+        `/api/admin/attendance/${year}/${month}/${userId}`, // 追加
     USERS: '/api/admin/users',
     USER_CREATE: '/api/admin/users/create',
     USER_UPDATE: (userId) => `/api/admin/users/${userId}`,
     USER_DELETE: (userId) => `/api/admin/users/${userId}`,
     USER_TOGGLE: (userId) => `/api/admin/users/${userId}/toggle`,
+    USER_RETIRE: (userId) => `/api/admin/retire/${userId}`, // 追加
     MONTHLY_REPORT: '/api/admin/monthly-report',
     EXPORT_CSV: '/api/admin/export/csv',
-    AUDIT_LOG: '/api/admin/audit-log'
-  },
-
-      ADMIN: {
-        REGISTER: '/api/admin/register',
-        USERS: '/api/admin/users',
-        STATUS_TODAY: '/api/admin/status/today',
-        ATTENDANCE_SEARCH: '/api/admin/attendance/search',
-        ATTENDANCE_CORRECT: '/api/admin/attendance/correct',
-        ATTENDANCE_MONTHLY: (year, month, userId) => 
-            `/api/admin/attendance/${year}/${month}/${userId}`,
-        USER_UPDATE: '/api/admin/user/update',
-        USER_RETIRE: (userId) => `/api/admin/retire/${userId}`,
-        AUDIT_LOG: '/api/admin/audit-log',
-        BREAK_STATUS: (userId, date) => 
-            `/api/admin/user/${userId}/break/status/${date}`
-    },
-    
-    STAFF: {
-        CLOCK_OUT: '/api/staff/clock-out',
-        USERS_LIST: '/api/staff/users',
-        ATTENDANCE_SEARCH: '/api/staff/attendance/search',
-        REPORT: (userId, date) => `/api/staff/reports/${userId}/${date}`,
-        COMMENT: '/api/staff/comment',
-        MONTHLY_ATTENDANCE: (year, month, userId) => 
-            `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`,
-        BREAK_START: '/api/staff/break/start',
-        BREAK_END: '/api/staff/break/end'
-    }
-  
+    AUDIT_LOG: '/api/admin/audit-log',
+    REGISTER: '/api/admin/register', // 追加
+    BREAK_STATUS: (userId, date) => 
+        `/api/admin/user/${userId}/break/status/${date}` // 追加
+  }
 };

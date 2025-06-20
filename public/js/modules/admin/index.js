@@ -13,6 +13,13 @@ window.modalManager = modalManager;
 export default class AdminModule extends BaseModule {
     constructor(app) {
         super(app);
+
+                // APIコールメソッドの確認
+        if (!this.apiCall) {
+            console.error('apiCallメソッドが見つかりません');
+            this.apiCall = this.app.apiCall.bind(this.app);
+        }
+        
         this.currentView = 'attendanceManagement';
         this.subModules = {};
         this.selectedYear = new Date().getFullYear();
@@ -143,18 +150,95 @@ export default class AdminModule extends BaseModule {
         this.currentView = viewName;
     }
 
-    // 以下、既存のメソッドはそのまま...
+    getSharedState() {
+        return {
+            selectedYear: this.selectedYear,
+            selectedMonth: this.selectedMonth,
+            selectedUserId: this.selectedUserId
+        };
+    }
+
+    updateSharedState(updates) {
+        Object.assign(this, updates);
+    }
+
+    async callApi(endpoint, options = {}) {
+        return await this.apiCall(endpoint, options);
+    }
+
+    showNotification(message, type = 'info') {
+        this.app.showNotification(message, type);
+    }
+
+    async showConfirm(options) {
+        return await modalManager.confirm(options);
+    }
+
+    showModal(id, data = {}) {
+        modalManager.show(id, data);
+    }
+
+    getRoleDisplayName(role) {
+        const roleNames = {
+            'user': '利用者',
+            'staff': 'スタッフ',
+            'admin': '管理者'
+        };
+        return roleNames[role] || role;
+    }
+
+    getServiceTypeDisplayName(serviceType) {
+        const serviceTypes = {
+            'commute': '通所',
+            'home': '在宅'
+        };
+        return serviceTypes[serviceType] || serviceType;
+    }
+
+    getRoleColor(role) {
+        const colors = {
+            'user': 'primary',
+            'staff': 'success',
+            'admin': 'danger'
+        };
+        return colors[role] || 'secondary';
+    }
+
+    calculateWorkDuration(attendance) {
+        if (!attendance || !attendance.clock_in || !attendance.clock_out) {
+            return null;
+        }
+
+        try {
+            const clockIn = new Date('1970-01-01 ' + attendance.clock_in);
+            const clockOut = new Date('1970-01-01 ' + attendance.clock_out);
+            const durationMs = clockOut - clockIn;
+            const hours = durationMs / (1000 * 60 * 60);
+
+            if (hours > 0) {
+                return hours.toFixed(1);
+            }
+        } catch (error) {
+            console.error('勤務時間計算エラー:', error);
+        }
+
+        return null;
+    }
+
+    getStatusBadge(status) {
+        const statusConfig = {
+            'normal': { class: 'bg-success', text: '正常' },
+            'late': { class: 'bg-warning text-dark', text: '遅刻' },
+            'early': { class: 'bg-info', text: '早退' },
+            'absence': { class: 'bg-danger', text: '欠勤' },
+            'paid_leave': { class: 'bg-primary', text: '有給欠勤' }
+        };
+
+        const config = statusConfig[status] || statusConfig['normal'];
+        return `<span class="badge ${config.class}">${config.text}</span>`;
+    }
 
     destroy() {
-        // 共通出勤管理モジュールのクリーンアップ
-        this.attendanceManagement?.destroy();
-        
-        // 申し送りモジュールのクリーンアップ
-        this.handoverSection?.destroy();
-        
-        // 月別出勤簿モジュールのクリーンアップ
-        this.monthlyReport?.destroy();
-
         // 各サブモジュールをクリーンアップ
         Object.values(this.subModules).forEach(module => {
             if (module.destroy) {
@@ -164,7 +248,8 @@ export default class AdminModule extends BaseModule {
 
         // 親クラスのクリーンアップ
         super.destroy();
-        
+
         console.log('🔧 管理者モジュールクリーンアップ完了');
     }
+  
 }

@@ -13,6 +13,12 @@ import SharedHandover from '../shared/handover.js';
 export default class StaffModule extends BaseModule {
   constructor(app) {
     super(app);
+
+    // APIコールメソッドの確認
+        if (!this.apiCall) {
+            console.error('apiCallメソッドが見つかりません');
+            this.apiCall = this.app.apiCall.bind(this.app);
+    }
     
     // 出退勤ハンドラー
     this.attendanceHandler = new StaffAttendanceHandler(
@@ -235,8 +241,6 @@ export default class StaffModule extends BaseModule {
     }
   }
 
-  // 他のメソッドは変更なし...
-
   async switchToSection(sectionId) {
     console.log(`[StaffModule] 画面切り替え: ${sectionId}`);
     
@@ -275,14 +279,116 @@ export default class StaffModule extends BaseModule {
     }
   }
 
-  // 以下、既存のメソッドはそのまま...
-  
-  getServiceTypeDisplayName(type) {
-    const types = {
-      'commute': '通所',
-      'home': '在宅'
+    /**
+   * スタッフコメントモーダルを開く
+   */
+  async openStaffCommentModal(userId, userName) {
+    await this.commentHandler.openModal(userId, userName);
+
+    // コメント保存後に出勤管理を更新
+    this.commentHandler.onSave = async () => {
+      if (this.attendanceManagement) {
+        await this.attendanceManagement.refresh();
+      }
     };
-    return types[type] || type;
+  }
+
+   /**
+   * 日報詳細を表示
+   */
+  async showDailyReportDetail(userId, userName, date) {
+    await this.commentHandler.showReportDetail(userId, userName, date);
+  }
+
+  /**
+   * 未コメントの日報をチェック
+   */
+  async checkUncommentedReports() {
+    return await this.commentHandler.getUncommentedReports();
+  }
+
+  /**
+   * ログアウト時の処理
+   */
+  async handleLogout() {
+    const uncommentedReports = await this.checkUncommentedReports();
+    if (uncommentedReports.length > 0) {
+      const userNames = uncommentedReports.map(report => report.user_name).join('、');
+      const confirmMessage = `以下の利用者の日報にまだコメントが記入されていません：\n${userNames}\n\nコメント記入は必須です。このままログアウトしますか？`;
+
+      if (!confirm(confirmMessage)) {
+        return false; // ログアウトをキャンセル
+      }
+    }
+
+    return true; // ログアウトを続行
+  }
+
+  // 通知バッジ更新
+  updateNotificationBadge() {
+    const badge = document.getElementById('notificationBadge');
+    const count = this.reportNotification.getPendingNotificationCount();
+    
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  }
+
+   // 共通メソッド（SharedAttendanceManagementから使用）
+  async callApi(endpoint, options = {}) {
+    return await this.apiCall(endpoint, options);
+  }
+
+  showNotification(message, type = 'info') {
+    this.app.showNotification(message, type);
+  }
+  
+  getRoleDisplayName(role) {
+    const roleNames = {
+      'user': '利用者',
+      'staff': 'スタッフ',
+    };
+    return roleNames[role] || role;
+  }
+
+  getRoleColor(role) {
+    const colors = {
+      'user': 'primary',
+      'staff': 'success',
+      'admin': 'danger'
+    };
+    return colors[role] || 'secondary';
+  }
+
+  getStatusBadge(status) {
+      const badges = {
+        'normal': '<span class="badge bg-success">正常</span>',
+        'late': '<span class="badge bg-warning">遅刻</span>',
+        'early': '<span class="badge bg-info">早退</span>',
+        'absence': '<span class="badge bg-danger">欠勤</span>',
+        'paid_leave': '<span class="badge bg-primary">有給欠勤</span>'
+      };
+      return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
+    }
+
+  calculateWorkDuration(record) {
+    if (!record.clock_in || !record.clock_out) return null;
+    
+    try {
+      const start = new Date(`1970-01-01 ${record.clock_in}`);
+      const end = new Date(`1970-01-01 ${record.clock_out}`);
+      const durationMs = end - start;
+        
+      return netHours > 0 ? netHours.toFixed(1) : 0;
+    } catch (error) {
+      console.error('勤務時間計算エラー:', error);
+      return null;
+    }
   }
 
   destroy() {
