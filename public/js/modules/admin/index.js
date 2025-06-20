@@ -6,7 +6,7 @@ import { modalManager } from '../shared/modal-manager.js';
 import { SharedAttendanceManagement } from '../shared/attendance-management.js';
 import AdminUserManagement from './user-management.js';
 import AdminMonthlyReport from './monthly-report.js';
-import { SharedHandover } from '../shared/handover.js';
+import SharedHandover from '../shared/handover.js';
 import AdminAuditLog from './audit-log.js';
 
 // グローバルに modalManager を公開（一時的な対処）
@@ -120,6 +120,7 @@ export default class AdminModule extends BaseModule {
         //出勤者管理
         this.attendanceManagement = new SharedAttendanceManagement(this.app, this);
         await this.attendanceManagement.init(contentArea);
+        
         //申し送り
         this.handoverSection = new SharedHandover(this.app, this);
         await this.handoverSection.init(contentArea);

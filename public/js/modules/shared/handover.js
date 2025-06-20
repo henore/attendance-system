@@ -1,5 +1,5 @@
 // modules/shared/handover.js
-// 管理者申し送り機能
+// 共通の申し送り機能
 
 export default class SharedHandover {
     constructor(app, parentModule) {

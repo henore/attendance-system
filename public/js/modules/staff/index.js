@@ -10,7 +10,7 @@ import { StaffMonthlyReport } from './monthly-report.js';
 import { StaffReportNotification } from './report-notification.js';
 import { StaffLastReportModal } from './last-report-modal.js';
 import { modalManager } from '../shared/modal-manager.js';
-import { SharedHandover }  from '../shared/handover.js';
+import SharedHandover from '../shared/handover.js';
 
 export default class StaffModule extends BaseModule {
   constructor(app) {
@@ -23,18 +23,21 @@ export default class StaffModule extends BaseModule {
     );
     
     // 共通出勤管理（ダッシュボード置き換え）
-    this.attendanceManagement = null; // 遅延初期化
+    this.StaffAttendanceHandler = null; // 遅延初期化
 
-    //共通申し送り
-    this.handoverSection = null;
-   
-    // その他のハンドラー
-    this.commentHandler = new StaffCommentHandler(
+     //申し送りハンドラー
+    this.handoverHandler = new SharedHandover(
       this.apiCall.bind(this),
       this.app.showNotification.bind(this.app),
       this.currentUser
     );
     
+    this.commentHandler = new StaffCommentHandler(
+      this.apiCall.bind(this),
+      this.app.showNotification.bind(this.app),
+      this.currentUser
+    );
+
     this.attendanceBook = new StaffAttendanceBook(
       this.apiCall.bind(this),
       this.app.showNotification.bind(this.app)
@@ -144,11 +147,7 @@ export default class StaffModule extends BaseModule {
     // 共通出勤管理モジュール初期化
     this.attendanceManagement = new SharedAttendanceManagement(this.app, this);
     await this.attendanceManagement.init(contentArea);
-
-   // 共通申し送りモジュール初期化
-    this.handoverSection = new SharedHandover(this.app, this);
-    await this.handoverSection.init(contentArea);
-  }
+   }
 
   renderAttendanceSection() {
     return `
