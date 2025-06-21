@@ -1,4 +1,4 @@
-// modules/staff/index.js（完全修正版）
+// modules/staff/index.js（色々修正版）
 import BaseModule from '../../base-module.js';
 import { StaffAttendanceHandler } from './attendance.js';
 import { SharedAttendanceManagement } from '../shared/attendance-management.js';
