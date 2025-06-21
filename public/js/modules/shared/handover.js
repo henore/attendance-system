@@ -76,6 +76,71 @@ setupEventListeners() {
     }
 }
 
+    async show() {
+        this.container.style.display = 'block';
+        await this.loadData();
+    }
+
+    hide() {
+        this.container.style.display = 'none';
+    }
+
+    async refresh() {
+        await this.loadData();
+        this.app.showNotification('申し送り事項を更新しました', 'info');
+    }
+
+    async loadData() {
+    try {
+        const response = await this.app.apiCall('/api/handover', {
+            method: 'GET'
+        });
+        
+        if (response && response.success) {
+            const handoverData = response.handover || {};
+            this.currentContent = handoverData.content || '';
+            this.lastUpdateInfo = {
+                updatedAt: handoverData.created_at,
+                updatedBy: handoverData.updated_by
+            };
+            
+            this.updateUI();
+        }
+    } catch (error) {
+        console.error('申し送り事項読み込みエラー:', error);
+        this.parent.showNotification('申し送り事項の読み込みに失敗しました', 'danger');
+    }
+   }
+
+    updateUI() {
+        const textarea = this.container.querySelector('#handoverContent');
+        const updateInfo = this.container.querySelector('#handoverUpdateInfo');
+        
+        if (textarea) {
+            textarea.value = this.currentContent;
+        }
+        
+        if (updateInfo) {
+            updateInfo.innerHTML = this.getUpdateInfoHTML();
+        }
+    }
+
+    getUpdateInfoHTML() {
+    if (!this.lastUpdateInfo || !this.lastUpdateInfo.updatedAt) {
+        return '<i class="fas fa-clock"></i> 最終更新: 未設定';
+    }
+    
+    const updateDate = new Date(this.lastUpdateInfo.updatedAt).toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    return `<i class="fas fa-clock"></i> 最終更新: ${updateDate}`;
+    }
+    
     // 削除メソッドを追加
     async deleteHandover() {
         if (!confirm('申し送り事項を削除しますか？')) {
@@ -96,24 +161,6 @@ setupEventListeners() {
             this.parent.showNotification(error.message || '申し送り事項の削除に失敗しました', 'danger');
         }
     }
-
-    // getUpdateInfoHTML メソッドを修正（表示形式の改善）
-    getUpdateInfoHTML() {
-        if (!this.lastUpdateInfo || !this.lastUpdateInfo.updatedAt) {
-            return '<i class="fas fa-clock"></i> 最終更新: 未設定';
-        }
-        
-        const updateDate = new Date(this.lastUpdateInfo.updatedAt).toLocaleString('ja-JP', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        
-        return `<i class="fas fa-clock"></i> 最終更新: ${updateDate}`;
-    }
-
     // updateHandover メソッドを修正
     async updateHandover() {
         const textarea = this.container.querySelector('#handoverContent');
