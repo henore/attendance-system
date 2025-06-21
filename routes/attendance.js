@@ -110,24 +110,24 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     }
   });
   
-  // 退勤処理（利用者用 - スタッフは別ルート）- 時間丸め機能追加
-  router.post('/clock-out', async (req, res) => {
-    try {
-      const userId = req.session.user.id;
-      const userRole = req.session.user.role;
-      
-      // スタッフは専用の退勤処理を使用
-      if (userRole === 'staff' || userRole === 'admin') {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'スタッフは /api/staff/clock-out を使用してください' 
-        });
-      }
-      
-      const today = new Date().toISOString().split('T')[0];
-      let currentTime = new Date().toTimeString().slice(0, 5);
-      
-      // 既存の出勤記録確認
+    // 退勤処理（利用者用 - スタッフは別ルート）- 時間丸め機能追加
+    router.post('/clock-out', async (req, res) => {
+      try {
+        const userId = req.session.user.id;
+        const userRole = req.session.user.role;
+        
+        // スタッフは専用の退勤処理を使用
+        if (userRole === 'staff' || userRole === 'admin') {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'スタッフは /api/staff/clock-out を使用してください' 
+          });
+        }
+        
+        const today = new Date().toISOString().split('T')[0];
+        let currentTime = new Date().toTimeString().slice(0, 5);
+        
+        // 既存の出勤記録確認
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
         [userId, today]
@@ -151,17 +151,17 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
       if (userRole === 'user') {
         const currentMinutes = timeToMinutes(currentTime);
         
-        // 11:30-12:30の退勤は11:30固定
-        if (currentMinutes >= 690 && currentMinutes <= 750) { // 11:30-12:30
+        // 通所者のみ11:30-12:30の退勤は11:30固定
+        if (userServiceType === 'commute' && currentMinutes >= 690 && currentMinutes <= 750) { // 11:30-12:30
           currentTime = '11:30';
         } 
-        // 15:30以前は15分切り下げ
-        else if (currentMinutes <= 929) { // 15:30 = 930分
+        // 15:30以前は15分切り下げ（通所者・在宅者共通）
+        else if (currentMinutes <= 930) { // 15:30 = 930分
           const roundedMinutes = Math.floor(currentMinutes / 15) * 15;
           currentTime = minutesToTime(roundedMinutes);
         } 
-        // 15:31以降は15:45固定
-        else if (currentMinutes >= 930) {
+        // 15:31以降は15:45固定（通所者・在宅者共通）
+        else if (currentMinutes >= 931) {
           currentTime = '15:45';
         }
       }
