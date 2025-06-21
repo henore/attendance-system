@@ -31,6 +31,9 @@ render() {
                     <button class="btn btn-outline-light btn-sm" id="refreshHandoverBtn">
                         <i class="fas fa-sync"></i> 更新
                     </button>
+                    <button class="btn btn-outline-danger btn-sm" id="deleteHandoverBtn">
+                        <i class="fas fa-trash"></i> 削除
+                    </button>
                 </div>
             </div>
             <div class="card-body">
@@ -68,7 +71,9 @@ setupEventListeners() {
         refreshBtn.addEventListener('click', () => this.refreshHandover());
     }
     
-
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', () => this.deleteHandover());
+    }
 }
 
     async show() {
@@ -170,6 +175,27 @@ setupEventListeners() {
         await this.loadData();
         this.app.showNotification('申し送り事項を更新しました', 'info');
     }
+
+    // 削除メソッドを追加
+    async deleteHandover() {
+    if (!confirm('申し送り事項を削除しますか？')) {
+        return;
+    }
+    
+    try {
+        const response = await this.app.apiCall('/api/handover', {
+            method: 'DELETE'
+        });
+        
+        if (response && response.success) {
+            await this.loadData();
+            this.parent.showNotification('申し送り事項を削除しました', 'success');
+        }
+    } catch (error) {
+        console.error('申し送り削除エラー:', error);
+        this.parent.showNotification(error.message || '申し送り事項の削除に失敗しました', 'danger');
+    }
+}
 
     destroy() {
         if (this.container && this.container.parentNode) {

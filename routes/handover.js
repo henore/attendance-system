@@ -98,5 +98,61 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
       });
     }
   });
+
+  // 申し送り事項削除（新規追加）
+  router.delete('/', requireAuth, async (req, res) => {
+    try {
+      // 権限チェック
+      if (!['staff', 'admin'].includes(req.session.user.role)) {
+        return res.status(403).json({ 
+          success: false, 
+          error: '権限がありません' 
+        });
+      }
+
+      // 最新の申し送りを取得
+      const latestHandover = await dbGet(
+        'SELECT * FROM handover_notes WHERE is_deleted = 0 ORDER BY id DESC LIMIT 1'
+      );
+
+      if (!latestHandover) {
+        return res.status(404).json({ 
+          success: false, 
+          error: '削除する申し送り事項がありません' 
+        });
+      }
+
+      // 論理削除
+      await dbRun(
+        'UPDATE handover_notes SET is_deleted = 1 WHERE id = ?',
+        [latestHandover.id]
+      );
+
+      // 削除記録を作成
+      const now = new Date();
+      const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+      const timeString = japanTime.toISOString().slice(11, 16);
+      
+      const deleteMessage = `【削除】前回の申し送りを削除しました (${timeString} ${req.session.user.name})`;
+      
+      await dbRun(
+        'INSERT INTO handover_notes (content, updated_by, is_deleted) VALUES (?, ?, 0)',
+        [deleteMessage, req.session.user.name]
+      );
+
+      res.json({ 
+        success: true, 
+        message: '申し送り事項を削除しました' 
+      });
+      
+    } catch (error) {
+      console.error('申し送り削除エラー:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: '申し送り事項の削除に失敗しました' 
+      });
+    }
+  });
+
   return router;
 };
