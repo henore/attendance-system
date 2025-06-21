@@ -1,11 +1,11 @@
-// routes/handover.js（権限チェック修正版）
+// routes/handover.js（ルート修正版）
 const express = require('express');
 const router = express.Router();
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
   
   // 申し送り事項取得（スタッフ・管理者のみ）
-  router.get('/handover', requireAuth, async (req, res) => {
+  router.get('/', requireAuth, async (req, res) => {
     try {
       // 権限チェック
       if (!['staff', 'admin'].includes(req.session.user.role)) {
@@ -33,7 +33,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
   });
 
   // 申し送り事項更新（スタッフ・管理者のみ）
-  router.post('/handover', requireAuth, async (req, res) => {
+  router.post('/', requireAuth, async (req, res) => {
     try {
       // 権限チェック
       if (!['staff', 'admin'].includes(req.session.user.role)) {

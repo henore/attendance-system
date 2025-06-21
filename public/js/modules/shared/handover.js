@@ -79,22 +79,26 @@ export default class SharedHandover {
     }
 
     async loadData() {
-        try {
-            const response = await this.app.apiCall('/api/handover');
+    try {
+        const response = await this.app.apiCall('/api/handover', {
+            method: 'GET'
+        });
+        
+        if (response && response.success) {
+            const handoverData = response.handover || {};
+            this.currentContent = handoverData.content || '';
+            this.lastUpdateInfo = {
+                updatedAt: handoverData.created_at,
+                updatedBy: handoverData.updated_by
+            };
             
-            if (response.handover) {
-                this.currentContent = response.handover.content || '';
-                this.lastUpdateInfo = {
-                    updatedAt: response.handover.created_at,
-                    updatedBy: response.handover.updated_by
-                };
-                
-                this.updateUI();
-            }
-        } catch (error) {
-            console.error('申し送り事項読み込みエラー:', error);
+            this.updateUI();
         }
+    } catch (error) {
+        console.error('申し送り事項読み込みエラー:', error);
+        this.parent.showNotification('申し送り事項の読み込みに失敗しました', 'danger');
     }
+   }
 
     updateUI() {
         const textarea = this.container.querySelector('#handoverContent');
@@ -120,6 +124,7 @@ export default class SharedHandover {
         return `<i class="fas fa-clock"></i> 最終更新: ${updateDate}${updatedBy ? ` (${updatedBy})` : ''}`;
     }
 
+    // updateHandover メソッドを修正
     async updateHandover() {
         const textarea = this.container.querySelector('#handoverContent');
         const content = textarea ? textarea.value.trim() : '';
@@ -130,19 +135,18 @@ export default class SharedHandover {
         }
         
         try {
-            await this.app.apiCall('/api/handover', {
+            const response = await this.app.apiCall('/api/handover', {
                 method: 'POST',
                 body: JSON.stringify({ content })
             });
             
-            await this.loadData();
-            this.parent.showNotification('申し送り事項を更新しました', 'success');
-            
+            if (response && response.success) {
+                await this.loadData();
+                this.parent.showNotification('申し送り事項を更新しました', 'success');
+            }
         } catch (error) {
             console.error('申し送り更新エラー:', error);
-            if (error.message && error.message.includes('5分間隔')) {
-                this.parent.showNotification(error.message, 'warning');
-            } else if (error.message && error.message.includes('他のユーザー')) {
+            if (error.message && error.message.includes('5分')) {
                 this.parent.showNotification(error.message, 'warning');
             } else {
                 this.parent.showNotification('申し送り事項の更新に失敗しました', 'danger');
@@ -152,7 +156,7 @@ export default class SharedHandover {
 
     async refreshHandover() {
         await this.loadData();
-        this.parent.showNotification('申し送り事項を更新しました', 'info');
+        this.app.showNotification('申し送り事項を更新しました', 'info');
     }
 
     destroy() {

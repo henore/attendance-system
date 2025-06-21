@@ -15,6 +15,12 @@ export const API_ENDPOINTS = {
     CLOCK_OUT: '/api/attendance/clock-out'
   },
   
+    // 申し送り（追加）
+  HANDOVER: {
+    GET: '/api/handover',
+    UPDATE: '/api/handover'
+  },
+  
   // 利用者用
   USER: {
     STATUS: '/api/user/status',

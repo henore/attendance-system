@@ -1,8 +1,21 @@
 // routes/attendance.js
-// 共通の出勤管理ルート
+// 共通の出勤管理ルート（時間丸め機能追加版）
 
 const express = require('express');
 const router = express.Router();
+
+// 時間を分に変換
+const timeToMinutes = (timeStr) => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+// 分を時間文字列に変換
+const minutesToTime = (minutes) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+};
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
   
@@ -30,12 +43,13 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     }
   });
   
-  // 出勤処理（全ロール共通）
+  // 出勤処理（全ロール共通）- 時間丸め機能追加
   router.post('/clock-in', async (req, res) => {
     try {
       const userId = req.session.user.id;
+      const userRole = req.session.user.role;
       const today = new Date().toISOString().split('T')[0];
-      const currentTime = new Date().toTimeString().slice(0, 5);
+      let currentTime = new Date().toTimeString().slice(0, 5);
       
       // 既存の出勤記録確認
       const existing = await dbGet(
@@ -48,6 +62,25 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
           success: false, 
           error: '既に出勤しています' 
         });
+      }
+      
+      // 利用者の場合は時間丸め処理
+      if (userRole === 'user') {
+        const currentMinutes = timeToMinutes(currentTime);
+        
+        // 11:30-12:30の出勤は12:30固定
+        if (currentMinutes >= 690 && currentMinutes <= 750) { // 11:30-12:30
+          currentTime = '12:30';
+        } 
+        // 9:00前は9:00固定
+        else if (currentMinutes < 540) { // 9:00 = 540分
+          currentTime = '09:00';
+        } 
+        // 9:01以降は15分切り上げ
+        else if (currentMinutes >= 541) {
+          const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
+          currentTime = minutesToTime(roundedMinutes);
+        }
       }
       
       // 出勤記録作成
@@ -77,7 +110,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     }
   });
   
-  // 退勤処理（利用者用 - スタッフは別ルート）
+  // 退勤処理（利用者用 - スタッフは別ルート）- 時間丸め機能追加
   router.post('/clock-out', async (req, res) => {
     try {
       const userId = req.session.user.id;
@@ -92,7 +125,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
       }
       
       const today = new Date().toISOString().split('T')[0];
-      const currentTime = new Date().toTimeString().slice(0, 5);
+      let currentTime = new Date().toTimeString().slice(0, 5);
       
       // 既存の出勤記録確認
       const attendance = await dbGet(
@@ -114,15 +147,41 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         });
       }
       
+      // 利用者の場合は時間丸め処理
+      if (userRole === 'user') {
+        const currentMinutes = timeToMinutes(currentTime);
+        
+        // 11:30-12:30の退勤は11:30固定
+        if (currentMinutes >= 690 && currentMinutes <= 750) { // 11:30-12:30
+          currentTime = '11:30';
+        } 
+        // 15:30以前は15分切り下げ
+        else if (currentMinutes <= 930) { // 15:30 = 930分
+          const roundedMinutes = Math.floor(currentMinutes / 15) * 15;
+          currentTime = minutesToTime(roundedMinutes);
+        } 
+        // 15:31以降は15:45固定
+        else if (currentMinutes >= 931) {
+          currentTime = '15:45';
+        }
+      }
+      
       // 退勤時間更新
       await dbRun(
         'UPDATE attendance SET clock_out = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [currentTime, attendance.id]
       );
       
+      // 更新された出勤記録を取得
+      const updatedAttendance = await dbGet(
+        'SELECT * FROM attendance WHERE id = ?',
+        [attendance.id]
+      );
+      
       res.json({
         success: true,
         message: '退勤しました',
+        attendance: updatedAttendance,
         time: currentTime
       });
       
