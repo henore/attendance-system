@@ -155,13 +155,13 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         if (userServiceType === 'commute' && currentMinutes >= 690 && currentMinutes <= 750) { // 11:30-12:30
           currentTime = '11:30';
         } 
-        // 15:30以前は15分切り下げ（通所者・在宅者共通）
-        else if (currentMinutes <= 930) { // 15:30 = 930分
+        // 15:29以前は15分切り下げ（通所者・在宅者共通）
+        else if (currentMinutes <= 929) { // 15:29 = 929分
           const roundedMinutes = Math.floor(currentMinutes / 15) * 15;
           currentTime = minutesToTime(roundedMinutes);
         } 
-        // 15:31以降は15:45固定（通所者・在宅者共通）
-        else if (currentMinutes >= 931) {
+        // 15:30以降は15:45固定（通所者・在宅者共通）
+        else if (currentMinutes >= 930) {
           currentTime = '15:45';
         }
       }

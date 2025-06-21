@@ -1,4 +1,4 @@
-// routes/handover.js（ルート修正版）
+// routes/handover.js（削除機能追加版）
 const express = require('express');
 const router = express.Router();
 
@@ -16,7 +16,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
       }
 
       const handover = await dbGet(
-        'SELECT * FROM handover_notes ORDER BY id DESC LIMIT 1'
+        'SELECT * FROM handover_notes WHERE is_deleted = 0 ORDER BY id DESC LIMIT 1'
       );
       
       res.json({ 
@@ -54,7 +54,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
 
       // 最新の申し送りを取得
       const latestHandover = await dbGet(
-        'SELECT * FROM handover_notes ORDER BY id DESC LIMIT 1'
+        'SELECT * FROM handover_notes WHERE is_deleted = 0 ORDER BY id DESC LIMIT 1'
       );
 
       // 5分以内の更新制限チェック
@@ -71,10 +71,18 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         }
       }
 
+      // 現在の時刻を取得（日本時間）
+      const now = new Date();
+      const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+      const timeString = japanTime.toISOString().slice(11, 16); // HH:MM形式
+      
+      // 改行を含む内容をフォーマット
+      const formattedContent = `${content.trim()} (${timeString} ${req.session.user.name})`;
+
       // 新しい申し送りを追加
       await dbRun(
-        'INSERT INTO handover_notes (content, updated_by) VALUES (?, ?)',
-        [content.trim(), req.session.user.name]
+        'INSERT INTO handover_notes (content, updated_by, is_deleted) VALUES (?, ?, 0)',
+        [formattedContent, req.session.user.name]
       );
 
       res.json({ 
@@ -90,6 +98,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
       });
     }
   });
-
+  
   return router;
 };
