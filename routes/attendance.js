@@ -156,12 +156,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
           currentTime = '11:30';
         } 
         // 15:30以前は15分切り下げ
-        else if (currentMinutes <= 930) { // 15:30 = 930分
+        else if (currentMinutes <= 929) { // 15:30 = 930分
           const roundedMinutes = Math.floor(currentMinutes / 15) * 15;
           currentTime = minutesToTime(roundedMinutes);
         } 
         // 15:31以降は15:45固定
-        else if (currentMinutes >= 931) {
+        else if (currentMinutes >= 930) {
           currentTime = '15:45';
         }
       }

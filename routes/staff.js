@@ -131,8 +131,18 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         'SELECT * FROM daily_reports WHERE user_id = ? AND date = ?',
         [userId, date]
       );
-      const comment = await dbGet(
-        'SELECT * FROM staff_comments WHERE user_id = ? AND date = ?',
+      
+      // スタッフコメントを取得（スタッフ名も含める）
+      const comment = await dbGet(`
+        SELECT sc.*, u.name as staff_name 
+        FROM staff_comments sc
+        LEFT JOIN users u ON sc.staff_id = u.id
+        WHERE sc.user_id = ? AND sc.date = ?
+      `, [userId, date]);
+      
+      // 休憩記録も取得（利用者の場合）
+      const breakRecord = await dbGet(
+        'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
         [userId, date]
       );
       
@@ -141,13 +151,15 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         user,
         attendance,
         report,
-        comment
+        comment,
+        breakRecord
       });
     } catch (error) {
       console.error('日報詳細取得エラー:', error);
       res.status(500).json({ success: false, error: '日報詳細の取得に失敗しました' });
     }
   });
+
 
   // コメント保存
   router.post('/comment', async (req, res) => {
@@ -183,45 +195,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     } catch (error) {
       console.error('コメント保存エラー:', error);
       res.status(500).json({ success: false, error: 'コメントの保存に失敗しました' });
-    }
-  });
-
-  // 月別出勤簿データ取得
-  router.get('/monthly-attendance', async (req, res) => {
-    try {
-      const { year, month, userId } = req.query;
-      
-      if (!year || !month || !userId) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'パラメータが不足しています' 
-        });
-      }
-      
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      const endDate = new Date(year, month, 0).toISOString().split('T')[0];
-      
-      const records = await dbAll(`
-        SELECT 
-          a.*, 
-          dr.id as report_id,
-          sc.comment as staff_comment
-        FROM attendance a
-        LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
-        LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
-        WHERE a.user_id = ? 
-          AND a.date >= ? 
-          AND a.date <= ?
-        ORDER BY a.date
-      `, [userId, startDate, endDate]);
-      
-      res.json({ success: true, records });
-    } catch (error) {
-      console.error('月別出勤簿取得エラー:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: '月別出勤簿の取得に失敗しました' 
-      });
     }
   });
 
@@ -316,6 +289,98 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       res.status(500).json({ 
         success: false, 
         error: '休憩終了に失敗しました' 
+      });
+    }
+  });
+
+   // 利用者一覧取得（月別出勤簿用）
+  router.get('/users/list', async (req, res) => {
+    try {
+      const users = await dbAll(`
+        SELECT 
+          u.id, 
+          u.name, 
+          u.role, 
+          u.service_type
+        FROM users u
+        WHERE u.role = 'user' 
+          AND u.is_active = 1
+        ORDER BY u.name
+      `);
+      
+      res.json({ 
+        success: true, 
+        users 
+      });
+    } catch (error) {
+      console.error('利用者一覧取得エラー:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: '利用者一覧の取得に失敗しました' 
+      });
+    }
+  });
+
+  // 月別出勤簿データ取得（スタッフ権限用に修正）
+  router.get('/monthly-attendance', async (req, res) => {
+    try {
+      const { year, month, userId } = req.query;
+      
+      if (!year || !month || !userId) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'パラメータが不足しています' 
+        });
+      }
+      
+      // 指定されたユーザーが利用者かチェック
+      const targetUser = await dbGet(
+        'SELECT id, name, role FROM users WHERE id = ? AND is_active = 1',
+        [userId]
+      );
+      
+      if (!targetUser || targetUser.role !== 'user') {
+        return res.status(403).json({ 
+          success: false, 
+          error: '利用者のみ閲覧可能です' 
+        });
+      }
+      
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+      
+      // ユーザー情報を含めて返す
+      const records = await dbAll(`
+        SELECT 
+          a.*, 
+          dr.id as report_id,
+          sc.comment as staff_comment,
+          sc.staff_id,
+          u.name as staff_name,
+          br.start_time as break_start,
+          br.end_time as break_end,
+          br.duration as break_duration
+        FROM attendance a
+        LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
+        LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
+        LEFT JOIN users u ON sc.staff_id = u.id
+        LEFT JOIN break_records br ON a.user_id = br.user_id AND a.date = br.date
+        WHERE a.user_id = ? 
+          AND a.date >= ? 
+          AND a.date <= ?
+        ORDER BY a.date
+      `, [userId, startDate, endDate]);
+      
+      res.json({ 
+        success: true, 
+        records,
+        user: targetUser 
+      });
+    } catch (error) {
+      console.error('月別出勤簿取得エラー:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: '月別出勤簿の取得に失敗しました' 
       });
     }
   });

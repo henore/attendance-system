@@ -1117,6 +1117,9 @@ export default class SharedMonthlyReport {
 
     generateCommentSection(comment) {
         if (comment && comment.comment) {
+            // スタッフ名の取得（APIレスポンスに含まれる場合）
+            const staffName = comment.staff_name || 'スタッフ';
+            
             return `
                 <hr>
                 <div class="staff-comment-display">
@@ -1125,7 +1128,7 @@ export default class SharedMonthlyReport {
                         ${comment.comment}
                     </div>
                     <small class="text-muted">
-                        <i class="fas fa-user"></i> 記入者: スタッフ | 
+                        <i class="fas fa-user"></i> 記入者: ${staffName} | 
                         <i class="fas fa-clock"></i> 記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
                     </small>
                 </div>
