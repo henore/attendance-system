@@ -110,7 +110,7 @@ setupEventListeners() {
         console.error('申し送り事項読み込みエラー:', error);
         this.parent.showNotification('申し送り事項の読み込みに失敗しました', 'danger');
     }
-   }
+}
 
     updateUI() {
         const textarea = this.container.querySelector('#handoverContent');
@@ -163,33 +163,33 @@ setupEventListeners() {
     }
     // updateHandover メソッドを修正
     async updateHandover() {
-        const textarea = this.container.querySelector('#handoverContent');
-        const content = textarea ? textarea.value.trim() : '';
+    const textarea = this.container.querySelector('#handoverContent');
+    const content = textarea ? textarea.value.trim() : '';
+    
+    if (!content) {
+        this.parent.showNotification('申し送り事項を入力してください', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await this.app.apiCall('/api/handover', {
+            method: 'POST',
+            body: JSON.stringify({ content })
+        });
         
-        if (!content) {
-            this.parent.showNotification('申し送り事項を入力してください', 'warning');
-            return;
+        if (response && response.success) {
+            await this.loadData();
+            this.parent.showNotification('申し送り事項を更新しました', 'success');
         }
-        
-        try {
-            const response = await this.app.apiCall('/api/handover', {
-                method: 'POST',
-                body: JSON.stringify({ content })
-            });
-            
-            if (response && response.success) {
-                await this.loadData();
-                this.parent.showNotification('申し送り事項を更新しました', 'success');
-            }
-        } catch (error) {
-            console.error('申し送り更新エラー:', error);
-            if (error.message && error.message.includes('5分')) {
-                this.parent.showNotification(error.message, 'warning');
-            } else {
-                this.parent.showNotification('申し送り事項の更新に失敗しました', 'danger');
-            }
+    } catch (error) {
+        console.error('申し送り更新エラー:', error);
+        if (error.message && error.message.includes('5分')) {
+            this.parent.showNotification(error.message, 'warning');
+        } else {
+            this.parent.showNotification('申し送り事項の更新に失敗しました', 'danger');
         }
     }
+}
 
     async refreshHandover() {
         await this.loadData();
