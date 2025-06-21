@@ -57,6 +57,14 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         'SELECT * FROM handover_notes ORDER BY id DESC LIMIT 1'
       );
 
+      // 既存の内容がある場合、空白での上書きを防ぐ
+      if (latestHandover && latestHandover.content && !content.trim()) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '申し送り事項を空にすることはできません' 
+        });
+      }
+
       // 5分以内の更新制限チェック
       if (latestHandover) {
         const lastUpdate = new Date(latestHandover.created_at);
@@ -71,10 +79,25 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         }
       }
 
+      // 日本時間で現在時刻を取得
+      const now = new Date();
+      const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+      const formattedTime = japanTime.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).replace(/\//g, '/');
+
+      // 記入者情報を内容に追記（改行なし）
+      const contentWithAuthor = `${content.trim()} - ${req.session.user.name} (${formattedTime})`;
+
       // 新しい申し送りを追加
       await dbRun(
         'INSERT INTO handover_notes (content, updated_by) VALUES (?, ?)',
-        [content.trim(), req.session.user.name]
+        [contentWithAuthor, req.session.user.name]
       );
 
       res.json({ 
