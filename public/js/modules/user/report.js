@@ -265,68 +265,67 @@ export class UserReportHandler {
       </div>
     `;
   }
-
-  /**
+   /**
    * 日報を提出（エラーハンドリング強化版）
    * @param {Event} event 
    */
-  async submitReport(event) {
-    event.preventDefault();
-    
-    console.log('[日報提出] 開始');
-    console.log('[日報提出] currentAttendance:', this.currentAttendance);
-    
-    // 出勤情報の再確認・復元
-    if (!this.currentAttendance) {
-      const form = event.target;
-      if (form.dataset.attendance) {
-        try {
-          this.currentAttendance = JSON.parse(form.dataset.attendance);
-          console.log('[日報提出] フォームから出勤情報を復元:', this.currentAttendance);
-        } catch (e) {
-          console.error('[日報提出] 出勤情報の復元エラー:', e);
+    async submitReport(event) {
+      event.preventDefault();
+      
+      console.log('[日報提出] 開始');
+      console.log('[日報提出] currentAttendance:', this.currentAttendance);
+      
+      // 出勤情報の再確認・復元
+      if (!this.currentAttendance) {
+        const form = event.target;
+        if (form.dataset.attendance) {
+          try {
+            this.currentAttendance = JSON.parse(form.dataset.attendance);
+            console.log('[日報提出] フォームから出勤情報を復元:', this.currentAttendance);
+          } catch (e) {
+            console.error('[日報提出] 出勤情報の復元エラー:', e);
+          }
         }
       }
-    }
-    
-    // 出勤情報の検証
-    if (!this.validateAttendanceForReport()) {
-      return;
-    }
-
-    const formData = this.collectFormData();
-    console.log('[日報提出] フォームデータ:', formData);
-    
-    try {
-      const response = await this.apiCall(API_ENDPOINTS.USER.REPORT, {
-        method: 'POST',
-        body: JSON.stringify(formData)
-      });
-
-      console.log('[日報提出] 成功レスポンス:', response);
       
-      this.hasTodayReport = true;
-      this.showNotification(MESSAGES.REPORT.SUBMIT_SUCCESS, 'success');
-
-      // コールバックを実行
-      if (this.onReportSubmit) {
-        this.onReportSubmit();
+      // 出勤情報の検証
+      if (!this.validateAttendanceForReport()) {
+        return;
       }
+
+      const formData = this.collectFormData();
+      console.log('[日報提出] フォームデータ:', formData);
       
-      // フォームを再読み込み
-      const container = document.getElementById('reportFormContainer');
-      if (container) {
-        await this.loadForm(container, this.currentAttendance);
+      try {
+        const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_SUBMIT, {
+          method: 'POST',
+          body: JSON.stringify(formData)
+        });
+
+        console.log('[日報提出] 成功レスポンス:', response);
+        
+        this.hasTodayReport = true;
+        this.showNotification(MESSAGES.REPORT.SUBMIT_SUCCESS, 'success');
+
+        // コールバックを実行
+        if (this.onReportSubmit) {
+          this.onReportSubmit();
+        }
+        
+        // フォームを再読み込み
+        const container = document.getElementById('reportFormContainer');
+        if (container) {
+          await this.loadForm(container, this.currentAttendance);
+        }
+        
+      } catch (error) {
+        console.error('[日報提出] エラー:', error);
+        this.showNotification(
+          error.message || MESSAGES.REPORT.SUBMIT_ERROR, 
+          'danger'
+        );
       }
-      
-    } catch (error) {
-      console.error('[日報提出] エラー:', error);
-      this.showNotification(
-        error.message || MESSAGES.REPORT.SUBMIT_ERROR, 
-        'danger'
-      );
     }
-  }
 
   /**
    * 日報提出時の出勤情報検証
