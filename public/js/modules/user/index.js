@@ -365,7 +365,7 @@ export default class UserModule extends BaseModule {
   async handleClockOut() {
     // 休憩中チェック（在宅者のみ）
     if (this.breakHandler.isOnBreak && this.currentUser.service_type === 'home') {
-      if (!confirm('休憩中です。休憩を終了して退勤しますか？')) {
+      if (!confirm('現在休憩中です。\n休憩を終了して退勤処理を行いますか？')) {
         return;
       }
     }
@@ -374,11 +374,18 @@ export default class UserModule extends BaseModule {
     if (result.success) {
       this.state.currentAttendance = result.attendance;
       this.state.isWorking = false;
-      this.breakHandler.stopBreakTimeMonitoring();
+      
+      // 休憩を強制終了
+      if (this.breakHandler.isOnBreak) {
+        this.breakHandler.isOnBreak = false;
+        this.breakHandler.stopBreakTimeMonitoring();
+        this.breakHandler.clearAutoBreakEnd();
+      }
+      
       this.updateAttendanceUI();
       this.loadReportForm();
       
-      // ログアウトボタンの表示状態を更新（追加）
+      // ログアウトボタンの表示状態を更新
       this.updateLogoutButtonVisibility();
       
       this.app.showNotification('退勤しました。日報の入力をお願いします。', 'info');

@@ -172,7 +172,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         }
     });
     
-    // 休憩開始（要件に従った修正版）
+    // 休憩開始（修正版：在宅者は休憩中状態を維持）
     router.post('/break/start', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
@@ -218,7 +218,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                     });
                 }
 
-                // 午前出勤の通所者：11:30-12:30固定
+                // 午前出勤の通所者：11:30-12:30固定で即座に完了
                 await dbRun(`
                     INSERT INTO break_records (user_id, date, start_time, end_time, duration)
                     VALUES (?, ?, ?, ?, ?)
@@ -233,7 +233,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 });
             }
 
-            // 在宅者の場合：15分単位で切り捨て、60分固定
+            // 在宅者の場合：15分単位で切り捨て、休憩中状態で開始
             const [hours, minutes] = currentTime.split(':').map(Number);
             const totalMinutes = hours * 60 + minutes;
             const roundedMinutes = Math.floor(totalMinutes / 15) * 15;
@@ -242,28 +242,17 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             
             const startTime = `${String(roundedHours).padStart(2, '0')}:${String(roundedMins).padStart(2, '0')}`;
             
-            // 60分後の終了時間を計算
-            let endHours = roundedHours + 1;
-            let endMins = roundedMins;
-            
-            if (endHours >= 24) {
-                endHours = 23;
-                endMins = 59;
-            }
-            
-            const endTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
-            
+            // 在宅者は終了時刻を設定せず、休憩中状態で記録
             await dbRun(`
                 INSERT INTO break_records (user_id, date, start_time, end_time, duration)
-                VALUES (?, ?, ?, ?, ?)
-            `, [userId, today, startTime, endTime, 60]);
+                VALUES (?, ?, ?, NULL, NULL)
+            `, [userId, today, startTime]);
             
             res.json({ 
                 success: true,
                 startTime,
-                endTime,
-                isCompleted: true,
-                message: `休憩時間を記録しました（${startTime}-${endTime} 60分）`
+                isCompleted: false,  // 在宅者は休憩中状態
+                message: `休憩開始（${startTime}）- 60分で自動終了します`
             });
             
         } catch (error) {
@@ -275,7 +264,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         }
     });
     
-    // 休憩終了
+    // 休憩終了（修正版）
     router.post('/break/end', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
@@ -296,9 +285,14 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             }
             
             // 休憩時間計算（分）
-            const startTime = new Date(`1970-01-01 ${breakRecord.start_time}`);
-            const endTime = new Date(`1970-01-01 ${currentTime}`);
-            const duration = Math.round((endTime - startTime) / (1000 * 60));
+            const startMinutes = timeToMinutes(breakRecord.start_time);
+            const currentMinutes = timeToMinutes(currentTime);
+            let duration = currentMinutes - startMinutes;
+            
+            // 日をまたぐ場合の処理
+            if (duration < 0) {
+                duration += 24 * 60;
+            }
             
             // 最大60分
             const finalDuration = Math.min(duration, 60);
@@ -313,7 +307,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 success: true,
                 endTime: currentTime,
                 duration: finalDuration,
-                message: `休憩終了（${currentTime}）`
+                message: `休憩終了（${currentTime}）- ${finalDuration}分`
             });
             
         } catch (error) {

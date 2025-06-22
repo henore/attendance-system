@@ -1,8 +1,21 @@
 // routes/attendance.js
-// 共通の出勤管理ルート（時間丸め機能追加版）
+// 共通の出勤管理ルート（時間丸め機能修正版）
 
 const express = require('express');
 const router = express.Router();
+
+// 日本時間を取得する関数
+const getJapanTime = () => {
+  const now = new Date();
+  const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  return japanTime.toISOString().slice(11, 16); // HH:MM形式
+};
+
+const getJapanDate = () => {
+  const now = new Date();
+  const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  return japanTime.toISOString().split('T')[0];
+};
 
 // 時間を分に変換
 const timeToMinutes = (timeStr) => {
@@ -23,7 +36,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
   router.get('/today', async (req, res) => {
     try {
       const userId = req.session.user.id;
-      const today = new Date().toISOString().split('T')[0];
+      const today = getJapanDate();
       
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
@@ -48,8 +61,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     try {
       const userId = req.session.user.id;
       const userRole = req.session.user.role;
-      const today = new Date().toISOString().split('T')[0];
-      let currentTime = new Date().toTimeString().slice(0, 5);
+      const today = getJapanDate();
+      let currentTime = getJapanTime();
       
       // 既存の出勤記録確認
       const existing = await dbGet(
@@ -110,24 +123,25 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     }
   });
   
-    // 退勤処理（利用者用 - スタッフは別ルート）- 時間丸め機能追加
-    router.post('/clock-out', async (req, res) => {
-      try {
-        const userId = req.session.user.id;
-        const userRole = req.session.user.role;
-        
-        // スタッフは専用の退勤処理を使用
-        if (userRole === 'staff' || userRole === 'admin') {
-          return res.status(400).json({ 
-            success: false, 
-            error: 'スタッフは /api/staff/clock-out を使用してください' 
-          });
-        }
-        
-        const today = new Date().toISOString().split('T')[0];
-        let currentTime = new Date().toTimeString().slice(0, 5);
-        
-        // 既存の出勤記録確認
+  // 退勤処理（利用者用 - スタッフは別ルート）- 修正版
+  router.post('/clock-out', async (req, res) => {
+    try {
+      const userId = req.session.user.id;
+      const userRole = req.session.user.role;
+      const userServiceType = req.session.user.service_type; // ユーザー情報から取得
+      
+      // スタッフは専用の退勤処理を使用
+      if (userRole === 'staff' || userRole === 'admin') {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'スタッフは /api/staff/clock-out を使用してください' 
+        });
+      }
+      
+      const today = getJapanDate();
+      let currentTime = getJapanTime();
+      
+      // 既存の出勤記録確認
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
         [userId, today]
@@ -145,6 +159,37 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
           success: false, 
           error: '既に退勤しています' 
         });
+      }
+      
+      // 休憩中チェック（在宅者のみ）
+      if (userServiceType === 'home') {
+        const breakRecord = await dbGet(
+          'SELECT * FROM break_records WHERE user_id = ? AND date = ? AND end_time IS NULL',
+          [userId, today]
+        );
+        
+        if (breakRecord) {
+          // 休憩中の場合は自動的に休憩を終了
+          const breakEndTime = currentTime;
+          const startMinutes = timeToMinutes(breakRecord.start_time);
+          const endMinutes = timeToMinutes(breakEndTime);
+          let duration = endMinutes - startMinutes;
+          
+          // 日をまたぐ場合の処理
+          if (duration < 0) {
+            duration += 24 * 60;
+          }
+          
+          // 最大60分
+          const finalDuration = Math.min(duration, 60);
+          
+          await dbRun(
+            'UPDATE break_records SET end_time = ?, duration = ? WHERE id = ?',
+            [breakEndTime, finalDuration, breakRecord.id]
+          );
+          
+          console.log(`休憩を自動終了しました: ${breakRecord.start_time} - ${breakEndTime} (${finalDuration}分)`);
+        }
       }
       
       // 利用者の場合は時間丸め処理

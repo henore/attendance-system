@@ -151,6 +151,17 @@ app.use('/api/admin', requireAuth, requireRole(['admin']), adminRouter);
 app.use('/api/attendance', requireAuth, attendanceRouter);
 app.use('/api/handover', requireAuth, handoverRouter);
 
+// サーバー日付取得エンドポイント（日本時間）
+app.get('/api/server-date', requireAuth, (req, res) => {
+  const now = new Date();
+  const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  res.json({
+    success: true,
+    serverDate: japanTime.toISOString().split('T')[0],
+    serverTime: japanTime.toISOString().slice(11, 16)
+  });
+});
+
 // SPAのためのフォールバック
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
