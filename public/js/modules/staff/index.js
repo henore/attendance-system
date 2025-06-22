@@ -509,11 +509,29 @@ export default class StaffModule extends BaseModule {
     const breakEndBtn = document.getElementById('breakEndBtn');
     
     if (this.state.isWorking) {
+      // 出勤中
       if (clockInBtn) clockInBtn.disabled = true;
       if (clockOutBtn) clockOutBtn.disabled = false;
-      if (breakStartBtn) breakStartBtn.disabled = false;
+      
+      // 休憩ボタンの制御
+      if (this.attendanceHandler.isOnBreak) {
+        // 休憩中
+        if (breakStartBtn) breakStartBtn.disabled = true;
+        if (breakEndBtn) breakEndBtn.disabled = false;
+      } else {
+        // 休憩していない
+        if (breakStartBtn) breakStartBtn.disabled = false;
+        if (breakEndBtn) breakEndBtn.disabled = true;
+      }
     } else {
-      if (clockInBtn) clockInBtn.disabled = false;
+      // 未出勤または退勤済み
+      if (this.state.currentAttendance && this.state.currentAttendance.clock_out) {
+        // 退勤済みの場合は出勤ボタンも無効化
+        if (clockInBtn) clockInBtn.disabled = true;
+      } else {
+        // 未出勤の場合
+        if (clockInBtn) clockInBtn.disabled = false;
+      }
       if (clockOutBtn) clockOutBtn.disabled = true;
       if (breakStartBtn) breakStartBtn.disabled = true;
       if (breakEndBtn) breakEndBtn.disabled = true;

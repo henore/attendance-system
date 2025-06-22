@@ -20,7 +20,12 @@ export class StaffAttendanceHandler extends AttendanceHandler {
    * スタッフの出勤処理
    */
   async clockIn() {
-    return await super.clockIn(API_ENDPOINTS.ATTENDANCE.CLOCK_IN);
+    const result = await super.clockIn(API_ENDPOINTS.ATTENDANCE.CLOCK_IN);
+    if (result.success) {
+      this.isWorking = true;
+      this.currentAttendance = result.attendance;
+    }
+    return result;
   }
 
  /**
