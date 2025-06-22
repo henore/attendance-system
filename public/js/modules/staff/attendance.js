@@ -23,13 +23,19 @@ export class StaffAttendanceHandler extends AttendanceHandler {
     return await super.clockIn(API_ENDPOINTS.ATTENDANCE.CLOCK_IN);
   }
 
-  /**
+ /**
    * スタッフの退勤処理（休憩押し忘れ対応版）
    */
   async clockOut(currentAttendance) {
     if (this.isOnBreak) {
-      this.showNotification('休憩中です。休憩を終了してから退勤してください', 'warning');
-      return { success: false };
+      // 休憩中の退勤確認
+      const confirmMessage = '現在休憩中です。\n急病・早退等の理由で退勤する場合は「OK」を押してください。\n休憩を終了してから退勤する場合は「キャンセル」を押してください。';
+      if (!confirm(confirmMessage)) {
+        return { success: false };
+      }
+      
+      // 休憩を自動終了
+      await this.handleBreakEnd();
     }
 
     return await super.clockOut(API_ENDPOINTS.STAFF.CLOCK_OUT, currentAttendance);

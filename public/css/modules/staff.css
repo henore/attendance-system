@@ -17,3 +17,53 @@
   background-color: var(--primary-color);
   color: white;
 }
+
+/* 休憩ステータス表示のスタイル */
+.break-status-display {
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 0.5rem;
+  margin-top: 1rem;
+  text-align: center;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.break-status-display:empty {
+  display: none;
+}
+
+.break-status-display p {
+  margin-bottom: 0.5rem;
+}
+
+.break-status-display small {
+  font-size: 0.875rem;
+  display: block;
+  margin-top: 0.25rem;
+}
+
+/* 休憩時間超過時の強調表示 */
+.break-status-display .text-danger {
+  font-weight: bold;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50%, 100% { opacity: 1; }
+  25%, 75% { opacity: 0.5; }
+}
+
+/* ボタンの視覚的フィードバック */
+#breakStartBtn:disabled, #breakEndBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 出勤・退勤ボタンの改善 */
+#clockInBtn:disabled, #clockOutBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

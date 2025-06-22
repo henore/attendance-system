@@ -448,8 +448,13 @@ export default class StaffModule extends BaseModule {
       if (result.success) {
         this.state.currentAttendance = result.attendance;
         this.state.isWorking = true;
+        // AttendanceHandlerの状態も更新
+        this.attendanceHandler.isWorking = true;
+        this.attendanceHandler.currentAttendance = result.attendance;
+        
         this.updateAttendanceUI();
         this.updateButtonStates();
+        this.updateBreakUI(); // 休憩UIも更新
       }
     } catch (error) {
       console.error('出勤処理エラー:', error);
