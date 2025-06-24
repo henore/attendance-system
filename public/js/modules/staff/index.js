@@ -25,20 +25,19 @@ export default class StaffModule extends BaseModule {
     this.handoverSection = null;
     this.monthlyReport = null;
     
-    // スタッフ専用モジュール
+    // スタッフ出勤簿
     this.attendanceBook = new StaffAttendanceBook(
       this.app.apiCall.bind(this.app),
       this.app.showNotification.bind(this.app)
     );
     
-    //スタッフ出勤簿
+    //日報通知機能
     this.reportNotification = new StaffReportNotification(
       this.app.apiCall.bind(this.app),
       this.app.showNotification.bind(this.app),
       this.switchToSection.bind(this)
     );
     
- 
     this.beforeUnloadHandler = null;
   }
 
