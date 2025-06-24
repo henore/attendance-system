@@ -1,9 +1,9 @@
 // modules/shared/monthly-report.js
-// 共通月別出勤簿機能（管理者・スタッフ共用）
+// 共通月別出勤簿機能（日本時間対応版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from './modal-manager.js';
-import { formatDate, getDaysInMonth, calculateWorkHours } from '../../utils/date-time.js';
+import { formatDate, getDaysInMonth, calculateWorkHours, formatDateTime } from '../../utils/date-time.js';
 import { formatServiceType, formatWorkHours as formatWorkHoursDisplay } from '../../utils/formatter.js';
 
 export default class SharedMonthlyReport {
@@ -1129,7 +1129,7 @@ export default class SharedMonthlyReport {
                     </div>
                     <small class="text-muted">
                         <i class="fas fa-user"></i> 記入者: ${staffName} | 
-                        <i class="fas fa-clock"></i> 記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
+                        <i class="fas fa-clock"></i> 記入日時: ${formatDateTime(comment.created_at)}
                     </small>
                 </div>
             `;

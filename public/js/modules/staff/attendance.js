@@ -1,56 +1,88 @@
 // modules/staff/attendance.js
-// スタッフの出退勤機能ハンドラー
+// スタッフの出退勤UI制御（簡潔版）
 
-import { AttendanceHandler } from '../shared/attendance-handler.js';
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-import { MESSAGES } from '../../constants/labels.js';
-import { getCurrentTime, calculateBreakDuration } from '../../utils/date-time.js';
+import { getCurrentTime } from '../../utils/date-time.js';
 
-export class StaffAttendanceHandler extends AttendanceHandler {
-  constructor(apiCall, showNotification) {
-    super(apiCall, showNotification);
+export class StaffAttendanceUI {
+  constructor(app, parentModule) {
+    this.app = app;
+    this.parent = parentModule;
     
-    // 休憩管理
+    // 状態管理
+    this.isWorking = false;
     this.isOnBreak = false;
-    this.currentBreakStart = null;
+    this.currentAttendance = null;
+    this.breakStartTime = null;
     this.breakCheckInterval = null;
   }
 
   /**
-   * スタッフの出勤処理
+   * 出勤処理
    */
-  async clockIn() {
-    const result = await super.clockIn(API_ENDPOINTS.ATTENDANCE.CLOCK_IN);
-    if (result.success) {
-      this.isWorking = true;
-      this.currentAttendance = result.attendance;
-    }
-    return result;
-  }
-
- /**
-   * スタッフの退勤処理（休憩押し忘れ対応版）
-   */
-  async clockOut(currentAttendance) {
-    if (this.isOnBreak) {
-      // 休憩中の退勤確認
-      const confirmMessage = '現在休憩中です。\n急病・早退等の理由で退勤する場合は「OK」を押してください。\n休憩を終了してから退勤する場合は「キャンセル」を押してください。';
-      if (!confirm(confirmMessage)) {
-        return { success: false };
-      }
+  async handleClockIn() {
+    try {
+      const response = await this.app.apiCall(API_ENDPOINTS.ATTENDANCE.CLOCK_IN, {
+        method: 'POST',
+        body: JSON.stringify({ time: getCurrentTime() })
+      });
       
-      // 休憩を自動終了
-      await this.handleBreakEnd();
+      if (response.success) {
+        this.isWorking = true;
+        this.currentAttendance = response.attendance;
+        this.updateUI();
+        this.app.showNotification('出勤しました', 'success');
+        return true;
+      }
+    } catch (error) {
+      console.error('出勤処理エラー:', error);
+      this.app.showNotification(error.message || '出勤処理に失敗しました', 'danger');
+      return false;
     }
-
-    return await super.clockOut(API_ENDPOINTS.STAFF.CLOCK_OUT, currentAttendance);
   }
 
   /**
-   * 今日の出勤状況を取得
+   * 退勤処理
    */
-  async getTodayAttendance() {
-    return await super.getTodayAttendance(API_ENDPOINTS.USER.ATTENDANCE_TODAY);
+  async handleClockOut() {
+    try {
+      // 休憩中の場合は確認
+      if (this.isOnBreak) {
+        const confirmMessage = '現在休憩中です。\n急病・早退等の理由で退勤する場合は「OK」を押してください。\n休憩を終了してから退勤する場合は「キャンセル」を押してください。';
+        if (!confirm(confirmMessage)) {
+          return false;
+        }
+        // 休憩を自動終了
+        await this.handleBreakEnd(true);
+      }
+
+      const response = await this.app.apiCall(API_ENDPOINTS.STAFF.CLOCK_OUT, {
+        method: 'POST'
+      });
+      
+      if (response.success) {
+        this.isWorking = false;
+        this.currentAttendance.clock_out = response.time;
+        this.updateUI();
+        this.app.showNotification('退勤しました', 'success');
+        return true;
+      }
+    } catch (error) {
+      console.error('退勤処理エラー:', error);
+      
+      // 未コメントの日報がある場合の処理
+      if (error.message && error.message.includes('未コメント')) {
+        const uncommentedReports = error.uncommentedReports || [];
+        const userNames = uncommentedReports.map(r => r.user_name).join('、');
+        this.app.showNotification(
+          `以下の利用者の日報にコメントが記入されていません：${userNames}`,
+          'warning'
+        );
+      } else {
+        this.app.showNotification(error.message || '退勤処理に失敗しました', 'danger');
+      }
+      return false;
+    }
   }
 
   /**
@@ -58,165 +90,206 @@ export class StaffAttendanceHandler extends AttendanceHandler {
    */
   async handleBreakStart() {
     if (!this.isWorking) {
-      this.showNotification('出勤中のみ休憩できます', 'warning');
-      return;
+      this.app.showNotification('出勤中のみ休憩できます', 'warning');
+      return false;
     }
 
-    const result = await super.startBreak(API_ENDPOINTS.STAFF.BREAK_START, true);
-    if (result.success) {
-      this.currentBreakStart = result.startTime || getCurrentTime();
-      this.isOnBreak = true;
-      this.updateBreakUI();
-      this.startBreakTimeMonitoring();
+    try {
+      const response = await this.app.apiCall(API_ENDPOINTS.STAFF.BREAK_START, {
+        method: 'POST'
+      });
+      
+      if (response.success) {
+        this.isOnBreak = true;
+        this.breakStartTime = response.startTime;
+        this.updateUI();
+        this.startBreakTimer();
+        this.app.showNotification('休憩を開始しました', 'info');
+        return true;
+      }
+    } catch (error) {
+      console.error('休憩開始エラー:', error);
+      this.app.showNotification(error.message || '休憩開始に失敗しました', 'danger');
+      return false;
     }
   }
 
   /**
    * 休憩終了処理
    */
-  async handleBreakEnd() {
-    const result = await super.endBreak(API_ENDPOINTS.STAFF.BREAK_END, this.isOnBreak);
-    if (result.success) {
-      this.isOnBreak = false;
-      this.currentBreakStart = null;
-      this.stopBreakTimeMonitoring();
-      this.updateBreakUI();
+  async handleBreakEnd(autoEnd = false) {
+    if (!this.isOnBreak) {
+      this.app.showNotification('休憩中ではありません', 'warning');
+      return false;
+    }
+
+    try {
+      const response = await this.app.apiCall(API_ENDPOINTS.STAFF.BREAK_END, {
+        method: 'POST',
+        body: JSON.stringify({ autoEnd })
+      });
+      
+      if (response.success) {
+        this.isOnBreak = false;
+        this.breakStartTime = null;
+        this.stopBreakTimer();
+        this.updateUI();
+        this.app.showNotification(
+          autoEnd ? '休憩を自動終了しました（60分）' : '休憩を終了しました',
+          'success'
+        );
+        return true;
+      }
+    } catch (error) {
+      console.error('休憩終了エラー:', error);
+      this.app.showNotification(error.message || '休憩終了に失敗しました', 'danger');
+      return false;
     }
   }
 
   /**
-   * 出勤状態のUIを更新
+   * 休憩タイマー開始（60分で自動終了）
    */
-  updateUI(state, statusElement, handlers = {}) {
-    if (!statusElement) return;
-
-    const { isWorking, currentAttendance } = state;
-
-    if (isWorking) {
-      statusElement.innerHTML = `
-        <p class="mb-3 text-success">
-          <i class="fas fa-play-circle"></i> 出勤中（${currentAttendance.clock_in}〜）
-        </p>
-        <button class="btn btn-clock btn-clock-out" id="staffClockOutBtn">
-          <i class="fas fa-clock"></i> 退勤
-        </button>
-      `;
-      
-      const clockOutBtn = document.getElementById('staffClockOutBtn');
-      if (clockOutBtn && handlers.onClockOut) {
-        clockOutBtn.addEventListener('click', handlers.onClockOut);
-      }
-    } else if (currentAttendance && currentAttendance.clock_out) {
-      statusElement.innerHTML = `
-        <p class="mb-3 text-info">
-          <i class="fas fa-check-circle"></i> 退勤済み（${currentAttendance.clock_in}〜${currentAttendance.clock_out}）
-        </p>
-      `;
-    } else {
-      statusElement.innerHTML = `
-        <p class="mb-3">本日はまだ出勤していません</p>
-        <button class="btn btn-clock btn-clock-in" id="staffClockInBtn">
-          <i class="fas fa-clock"></i> 出勤
-        </button>
-      `;
-      
-      const clockInBtn = document.getElementById('staffClockInBtn');
-      if (clockInBtn && handlers.onClockIn) {
-        clockInBtn.addEventListener('click', handlers.onClockIn);
-      }
-    }
+  startBreakTimer() {
+    // 60分後に自動終了
+    this.breakCheckInterval = setTimeout(() => {
+      this.handleBreakEnd(true);
+    }, 60 * 60 * 1000);
   }
 
   /**
-   * 休憩UIを更新
+   * 休憩タイマー停止
    */
-  updateBreakUI(breakElement = null) {
-    if (!breakElement) {
-      breakElement = document.getElementById('breakManagementStatus');
-    }
-    
-    const breakDisplay = document.getElementById('breakTimeDisplay');
-    if (!breakElement) return;
-
-    if (this.isOnBreak) {
-      breakElement.innerHTML = `
-        <p class="mb-3 text-warning">
-          <i class="fas fa-pause-circle"></i> 休憩中（${this.currentBreakStart}〜）
-        </p>
-        <button class="btn btn-warning" id="breakEndBtn">
-          <i class="fas fa-play"></i> 休憩終了
-        </button>
-      `;
-      
-      if (breakDisplay) breakDisplay.style.display = 'block';
-      
-      const endBtn = document.getElementById('breakEndBtn');
-      if (endBtn) {
-        endBtn.addEventListener('click', () => this.handleBreakEnd());
-      }
-    } else {
-      breakElement.innerHTML = `
-        <p class="text-muted">休憩時間を記録できます</p>
-        <button class="btn btn-info" id="breakStartBtn">
-          <i class="fas fa-pause"></i> 休憩開始
-        </button>
-      `;
-      
-      if (breakDisplay) breakDisplay.style.display = 'none';
-      
-      const startBtn = document.getElementById('breakStartBtn');
-      if (startBtn) {
-        startBtn.addEventListener('click', () => this.handleBreakStart());
-      }
-    }
-  }
-
-  /**
-   * 休憩時間監視を開始
-   */
-  startBreakTimeMonitoring() {
-    this.breakCheckInterval = setInterval(() => {
-      this.updateBreakTimeDisplay();
-    }, 60000); // 1分ごと
-  }
-
-  /**
-   * 休憩時間監視を停止
-   */
-  stopBreakTimeMonitoring() {
+  stopBreakTimer() {
     if (this.breakCheckInterval) {
-      clearInterval(this.breakCheckInterval);
+      clearTimeout(this.breakCheckInterval);
       this.breakCheckInterval = null;
     }
   }
 
   /**
-   * 休憩時間表示を更新
+   * 今日の出勤状況を読み込み
    */
-  updateBreakTimeDisplay() {
-    if (!this.isOnBreak || !this.currentBreakStart) return;
-    
-    const currentTime = getCurrentTime();
-    const duration = calculateBreakDuration(this.currentBreakStart, currentTime);
-    const durationElement = document.getElementById('breakDuration');
-    
-    if (durationElement) {
-      const hours = Math.floor(duration / 60);
-      const minutes = duration % 60;
-      durationElement.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  async loadTodayAttendance() {
+    try {
+      const response = await this.app.apiCall(API_ENDPOINTS.ATTENDANCE.TODAY);
+      
+      if (response.attendance) {
+        this.currentAttendance = response.attendance;
+        this.isWorking = response.attendance.clock_in && !response.attendance.clock_out;
+        
+        // 休憩状態もチェック
+        if (response.attendance.break_start && !response.attendance.break_end) {
+          this.isOnBreak = true;
+          this.breakStartTime = response.attendance.break_start;
+          this.startBreakTimer();
+        }
+      }
+      
+      this.updateUI();
+    } catch (error) {
+      console.error('出勤状況取得エラー:', error);
     }
   }
 
   /**
-   * 特定日の出勤記録取得
+   * UI更新
    */
-  async getAttendanceByDate(date) {
-    try {
-      const response = await this.apiCall(API_ENDPOINTS.STAFF.ATTENDANCE(date));
-      return response.attendance || null;
-    } catch (error) {
-      console.error('出勤記録取得エラー:', error);
-      return null;
+  updateUI() {
+    this.updateAttendanceDisplay();
+    this.updateButtonStates();
+  }
+
+  /**
+   * 出勤状況表示更新
+   */
+  updateAttendanceDisplay() {
+    const statusElement = document.getElementById('attendanceStatusDisplay');
+    if (!statusElement) return;
+
+    let html = '';
+
+    if (this.isWorking) {
+      html = `
+        <div class="alert alert-success">
+          <i class="fas fa-play-circle"></i> 
+          出勤中（${this.currentAttendance.clock_in}〜）
+        </div>
+      `;
+      
+      if (this.isOnBreak) {
+        html += `
+          <div class="alert alert-warning">
+            <i class="fas fa-pause-circle"></i> 
+            休憩中（${this.breakStartTime}〜）
+          </div>
+        `;
+      }
+    } else if (this.currentAttendance && this.currentAttendance.clock_out) {
+      html = `
+        <div class="alert alert-info">
+          <i class="fas fa-check-circle"></i> 
+          退勤済み（${this.currentAttendance.clock_in}〜${this.currentAttendance.clock_out}）
+        </div>
+      `;
+    } else {
+      html = `
+        <div class="alert alert-secondary">
+          <i class="fas fa-clock"></i> 
+          本日はまだ出勤していません
+        </div>
+      `;
     }
+
+    statusElement.innerHTML = html;
+  }
+
+  /**
+   * ボタン状態更新
+   */
+  updateButtonStates() {
+    const clockInBtn = document.getElementById('clockInBtn');
+    const clockOutBtn = document.getElementById('clockOutBtn');
+    const breakStartBtn = document.getElementById('breakStartBtn');
+    const breakEndBtn = document.getElementById('breakEndBtn');
+    
+    if (this.isWorking) {
+      // 出勤中
+      if (clockInBtn) clockInBtn.disabled = true;
+      if (clockOutBtn) clockOutBtn.disabled = false;
+      
+      // 休憩ボタンの制御
+      if (this.isOnBreak) {
+        // 休憩中
+        if (breakStartBtn) breakStartBtn.disabled = true;
+        if (breakEndBtn) breakEndBtn.disabled = false;
+      } else {
+        // 休憩していない
+        if (breakStartBtn) {
+          // 既に休憩を取った場合は無効化
+          breakStartBtn.disabled = this.currentAttendance.break_start ? true : false;
+        }
+        if (breakEndBtn) breakEndBtn.disabled = true;
+      }
+    } else {
+      // 未出勤または退勤済み
+      if (this.currentAttendance && this.currentAttendance.clock_out) {
+        // 退勤済みの場合は全て無効化
+        if (clockInBtn) clockInBtn.disabled = true;
+      } else {
+        // 未出勤の場合
+        if (clockInBtn) clockInBtn.disabled = false;
+      }
+      if (clockOutBtn) clockOutBtn.disabled = true;
+      if (breakStartBtn) breakStartBtn.disabled = true;
+      if (breakEndBtn) breakEndBtn.disabled = true;
+    }
+  }
+
+  /**
+   * クリーンアップ
+   */
+  destroy() {
+    this.stopBreakTimer();
   }
 }

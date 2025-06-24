@@ -1,5 +1,7 @@
 // modules/shared/handover.js
-// 共通の申し送り機能
+// 共通の申し送り機能（日本時間対応版）
+
+import { formatDateTime } from '../../utils/date-time.js';
 
 export default class SharedHandover {
     constructor(app, parentModule) {
@@ -21,7 +23,6 @@ export default class SharedHandover {
         this.setupEventListeners();
     }
 
-    // render メソッドを修正（削除ボタンを除去）
     render() {
         this.container.innerHTML = `
             <div class="custom-card">
@@ -52,7 +53,6 @@ export default class SharedHandover {
         `;
     }
 
-    // setupEventListeners メソッドを修正（削除機能を除去）
     setupEventListeners() {
         const updateBtn = this.container.querySelector('#updateHandoverBtn');
         const refreshBtn = this.container.querySelector('#refreshHandoverBtn');
@@ -115,25 +115,17 @@ export default class SharedHandover {
         }
     }
 
-    // 日本時間に修正
+    // 日本時間に修正（date-time.jsを使用）
     getUpdateInfoHTML() {
         if (!this.lastUpdateInfo || !this.lastUpdateInfo.updatedAt) {
             return '<i class="fas fa-clock"></i> 最終更新: 未設定';
         }
         
-        const updateDate = new Date(this.lastUpdateInfo.updatedAt).toLocaleString('ja-JP', {
-            timeZone: 'Asia/Tokyo',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const updateDate = formatDateTime(this.lastUpdateInfo.updatedAt);
         
         return `<i class="fas fa-clock"></i> 最終更新: ${updateDate}`;
     }
     
-    // updateHandover メソッドを修正（空白チェック強化）
     async updateHandover() {
         const textarea = this.container.querySelector('#handoverContent');
         const content = textarea ? textarea.value.trim() : '';

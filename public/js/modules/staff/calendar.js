@@ -20,7 +20,7 @@ export class StaffAttendanceBook {
     return `
       <div class="custom-card">
         <div class="custom-card-header">
-          <h5><i class="fas fa-calendar-check"></i> 出勤簿</h5>
+          <h5><i class="fas fa-calendar-check"></i> スタッフ出勤簿</h5>
           <button class="btn btn-outline-light btn-sm" id="refreshAttendanceBookBtn">
             <i class="fas fa-sync"></i> 更新
           </button>

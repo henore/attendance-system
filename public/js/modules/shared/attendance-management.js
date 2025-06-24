@@ -1,8 +1,9 @@
 // modules/shared/attendance-management.js
-// スタッフ・管理者共通の出勤記録管理モジュール（完全版・休憩データ統合対応）
+// スタッフ・管理者共通の出勤記録管理モジュール（日本時間対応版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from '../shared/modal-manager.js';
+import { getCurrentDate, formatDate, formatDateTime } from '../../utils/date-time.js';
 
 export class SharedAttendanceManagement {
   constructor(app, parentModule) {
@@ -28,6 +29,7 @@ export class SharedAttendanceManagement {
   render() {
     // 管理者のみ編集ボタンを表示するためのクラス
     const isAdminClass = this.userRole === 'admin' ? 'is-admin' : 'is-staff';
+    const today = getCurrentDate(); // 日本時間の今日
     
     this.container.innerHTML = `
       <div class="custom-card ${isAdminClass}">
@@ -42,8 +44,7 @@ export class SharedAttendanceManagement {
           <div class="row mb-4">
             <div class="col-md-3">
               <label for="searchDate" class="form-label">検索日付</label>
-              <input type="date" class="form-control" id="searchDate" 
-                     value="${new Date().toISOString().split('T')[0]}">
+              <input type="date" class="form-control" id="searchDate" value="${today}">
             </div>
             ${this.userRole === 'admin' ? `
               <div class="col-md-3">
@@ -356,7 +357,7 @@ export class SharedAttendanceManagement {
       let records = response.records || [];
       
       // データが取得できない場合、全ユーザーの今日の状況を取得
-      if (records.length === 0 && !searchUser && searchDate === new Date().toISOString().split('T')[0]) {
+      if (records.length === 0 && !searchUser && searchDate === getCurrentDate()) {
         // 管理者の場合
         if (this.userRole === 'admin') {
           const statusResponse = await this.parent.callApi(API_ENDPOINTS.ADMIN.STATUS_TODAY);
@@ -401,7 +402,7 @@ export class SharedAttendanceManagement {
         }
       }
       
-      // レスポンスに既に休憩データが含まれているかチェック（修正版）
+      // レスポンスに既に休憩データが含まれているかチェック
       this.currentRecords = records.map(record => {
         // レスポンスから直接break情報を取得
         if (record.break_start || record.break_end || record.break_duration) {
@@ -425,7 +426,7 @@ export class SharedAttendanceManagement {
 
   updateSearchSummary(records, searchDate) {
     const summaryContainer = this.container.querySelector('#searchSummary');
-    const formattedDate = new Date(searchDate).toLocaleDateString('ja-JP', {
+    const formattedDate = formatDate(searchDate, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -526,7 +527,7 @@ export class SharedAttendanceManagement {
         const roleClass = this.getRoleColor(record.user_role);
         const workDuration = this.calculateWorkDuration(record);
         
-        // 休憩時間表示（修正版）
+        // 休憩時間表示
         let breakTimeDisplay = '-';
         if (record.break && record.break.start) {
           if (record.break.end) {
@@ -669,13 +670,6 @@ export class SharedAttendanceManagement {
     return names[role] || role;
   }
 
-
-
-// modules/shared/attendance-management.js（休憩時間計算部分のみ）
-// 勤務時間計算メソッドを修正
-
-// modules/shared/attendance-management.js（calculateWorkDurationメソッドの修正版）
-
   calculateWorkDuration(record) {
     if (!record.clock_in || !record.clock_out) return null;
     
@@ -731,7 +725,7 @@ export class SharedAttendanceManagement {
       const title = this.container.querySelector('#dailyReportDetailTitle');
       const content = this.container.querySelector('#dailyReportDetailContent');
       
-      const formattedDate = new Date(date).toLocaleDateString('ja-JP', {
+      const formattedDate = formatDate(date, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -822,7 +816,7 @@ export class SharedAttendanceManagement {
           </div>
           <small class="text-muted">
             <i class="fas fa-user"></i> 記入者: スタッフ | 
-            <i class="fas fa-clock"></i> 記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
+            <i class="fas fa-clock"></i> 記入日時: ${formatDateTime(comment.created_at)}
           </small>
         </div>
       ` : `
@@ -835,7 +829,7 @@ export class SharedAttendanceManagement {
   }
 
   async openCommentModal(userId, userName) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getCurrentDate();
     
     try {
       const response = await this.parent.callApi(API_ENDPOINTS.STAFF.REPORT(userId, today));
@@ -911,7 +905,7 @@ export class SharedAttendanceManagement {
           <div class="existing-comment-info">
             <small class="text-muted">
               <i class="fas fa-info-circle"></i> 
-              記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
+              記入日時: ${formatDateTime(comment.created_at)}
             </small>
           </div>
         ` : ''}
@@ -934,7 +928,7 @@ export class SharedAttendanceManagement {
         return;
       }
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getCurrentDate();
       
       await this.parent.callApi(API_ENDPOINTS.STAFF.COMMENT, {
         method: 'POST',

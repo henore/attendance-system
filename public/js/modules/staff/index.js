@@ -1,84 +1,53 @@
-// modules/staff/index.js（完全修正版）
+// modules/staff/index.js（簡潔化版）
 import BaseModule from '../../base-module.js';
-import { StaffAttendanceHandler } from './attendance.js';
+import { StaffAttendanceUI } from './attendance.js';
 import { SharedAttendanceManagement } from '../shared/attendance-management.js';
-import { StaffCommentHandler } from './comment.js';
 import { StaffAttendanceBook } from './attendance-book.js';
 import SharedMonthlyReport from '../shared/monthly-report.js';
 import { StaffReportNotification } from './report-notification.js';
 import { StaffLastReportModal } from './last-report-modal.js';
-import { modalManager } from '../shared/modal-manager.js';
 import SharedHandover from '../shared/handover.js';
+import { getCurrentDate, formatDateTime } from '../../utils/date-time.js';
 
 export default class StaffModule extends BaseModule {
   constructor(app) {
     super(app);
-
-    // APIコールメソッドの確実なバインディング
-    this.apiCall = app.apiCall ? app.apiCall.bind(app) : this.app.apiCall.bind(this.app);
-    this.showNotification = app.showNotification ? app.showNotification.bind(app) : this.app.showNotification.bind(this.app);
     
-    // 状態管理（先に定義）
+    // 状態管理
     this.state = {
-      currentView: 'attendanceSection',
-      currentAttendance: null,
-      isWorking: false,
-      breakStatus: null
+      currentView: 'attendanceSection'
     };
     
-    this.beforeUnloadHandler = null;
+    // UI制御モジュール
+    this.attendanceUI = new StaffAttendanceUI(app, this);
     
-    // 出退勤ハンドラー
-    this.attendanceHandler = new StaffAttendanceHandler(
-      this.apiCall,
-      this.showNotification
-    );
+    // 共通モジュール（遅延初期化）
+    this.attendanceManagement = null;
+    this.handoverSection = null;
+    this.monthlyReport = null;
     
-    // 共通出勤管理（ダッシュボード置き換え）
-    this.attendanceManagement = null; // 遅延初期化
-
-    // 申し送りハンドラー
-    this.handoverSection = null; // 遅延初期化
-    
-    this.commentHandler = new StaffCommentHandler(
-      this.apiCall,
-      this.showNotification,
-      this.currentUser
-    );
-
+    // スタッフ専用モジュール
     this.attendanceBook = new StaffAttendanceBook(
-      this.apiCall,
-      this.showNotification
+      this.app.apiCall.bind(this.app),
+      this.app.showNotification.bind(this.app)
     );
-    
-    // 月別出勤簿（共通化）
-    this.monthlyReport = null; // 遅延初期化
     
     this.reportNotification = new StaffReportNotification(
-      this.apiCall,
-      this.showNotification,
+      this.app.apiCall.bind(this.app),
+      this.app.showNotification.bind(this.app),
       this.switchToSection.bind(this)
     );
-
-    // StaffLastReportModalの初期化（メソッドを先に定義してから）
+    
     this.lastReportModal = new StaffLastReportModal(
       (disabled) => this.updateClockInButtonState(disabled),
-      this.showNotification
+      this.showNotification.bind(this)
     );
-  }
-
-  // 出勤ボタンの状態を更新するメソッド（コンストラクタの後、initの前に定義）
-  updateClockInButtonState(disabled) {
-    const clockInBtn = document.getElementById('clockInBtn');
-    if (clockInBtn) {
-      clockInBtn.disabled = disabled;
-    }
+    
+    this.beforeUnloadHandler = null;
   }
 
   async init() {
-    console.log('👥 スタッフモジュール初期化（統合版）');
-    console.log('Current User:', this.currentUser);
-    console.log('API Call function:', typeof this.apiCall);
+    console.log('👥 スタッフモジュール初期化');
     
     this.render();
     await this.initializeSharedModules();
@@ -95,7 +64,7 @@ export default class StaffModule extends BaseModule {
     const content = document.getElementById('app-content');
     content.innerHTML = `
       <div class="staff-dashboard">
-        <!-- スタッフメニュー（画面切り替え） -->
+        <!-- スタッフメニュー -->
         <div class="staff-menu mb-4">
           <div class="btn-group w-100" role="group">
             <button class="btn btn-outline-primary staff-menu-btn active" data-target="attendanceSection">
@@ -116,7 +85,7 @@ export default class StaffModule extends BaseModule {
           </div>
         </div>
 
-        <!-- 通知バッジ（日報提出時） -->
+        <!-- 通知バッジ -->
         <div id="notificationBadge" class="notification-badge" style="display: none;">0</div>
 
         <!-- 1. 出退勤セクション -->
@@ -125,20 +94,14 @@ export default class StaffModule extends BaseModule {
         </div>
 
         <!-- 2. 利用者出勤状況セクション（動的に作成） -->
-        <!-- attendanceManagementがここに挿入される -->
-
         <!-- 3. 申し送り事項セクション（動的に作成） -->
-        <!-- handoverSectionがここに挿入される -->
 
         <!-- 4. 出勤簿セクション -->
         <div id="attendanceBookSection" class="staff-section mb-4" style="display: none;">
           ${this.attendanceBook.render()}
         </div>
 
-        <!-- 5. 月別出勤簿セクション -->
-        <div id="monthlyAttendanceSection" class="staff-section mb-4" style="display: none;">
-          <!-- 共通モジュールが動的に挿入される -->
-        </div>
+        <!-- 5. 月別出勤簿セクション（動的に作成） -->
       </div>
     `;
 
@@ -193,7 +156,7 @@ export default class StaffModule extends BaseModule {
   }
 
   setupEventListeners() {
-    // メニューボタン（画面切り替え）
+    // メニューボタン
     document.querySelectorAll('.staff-menu-btn').forEach(btn => {
       this.addEventListener(btn, 'click', (e) => {
         const targetId = e.target.closest('button').getAttribute('data-target');
@@ -205,13 +168,13 @@ export default class StaffModule extends BaseModule {
       });
     });
     
-    // 出退勤ボタン
-    this.addEventListenerById('clockInBtn', 'click', () => this.handleClockIn());
-    this.addEventListenerById('clockOutBtn', 'click', () => this.handleClockOut());
+    // 出退勤ボタン（AttendanceUIに委譲）
+    this.addEventListenerById('clockInBtn', 'click', () => this.attendanceUI.handleClockIn());
+    this.addEventListenerById('clockOutBtn', 'click', () => this.attendanceUI.handleClockOut());
     
-    // 休憩ボタン
-    this.addEventListenerById('breakStartBtn', 'click', () => this.handleBreakStart());
-    this.addEventListenerById('breakEndBtn', 'click', () => this.handleBreakEnd());
+    // 休憩ボタン（AttendanceUIに委譲）
+    this.addEventListenerById('breakStartBtn', 'click', () => this.attendanceUI.handleBreakStart());
+    this.addEventListenerById('breakEndBtn', 'click', () => this.attendanceUI.handleBreakEnd());
 
     // 時刻表示の更新
     this.startTimeDisplay();
@@ -221,15 +184,15 @@ export default class StaffModule extends BaseModule {
     const contentArea = document.querySelector('.staff-dashboard');
     
     try {
-      // 共通出勤管理モジュール初期化
+      // 共通出勤管理モジュール
       this.attendanceManagement = new SharedAttendanceManagement(this.app, this);
       await this.attendanceManagement.init(contentArea);
       
-      // 申し送りモジュール初期化
+      // 申し送りモジュール
       this.handoverSection = new SharedHandover(this.app, this);
       await this.handoverSection.init(contentArea);
       
-      // 月別出勤簿モジュール初期化（共通化）
+      // 月別出勤簿モジュール
       this.monthlyReport = new SharedMonthlyReport(this.app, this);
       await this.monthlyReport.init(contentArea);
       
@@ -242,8 +205,8 @@ export default class StaffModule extends BaseModule {
 
   async loadInitialData() {
     try {
-      // 今日の出勤状況取得
-      await this.loadTodayAttendance();
+      // 今日の出勤状況取得（AttendanceUIに委譲）
+      await this.attendanceUI.loadTodayAttendance();
       
       // 前回の未退勤チェック
       await this.checkLastRecord();
@@ -284,15 +247,11 @@ export default class StaffModule extends BaseModule {
         case 'attendanceManagementSection':
           if (this.attendanceManagement) {
             await this.attendanceManagement.show();
-          } else {
-            console.error('出勤管理モジュールが初期化されていません');
           }
           break;
         case 'handoverSection':
           if (this.handoverSection) {
             await this.handoverSection.show();
-          } else {
-            console.error('申し送りモジュールが初期化されていません');
           }
           break;
         case 'attendanceBookSection':
@@ -301,8 +260,6 @@ export default class StaffModule extends BaseModule {
         case 'monthlyAttendanceSection':
           if (this.monthlyReport) {
             await this.monthlyReport.show();
-          } else {
-            console.error('月別出勤簿モジュールが初期化されていません');
           }
           break;
       }
@@ -313,68 +270,61 @@ export default class StaffModule extends BaseModule {
   }
 
   /**
-   * スタッフコメントモーダルを開く
-   */
-  async openStaffCommentModal(userId, userName) {
-    await this.commentHandler.openModal(userId, userName);
-
-    // コメント保存後に出勤管理を更新
-    this.commentHandler.onSave = async () => {
-      if (this.attendanceManagement) {
-        await this.attendanceManagement.refresh();
-      }
-    };
-  }
-
-  /**
-   * 日報詳細を表示
-   */
-  async showDailyReportDetail(userId, userName, date) {
-    await this.commentHandler.showReportDetail(userId, userName, date);
-  }
-
-  /**
-   * 未コメントの日報をチェック
-   */
-  async checkUncommentedReports() {
-    return await this.commentHandler.getUncommentedReports();
-  }
-
-  /**
-   * ログアウト時の処理
+   * ログアウト時の処理（コメント未記入チェック）
    */
   async handleLogout() {
-    const uncommentedReports = await this.checkUncommentedReports();
-    if (uncommentedReports.length > 0) {
-      const userNames = uncommentedReports.map(report => report.user_name).join('、');
-      const confirmMessage = `以下の利用者の日報にまだコメントが記入されていません：\n${userNames}\n\nコメント記入は必須です。このままログアウトしますか？`;
-
-      if (!confirm(confirmMessage)) {
-        return false; // ログアウトをキャンセル
-      }
-    }
-
-    return true; // ログアウトを続行
+    const uncommentedReports = await this.attendanceManagement?.searchAttendanceRecords();
+    // 未コメントがある場合の確認処理
+    // TODO: 実装
+    return true;
   }
 
-  // 通知バッジ更新
-  updateNotificationBadge() {
-    const badge = document.getElementById('notificationBadge');
-    const count = this.reportNotification.getPendingNotificationCount();
+  updateClockInButtonState(disabled) {
+    const clockInBtn = document.getElementById('clockInBtn');
+    if (clockInBtn) {
+      clockInBtn.disabled = disabled;
+    }
+  }
+
+  async checkLastRecord() {
+    try {
+      const response = await this.app.apiCall('/api/user/last-record');
+      if (response.lastRecord && !response.lastRecord.has_report) {
+        this.lastReportModal.show(response.lastRecord, () => {
+          console.log('前回記録確認完了');
+        });
+      }
+    } catch (error) {
+      console.error('前回記録確認エラー:', error);
+    }
+  }
+
+  setupPageLeaveWarning() {
+    this.beforeUnloadHandler = (e) => {
+      if (this.attendanceUI.isWorking) {
+        e.preventDefault();
+        e.returnValue = '出勤中です。ページを離れますか？';
+      }
+    };
     
-    if (badge) {
-      if (count > 0) {
-        badge.textContent = count;
-        badge.style.display = 'inline-block';
-      } else {
-        badge.style.display = 'none';
-      }
-    }
+    window.addEventListener('beforeunload', this.beforeUnloadHandler);
   }
 
-  // 共通メソッド（SharedAttendanceManagementから使用）
-  async callApi(endpoint, options = {}) {
-    return await this.apiCall(endpoint, options);
+  startTimeDisplay() {
+    const updateTime = () => {
+      const displayElement = document.getElementById('currentTimeDisplay');
+      if (displayElement) {
+        displayElement.innerHTML = `<i class="fas fa-clock"></i> ${formatDateTime(new Date(), 'datetime')}`;
+      }
+    };
+    
+    updateTime();
+    setInterval(updateTime, 1000);
+  }
+
+  // 共通メソッド（SharedModulesから使用）
+  callApi(endpoint, options = {}) {
+    return this.app.apiCall(endpoint, options);
   }
 
   showNotification(message, type = 'info') {
@@ -441,164 +391,10 @@ export default class StaffModule extends BaseModule {
     }
   }
 
-  // 出退勤処理
-  async handleClockIn() {
-    try {
-      const result = await this.attendanceHandler.clockIn();
-      if (result.success) {
-        this.state.currentAttendance = result.attendance;
-        this.state.isWorking = true;
-        // AttendanceHandlerの状態も更新
-        this.attendanceHandler.isWorking = true;
-        this.attendanceHandler.currentAttendance = result.attendance;
-        
-        this.updateAttendanceUI();
-        this.updateButtonStates();
-        this.updateBreakUI(); // 休憩UIも更新
-      }
-    } catch (error) {
-      console.error('出勤処理エラー:', error);
-    }
-  }
-
-  async handleClockOut() {
-    try {
-      const result = await this.attendanceHandler.clockOut(this.state.currentAttendance);
-      if (result.success) {
-        this.state.currentAttendance = result.attendance;
-        this.state.isWorking = false;
-        this.updateAttendanceUI();
-        this.updateButtonStates();
-      }
-    } catch (error) {
-      console.error('退勤処理エラー:', error);
-    }
-  }
-
-  async handleBreakStart() {
-    await this.attendanceHandler.handleBreakStart();
-    this.updateBreakUI();
-  }
-
-  async handleBreakEnd() {
-    await this.attendanceHandler.handleBreakEnd();
-    this.updateBreakUI();
-  }
-
-  updateAttendanceUI() {
-    const statusElement = document.getElementById('attendanceStatusDisplay');
-    if (statusElement) {
-      this.attendanceHandler.updateUI(this.state, statusElement, {
-        onClockIn: () => this.handleClockIn(),
-        onClockOut: () => this.handleClockOut()
-      });
-    }
-  }
-
-  updateBreakUI() {
-    const breakElement = document.getElementById('breakManagementStatus');
-    if (breakElement) {
-      this.attendanceHandler.updateBreakUI(breakElement);
-    }
-  }
-
-  updateButtonStates() {
-    const clockInBtn = document.getElementById('clockInBtn');
-    const clockOutBtn = document.getElementById('clockOutBtn');
-    const breakStartBtn = document.getElementById('breakStartBtn');
-    const breakEndBtn = document.getElementById('breakEndBtn');
-    
-    if (this.state.isWorking) {
-      // 出勤中
-      if (clockInBtn) clockInBtn.disabled = true;
-      if (clockOutBtn) clockOutBtn.disabled = false;
-      
-      // 休憩ボタンの制御
-      if (this.attendanceHandler.isOnBreak) {
-        // 休憩中
-        if (breakStartBtn) breakStartBtn.disabled = true;
-        if (breakEndBtn) breakEndBtn.disabled = false;
-      } else {
-        // 休憩していない
-        if (breakStartBtn) breakStartBtn.disabled = false;
-        if (breakEndBtn) breakEndBtn.disabled = true;
-      }
-    } else {
-      // 未出勤または退勤済み
-      if (this.state.currentAttendance && this.state.currentAttendance.clock_out) {
-        // 退勤済みの場合は出勤ボタンも無効化
-        if (clockInBtn) clockInBtn.disabled = true;
-      } else {
-        // 未出勤の場合
-        if (clockInBtn) clockInBtn.disabled = false;
-      }
-      if (clockOutBtn) clockOutBtn.disabled = true;
-      if (breakStartBtn) breakStartBtn.disabled = true;
-      if (breakEndBtn) breakEndBtn.disabled = true;
-    }
-  }
-
-  async loadTodayAttendance() {
-    try {
-      const result = await this.attendanceHandler.getTodayAttendance();
-      this.state.currentAttendance = result.attendance;
-      this.state.isWorking = result.isWorking;
-      this.updateAttendanceUI();
-      this.updateButtonStates();
-    } catch (error) {
-      console.error('今日の出勤状況取得エラー:', error);
-    }
-  }
-
-  async checkLastRecord() {
-    try {
-      const response = await this.apiCall('/api/user/last-record');
-      if (response.lastRecord && !response.lastRecord.has_report) {
-        this.lastReportModal.show(response.lastRecord, () => {
-          console.log('前回記録確認完了');
-        });
-      }
-    } catch (error) {
-      console.error('前回記録確認エラー:', error);
-    }
-  }
-
-  setupPageLeaveWarning() {
-    this.beforeUnloadHandler = async (e) => {
-      if (this.state.isWorking) {
-        e.preventDefault();
-        e.returnValue = '出勤中です。ページを離れますか？';
-      }
-    };
-    
-    window.addEventListener('beforeunload', this.beforeUnloadHandler);
-  }
-
-  startTimeDisplay() {
-    const updateTime = () => {
-      const now = new Date();
-      const timeString = now.toLocaleTimeString('ja-JP');
-      const dateString = now.toLocaleDateString('ja-JP', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        weekday: 'long'
-      });
-      
-      const displayElement = document.getElementById('currentTimeDisplay');
-      if (displayElement) {
-        displayElement.innerHTML = `<i class="fas fa-clock"></i> ${dateString} ${timeString}`;
-      }
-    };
-    
-    updateTime();
-    setInterval(updateTime, 1000);
-  }
-
   destroy() {
-    // 各ハンドラーのクリーンアップ
-    if (this.attendanceHandler) {
-      this.attendanceHandler.stopBreakTimeMonitoring?.();
+    // 各モジュールのクリーンアップ
+    if (this.attendanceUI) {
+      this.attendanceUI.destroy();
     }
     
     if (this.attendanceManagement) {

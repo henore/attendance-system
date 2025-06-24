@@ -8,7 +8,7 @@ const { getCurrentDate, getCurrentTime, timeToMinutes, minutesToTime } = require
 module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
   
   // スタッフの退勤処理（未コメント日報チェック付き）
-  router.post('/clock-out', async (req, res) => {
+  router.post('/api/staff/clock-out', async (req, res) => {
     try {
       const staffId = req.session.user.id;
       const today = getCurrentDate();
