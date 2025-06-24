@@ -3,7 +3,6 @@
 
 import { AttendanceHandler } from '../shared/attendance-handler.js';
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-import { MESSAGES } from '../../constants/labels.js';
 import { getCurrentDate } from '../../utils/date-time.js';
 
 export class UserAttendanceHandler extends AttendanceHandler {

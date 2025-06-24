@@ -3,7 +3,6 @@ import { UserAttendanceHandler } from './attendance.js';
 import { UserReportHandler } from './report.js';
 import { UserBreakHandler } from './break.js';
 import { UserAttendanceCalendar } from './calendar.js';
-import { LastReportModal } from './last-report-modal.js';
 import { TermsModal } from './terms-modal.js';
 
 export default class UserModule extends BaseModule {
@@ -142,34 +141,33 @@ export default class UserModule extends BaseModule {
   }
 
 
-  async getLastReport() {
-  try {
-    const serverTimeRes = await this.apiCall('/api/server-date');
-    const serverToday = new Date(serverTimeRes.serverDate);
+    async getLastReport() {
+    try {
+      const today = getJSTNow();
 
-    for (let i = 1; i <= 30; i++) {
-      const checkDate = new Date(serverToday);
-      checkDate.setDate(serverToday.getDate() - i);
-      const dateStr = checkDate.toISOString().split('T')[0];
+      for (let i = 1; i <= 30; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() - i);
+        const dateStr = checkDate.toISOString().split('T')[0];
 
-      const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
-      if (response.attendance && response.report) {
-        return {
-          date: dateStr,
-          attendance: response.attendance,
-          report: response.report,
-          stafshowInitialModalsfComment: response.staffComment || null
-        };
+        const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
+
+        if (response.attendance && response.report) {
+          return {
+            date: dateStr,
+            attendance: response.attendance,
+            report: response.report,
+            staffComment: response.staffComment || null  // ← 修正箇所
+          };
+        }
+      }
+
+        return null; // 該当データが見つからなかった場合
+      } catch (error) {
+        console.error('前回レポート取得エラー:', error);
+        return null;
       }
     }
-
-    return null;
-  } catch (error) {
-    console.error('前回記録取得エラー:', error);
-    return null;
-  }
-}
-
 
   render() {
     const content = document.getElementById('app-content');
