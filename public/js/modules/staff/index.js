@@ -5,7 +5,6 @@ import { SharedAttendanceManagement } from '../shared/attendance-management.js';
 import { StaffAttendanceBook } from './calendar.js';
 import SharedMonthlyReport from '../shared/monthly-report.js';
 import { StaffReportNotification } from './report-notification.js';
-import { StaffLastReportModal } from './last-report-modal.js';
 import SharedHandover from '../shared/handover.js';
 import { getCurrentDate, formatDateTime } from '../../utils/date-time.js';
 
