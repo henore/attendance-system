@@ -1,5 +1,5 @@
 // routes/staff.js
-// スタッフAPI - JST統一版
+// スタッフAPI - 役割整理・JST統一版
 
 const express = require('express');
 const router = express.Router();
@@ -8,10 +8,11 @@ const { getCurrentDate, getCurrentTime, timeToMinutes, minutesToTime } = require
 module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
   
   // スタッフの退勤処理（未コメント日報チェック付き）
-  router.post('/api/staff/clock-out', async (req, res) => {
+  router.post('/clock-out', async (req, res) => {
     try {
       const staffId = req.session.user.id;
       const today = getCurrentDate();
+      const currentTime = getCurrentTime();
       
       // 未コメントの日報をチェック
       const uncommentedReports = await dbAll(`
@@ -33,7 +34,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       }
       
       // 退勤処理
-      const currentTime = getCurrentTime();
       await dbRun(
         'UPDATE attendance SET clock_out = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND date = ?',
         [currentTime, staffId, today]
@@ -51,7 +51,28 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
   });
 
-  // 利用者一覧取得
+  // スタッフ自身の出勤記録取得
+  router.get('/attendance/:date', async (req, res) => {
+    try {
+      const staffId = req.session.user.id;
+      const { date } = req.params;
+      
+      const attendance = await dbGet(
+        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+        [staffId, date]
+      );
+      
+      res.json({ 
+        success: true, 
+        attendance: attendance || null 
+      });
+    } catch (error) {
+      console.error('出勤記録取得エラー:', error);
+      res.status(500).json({ success: false, error: '出勤記録の取得に失敗しました' });
+    }
+  });
+
+  // 利用者一覧取得（今日の状況）
   router.get('/users', async (req, res) => {
     try {
       const today = getCurrentDate();
@@ -79,6 +100,34 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
   });
 
+  // 利用者一覧取得（シンプル版）
+  router.get('/users/list', async (req, res) => {
+    try {
+      const users = await dbAll(`
+        SELECT 
+          u.id, 
+          u.name, 
+          u.role, 
+          u.service_type
+        FROM users u
+        WHERE u.role = 'user' 
+          AND u.is_active = 1
+        ORDER BY u.name
+      `);
+      
+      res.json({ 
+        success: true, 
+        users 
+      });
+    } catch (error) {
+      console.error('利用者一覧取得エラー:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: '利用者一覧の取得に失敗しました' 
+      });
+    }
+  });
+
   // 出勤記録検索
   router.get('/attendance/search', async (req, res) => {
     try {
@@ -94,11 +143,15 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
           a.break_start, a.break_end,
           u.name as user_name, u.role as user_role, u.service_type,
           dr.id as report_id,
-          sc.id as comment_id
+          sc.id as comment_id,
+          br.start_time as break_start_time,
+          br.end_time as break_end_time,
+          br.duration as break_duration
         FROM attendance a
         JOIN users u ON a.user_id = u.id
         LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
         LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
+        LEFT JOIN break_records br ON a.user_id = br.user_id AND a.date = br.date
         WHERE a.date = ? AND u.role = 'user'
       `;
       
@@ -113,7 +166,19 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       
       const records = await dbAll(query, params);
       
-      res.json({ success: true, records });
+      // 休憩情報を統合
+      const processedRecords = records.map(record => {
+        if (record.break_start_time || record.break_end_time) {
+          record.break = {
+            start: record.break_start_time,
+            end: record.break_end_time,
+            duration: record.break_duration
+          };
+        }
+        return record;
+      });
+      
+      res.json({ success: true, records: processedRecords });
     } catch (error) {
       console.error('出勤記録検索エラー:', error);
       res.status(500).json({ success: false, error: '出勤記録の検索に失敗しました' });
@@ -163,7 +228,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
   });
 
-
   // コメント保存
   router.post('/comment', async (req, res) => {
     try {
@@ -201,7 +265,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
   });
 
-  // 休憩開始
+  // 休憩開始（スタッフ専用）
   router.post('/break/start', async (req, res) => {
     try {
       const userId = req.session.user.id;
@@ -248,12 +312,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
   });
 
-  // 休憩終了
+  // 休憩終了（スタッフ専用）
   router.post('/break/end', async (req, res) => {
     try {
       const userId = req.session.user.id;
       const today = getCurrentDate();
-      const { autoEnd, endTime } = req.body;
+      const { autoEnd } = req.body;
       
       // 既存の出勤記録を確認
       const attendance = await dbGet(
@@ -277,11 +341,11 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       
       // 終了時刻の決定
       let finalEndTime;
-      if (autoEnd && endTime) {
-        // 自動終了の場合は指定された時刻を使用
-        finalEndTime = endTime;
+      if (autoEnd) {
+        // 自動終了の場合は開始時刻+60分
+        const maxEndMinutes = timeToMinutes(attendance.break_start) + 60;
+        finalEndTime = minutesToTime(maxEndMinutes);
       } else {
-        // 通常の終了
         const currentTime = getCurrentTime();
         
         // 60分経過チェック
@@ -317,35 +381,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
   });
 
-   // 利用者一覧取得（月別出勤簿用）
-  router.get('/users/list', async (req, res) => {
-    try {
-      const users = await dbAll(`
-        SELECT 
-          u.id, 
-          u.name, 
-          u.role, 
-          u.service_type
-        FROM users u
-        WHERE u.role = 'user' 
-          AND u.is_active = 1
-        ORDER BY u.name
-      `);
-      
-      res.json({ 
-        success: true, 
-        users 
-      });
-    } catch (error) {
-      console.error('利用者一覧取得エラー:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: '利用者一覧の取得に失敗しました' 
-      });
-    }
-  });
-
-  // 月別出勤簿データ取得（スタッフ権限用に修正）
+  // 月別出勤簿データ取得（スタッフ権限用）
   router.get('/monthly-attendance', async (req, res) => {
     try {
       const { year, month, userId } = req.query;
@@ -359,7 +395,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       
       // 指定されたユーザーが利用者かチェック
       const targetUser = await dbGet(
-        'SELECT id, name, role FROM users WHERE id = ? AND is_active = 1',
+        'SELECT id, name, role, service_type FROM users WHERE id = ? AND is_active = 1',
         [userId]
       );
       
@@ -373,16 +409,17 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
       const endDate = new Date(year, month, 0).toISOString().split('T')[0];
       
-      // ユーザー情報を含めて返す
+      // 月次データを取得
       const records = await dbAll(`
         SELECT 
           a.*, 
           dr.id as report_id,
           sc.comment as staff_comment,
+          sc.id as comment_id,
           sc.staff_id,
           u.name as staff_name,
-          br.start_time as break_start,
-          br.end_time as break_end,
+          br.start_time as break_start_time,
+          br.end_time as break_end_time,
           br.duration as break_duration
         FROM attendance a
         LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
@@ -395,9 +432,20 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         ORDER BY a.date
       `, [userId, startDate, endDate]);
       
+      // 休憩情報の統合（利用者用）
+      const processedRecords = records.map(record => {
+        // 利用者の休憩情報（break_records）
+        if (record.break_start_time) {
+          record.break_start = record.break_start_time;
+          record.break_end = record.break_end_time;
+          record.break_duration = record.break_duration;
+        }
+        return record;
+      });
+      
       res.json({ 
         success: true, 
-        records,
+        records: processedRecords,
         user: targetUser 
       });
     } catch (error) {
@@ -405,54 +453,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       res.status(500).json({ 
         success: false, 
         error: '月別出勤簿の取得に失敗しました' 
-      });
-    }
-  });
-
-  // スタッフ本人の出勤記録取得
-  router.get('/my-attendance', async (req, res) => {
-    try {
-      const staffId = req.session.user.id;
-      const { startDate, endDate } = req.query;
-      
-      if (!startDate || !endDate) {
-        return res.status(400).json({ 
-          success: false, 
-          error: '期間が指定されていません' 
-        });
-      }
-      
-      // スタッフ本人の出勤記録を取得
-      const records = await dbAll(`
-        SELECT 
-          a.id,
-          a.date,
-          a.clock_in,
-          a.clock_out,
-          a.status,
-          a.break_start,
-          a.break_end,
-          a.created_at,
-          a.updated_at
-        FROM attendance a
-        WHERE a.user_id = ? 
-          AND a.date >= ? 
-          AND a.date <= ?
-        ORDER BY a.date ASC
-      `, [staffId, startDate, endDate]);
-      
-      console.log(`[スタッフ出勤記録] スタッフID: ${staffId}, 期間: ${startDate}〜${endDate}, 件数: ${records.length}`);
-      
-      res.json({ 
-        success: true, 
-        records: records || []
-      });
-      
-    } catch (error) {
-      console.error('スタッフ出勤記録取得エラー:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: '出勤記録の取得に失敗しました' 
       });
     }
   });

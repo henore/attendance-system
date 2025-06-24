@@ -1,5 +1,5 @@
 // modules/shared/attendance-handler.js
-// 共通の出退勤処理ハンドラー
+// 共通の出退勤処理ハンドラー（最小限の変更版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { MESSAGES } from '../../constants/labels.js';
@@ -16,7 +16,6 @@ export class AttendanceHandler {
    * @param {string} endpoint APIエンドポイント
    * @returns {Promise<Object>}
    */
-
   async clockIn(endpoint = API_ENDPOINTS.ATTENDANCE.CLOCK_IN) {
     try {
       console.log('[出勤処理] 開始');
@@ -41,7 +40,7 @@ export class AttendanceHandler {
         throw new Error('出勤処理のレスポンスが不正です');
       }
 
-         } catch (error) {
+    } catch (error) {
       console.error('[出勤処理] エラー:', error);
       this.showNotification(error.message || MESSAGES.ATTENDANCE.CLOCK_IN_ERROR, 'danger');
       throw error;
@@ -60,9 +59,8 @@ export class AttendanceHandler {
       return { success: false };
     }
 
- try {
-
-  console.log('[退勤処理] 開始');
+    try {
+      console.log('[退勤処理] 開始');
       
       const response = await this.apiCall(endpoint, { method: 'POST' });
       
@@ -74,7 +72,8 @@ export class AttendanceHandler {
         
         const message = response.message || MESSAGES.ATTENDANCE.CLOCK_OUT_SUCCESS(response.time || attendance.clock_out);
         this.showNotification(message, 'success');
-              return {
+        
+        return {
           success: true,
           attendance,
           isWorking: false
@@ -83,20 +82,19 @@ export class AttendanceHandler {
         throw new Error('退勤処理のレスポンスが不正です');
       }
       
-       } catch (error) {
+    } catch (error) {
       console.error('[退勤処理] エラー:', error);
       this.showNotification(error.message || MESSAGES.ATTENDANCE.CLOCK_OUT_ERROR, 'danger');
       throw error;
     }
   }
 
-   /**Add commentMore actions
-   * 今日の出勤状況を取得
+   /**
+   * 今日の出勤状況を取得（日本時間対応）
    * @param {string} endpoint 
    * @returns {Promise<Object>}
    */
-
-    async getTodayAttendance(endpoint = API_ENDPOINTS.USER.ATTENDANCE_TODAY) {
+  async getTodayAttendance(endpoint = API_ENDPOINTS.USER.ATTENDANCE_TODAY) {
     try {
       const response = await this.apiCall(endpoint);
       
@@ -117,7 +115,7 @@ export class AttendanceHandler {
     }
   }
 
-  /**Add commentMore actions
+  /**
    * 出勤状態のUIを更新する共通処理
    * @param {Object} state 状態
    * @param {HTMLElement} statusElement 

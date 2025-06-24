@@ -1,8 +1,9 @@
 // modules/staff/report-notification.js
-// スタッフの日報提出通知機能ハンドラー（統合版対応）
+// スタッフの日報提出通知機能（日本時間対応版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from '../shared/modal-manager.js';
+import { formatDateTime } from '../../utils/date-time.js';
 
 export class StaffReportNotification {
   constructor(apiCall, showNotification, switchToSection) {
@@ -68,7 +69,8 @@ export class StaffReportNotification {
               newReports.push({
                 userId: user.id,
                 userName: user.name,
-                reportId: user.report_id
+                reportId: user.report_id,
+                submittedAt: formatDateTime(new Date()) // 日本時間
               });
             }
           }
@@ -124,6 +126,9 @@ export class StaffReportNotification {
         <li class="mb-2">
           <i class="fas fa-user text-primary"></i> 
           <strong>${report.userName}</strong>さんが日報を提出しました
+          <small class="text-muted d-block ms-4">
+            <i class="fas fa-clock"></i> ${report.submittedAt}
+          </small>
         </li>
       `;
     });
@@ -199,7 +204,8 @@ export class StaffReportNotification {
         body: body,
         icon: '/favicon.ico',
         tag: 'report-notification',
-        requireInteraction: true
+        requireInteraction: true,
+        timestamp: Date.now()
       });
 
       // 通知クリック時の処理
@@ -212,13 +218,13 @@ export class StaffReportNotification {
   }
 
   /**
-   * 通知から利用者出勤状況画面へ遷移（修正版）
+   * 通知から利用者出勤状況画面へ遷移
    */
   goToAttendanceManagement() {
     // モーダルを閉じる
     modalManager.hide('reportNotificationModal');
     
-    // 利用者出勤状況画面に切り替え（統合版）
+    // 利用者出勤状況画面に切り替え
     this.switchToSection('attendanceManagementSection');
     
     // メニューボタンのアクティブ状態を更新
@@ -234,7 +240,7 @@ export class StaffReportNotification {
   }
 
   /**
-   * 通知バッジを更新（修正版）
+   * 通知バッジを更新
    */
   updateNotificationBadge(count = null) {
     const badge = document.getElementById('notificationBadge');
@@ -275,7 +281,8 @@ export class StaffReportNotification {
         submitted: users.filter(u => u.report_id).length,
         notSubmitted: users.filter(u => u.clock_out && !u.report_id).length,
         commented: users.filter(u => u.report_id && u.comment_id).length,
-        uncommented: users.filter(u => u.report_id && !u.comment_id).length
+        uncommented: users.filter(u => u.report_id && !u.comment_id).length,
+        timestamp: formatDateTime(new Date()) // 日本時間
       };
       
       return summary;
@@ -321,11 +328,13 @@ export class StaffReportNotification {
   }
 
   /**
-   * 通知履歴を取得
+   * 通知履歴を取得（日本時間で保存）
    */
   getNotificationHistory() {
-    // 実装では、通知履歴をlocalStorageやメモリに保存
-    return [];
+    return this.pendingNotifications.map(notification => ({
+      ...notification,
+      timestamp: formatDateTime(new Date())
+    }));
   }
 
   /**
