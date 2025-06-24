@@ -2,9 +2,10 @@
 import BaseModule from '../../base-module.js';
 import { StaffAttendanceUI } from './attendance.js';
 import { SharedAttendanceManagement } from '../shared/attendance-management.js';
-import { StaffAttendanceBook } from './calendar.js';
+import { StaffAttendanceBook } from './attendance-book.js';
 import SharedMonthlyReport from '../shared/monthly-report.js';
 import { StaffReportNotification } from './report-notification.js';
+import { StaffLastReportModal } from './last-report-modal.js';
 import SharedHandover from '../shared/handover.js';
 import { getCurrentDate, formatDateTime } from '../../utils/date-time.js';
 
@@ -25,17 +26,21 @@ export default class StaffModule extends BaseModule {
     this.handoverSection = null;
     this.monthlyReport = null;
     
-    // スタッフ出勤簿
+    // スタッフ専用モジュール
     this.attendanceBook = new StaffAttendanceBook(
       this.app.apiCall.bind(this.app),
       this.app.showNotification.bind(this.app)
     );
     
-    //日報通知機能
     this.reportNotification = new StaffReportNotification(
       this.app.apiCall.bind(this.app),
       this.app.showNotification.bind(this.app),
       this.switchToSection.bind(this)
+    );
+    
+    this.lastReportModal = new StaffLastReportModal(
+      (disabled) => this.updateClockInButtonState(disabled),
+      this.showNotification.bind(this)
     );
     
     this.beforeUnloadHandler = null;
