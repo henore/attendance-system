@@ -31,13 +31,13 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     }
   });
   
-  // 出勤処理（全ロール共通）- 時間丸め機能追加
+  // 出勤処理（全ロール共通）
   router.post('/clock-in', async (req, res) => {
     try {
       const userId = req.session.user.id;
       const userRole = req.session.user.role;
       const today = getCurrentDate();
-      let currentTime = getCurrentTime();
+      const currentTime = req.body.time || getCurrentTime(); // フロントエンドから時刻を受け取る
       
       // 既存の出勤記録確認
       const existing = await dbGet(
@@ -50,25 +50,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
           success: false, 
           error: '既に出勤しています' 
         });
-      }
-      
-      // 利用者の場合は時間丸め処理
-      if (userRole === 'user') {
-        const currentMinutes = timeToMinutes(currentTime);
-        
-        // 11:30-12:30の出勤は12:30固定
-        if (currentMinutes >= 690 && currentMinutes <= 750) { // 11:30-12:30
-          currentTime = '12:30';
-        } 
-        // 9:00前は9:00固定
-        else if (currentMinutes < 540) { // 9:00 = 540分
-          currentTime = '09:00';
-        } 
-        // 9:01以降は15分切り上げ
-        else if (currentMinutes >= 541) {
-          const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
-          currentTime = minutesToTime(roundedMinutes);
-        }
       }
       
       // 出勤記録作成
@@ -98,12 +79,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     }
   });
   
-  // 退勤処理（利用者用 - スタッフは別ルート）- 修正版
+  // 退勤処理（利用者用 - スタッフは別ルート）
   router.post('/clock-out', async (req, res) => {
     try {
       const userId = req.session.user.id;
       const userRole = req.session.user.role;
-      const userServiceType = req.session.user.service_type; // ユーザー情報から取得
+      const userServiceType = req.session.user.service_type;
       
       // スタッフは専用の退勤処理を使用
       if (userRole === 'staff' || userRole === 'admin') {
@@ -114,7 +95,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
       }
       
       const today = getCurrentDate();
-      let currentTime = getCurrentTime();
+      const currentTime = req.body.time || getCurrentTime(); // フロントエンドから時刻を受け取る
       
       // 既存の出勤記録確認
       const attendance = await dbGet(
@@ -164,25 +145,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
           );
           
           console.log(`休憩を自動終了しました: ${breakRecord.start_time} - ${breakEndTime} (${finalDuration}分)`);
-        }
-      }
-      
-      // 利用者の場合は時間丸め処理
-      if (userRole === 'user') {
-        const currentMinutes = timeToMinutes(currentTime);
-        
-        // 通所者のみ11:30-12:30の退勤は11:30固定
-        if (userServiceType === 'commute' && currentMinutes >= 690 && currentMinutes <= 750) { // 11:30-12:30
-          currentTime = '11:30';
-        } 
-        // 15:29以前は15分切り下げ（通所者・在宅者共通）
-        else if (currentMinutes <= 929) { // 15:29 = 929分
-          const roundedMinutes = Math.floor(currentMinutes / 15) * 15;
-          currentTime = minutesToTime(roundedMinutes);
-        } 
-        // 15:30以降は15:45固定（通所者・在宅者共通）
-        else if (currentMinutes >= 930) {
-          currentTime = '15:45';
         }
       }
       

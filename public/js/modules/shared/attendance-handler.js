@@ -10,107 +10,71 @@ export class AttendanceHandler {
     this.apiCall = apiCall;
     this.showNotification = showNotification;
   }
-
-  /**
-   * 出勤処理
-   * @param {string} endpoint APIエンドポイント
-   * @returns {Promise<Object>}
-   */
-  async clockIn(endpoint = API_ENDPOINTS.ATTENDANCE.CLOCK_IN) {
-    try {
-      console.log('[出勤処理] 開始');
-      
-      const response = await this.apiCall(endpoint, { method: 'POST' });
-      
-      if (response && (response.success || response.attendance || response.time)) {
-        const attendance = response.attendance || {
-          clock_in: response.time,
-          clock_out: null
-        };
-        
-        const message = response.message || MESSAGES.ATTENDANCE.CLOCK_IN_SUCCESS(response.time || attendance.clock_in);
-        this.showNotification(message, 'success');
-        
-        return {
-          success: true,
-          attendance,
-          isWorking: true
-        };
-      } else {
-        throw new Error('出勤処理のレスポンスが不正です');
-      }
-    } catch (error) {
-      console.error('[出勤処理] エラー:', error);
-      this.showNotification(error.message || MESSAGES.ATTENDANCE.CLOCK_IN_ERROR, 'danger');
-      throw error;
-    }
-  }
-
-  /**
-   * 退勤処理
-   * @param {string} endpoint APIエンドポイント
-   * @param {Object} currentAttendance 現在の出勤情報
-   * @returns {Promise<Object>}
-   */
-  async clockOut(endpoint = API_ENDPOINTS.ATTENDANCE.CLOCK_OUT, currentAttendance = null) {
-    if (!currentAttendance || !currentAttendance.clock_in) {
-      this.showNotification(MESSAGES.ATTENDANCE.NO_CLOCK_IN_RECORD, 'danger');
-      return { success: false };
-    }
-
-    try {
-      console.log('[退勤処理] 開始');
-      
-      const response = await this.apiCall(endpoint, { method: 'POST' });
-      
-      if (response && (response.success || response.attendance || response.time)) {
-        const attendance = response.attendance || {
-          ...currentAttendance,
-          clock_out: response.time
-        };
-        
-        const message = response.message || MESSAGES.ATTENDANCE.CLOCK_OUT_SUCCESS(response.time || attendance.clock_out);
-        this.showNotification(message, 'success');
-        
-        return {
-          success: true,
-          attendance,
-          isWorking: false
-        };
-      } else {
-        throw new Error('退勤処理のレスポンスが不正です');
-      }
-    } catch (error) {
-      console.error('[退勤処理] エラー:', error);
-      this.showNotification(error.message || MESSAGES.ATTENDANCE.CLOCK_OUT_ERROR, 'danger');
-      throw error;
-    }
-  }
-
-  /**
-   * 今日の出勤状況を取得
+   /**
+   * 出勤処理の共通実装
    * @param {string} endpoint 
-   * @returns {Promise<Object>}
+   * @returns {Promise}
    */
-  async getTodayAttendance(endpoint = API_ENDPOINTS.USER.ATTENDANCE_TODAY) {
+  async clockIn(endpoint) {
     try {
-      const response = await this.apiCall(endpoint);
-      
-      return {
-        attendance: response.attendance || null,
-        report: response.report || null,
-        isWorking: response.attendance && response.attendance.clock_in && !response.attendance.clock_out,
-        hasReport: response.attendance && response.attendance.has_report
-      };
+      const response = await this.apiCall(endpoint, {
+        method: 'POST'
+      });
+
+      if (response.success) {
+        this.showNotification('出勤しました', 'success');
+        return {
+          success: true,
+          attendance: response.attendance
+        };
+      }
+
+      throw new Error(response.error || '出勤処理に失敗しました');
     } catch (error) {
-      console.error('今日の出勤状況取得エラー:', error);
-      return {
-        attendance: null,
-        report: null,
-        isWorking: false,
-        hasReport: false
-      };
+      this.showNotification(error.message, 'danger');
+      return { success: false, error: error.message };
     }
+  }
+
+    /**
+   * 退勤処理の共通実装
+   * @param {string} endpoint 
+   * @param {Object} currentAttendance 
+   * @returns {Promise}
+   */
+  async clockOut(endpoint, currentAttendance) {
+    try {
+      if (!currentAttendance || !currentAttendance.clock_in) {
+        throw new Error('出勤していません');
+      }
+
+      const response = await this.apiCall(endpoint, {
+        method: 'POST'
+      });
+
+      if (response.success) {
+        this.showNotification('退勤しました', 'success');
+        return {
+          success: true,
+          attendance: response.attendance
+        };
+      }
+
+      throw new Error(response.error || '退勤処理に失敗しました');
+    } catch (error) {
+      this.showNotification(error.message, 'danger');
+      return { success: false, error: error.message };
+    }
+  }
+
+
+  /**
+   * 出勤状態の確認
+   * @param {Object} attendance 
+   * @returns {boolean}
+   */
+  isWorking(attendance) {
+    return attendance && attendance.clock_in && !attendance.clock_out;
   }
 
   /**
@@ -232,5 +196,21 @@ export class AttendanceHandler {
       this.showNotification(error.message || '休憩終了処理でエラーが発生しました', 'danger');
       return { success: false };
     }
+  }
+
+   /**
+   * 勤務時間の計算
+   * @param {string} clockIn 
+   * @param {string} clockOut 
+   * @returns {number} 時間単位
+   */
+  calculateWorkHours(clockIn, clockOut) {
+    if (!clockIn || !clockOut) return 0;
+
+    const start = new Date(`2000-01-01 ${clockIn}`);
+    const end = new Date(`2000-01-01 ${clockOut}`);
+    
+    const diff = end - start;
+    return diff / (1000 * 60 * 60); // ミリ秒を時間に変換
   }
 }

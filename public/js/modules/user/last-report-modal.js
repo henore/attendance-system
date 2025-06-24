@@ -2,7 +2,6 @@
 // 前回出勤記録確認モーダルの管理
 
 import { formatDate } from '../../utils/date-time.js';
-import { modalManager } from '../shared/modal-manager.js';
 
 export class LastReportModal {
   constructor(updateClockInButtonState, showNotification) {
@@ -101,6 +100,7 @@ export class LastReportModal {
                 <i class="fas fa-clock text-info"></i> 
                 記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
               </small>
+          </div>
         </div>
       `;
     } else {

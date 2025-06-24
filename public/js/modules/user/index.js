@@ -4,6 +4,7 @@ import { UserReportHandler } from './report.js';
 import { UserBreakHandler } from './break.js';
 import { UserAttendanceCalendar } from './calendar.js';
 import { TermsModal } from './terms-modal.js';
+import { LastReportModal } from './last-report-modal.js';
 
 export default class UserModule extends BaseModule {
   constructor(app) {
@@ -12,7 +13,8 @@ export default class UserModule extends BaseModule {
     // サブモジュール初期化
     this.attendanceHandler = new UserAttendanceHandler(
       this.apiCall.bind(this),
-      this.app.showNotification.bind(this.app)
+      this.app.showNotification.bind(this.app),
+      this.currentUser
     );
     
     this.reportHandler = new UserReportHandler(
@@ -139,35 +141,6 @@ export default class UserModule extends BaseModule {
       this.app.showNotification('出勤しました。本日の業務を開始してください。', 'success');
     }
   }
-
-
-    async getLastReport() {
-    try {
-      const today = getJSTNow();
-
-      for (let i = 1; i <= 30; i++) {
-        const checkDate = new Date(today);
-        checkDate.setDate(today.getDate() - i);
-        const dateStr = checkDate.toISOString().split('T')[0];
-
-        const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_BY_DATE(dateStr));
-
-        if (response.attendance && response.report) {
-          return {
-            date: dateStr,
-            attendance: response.attendance,
-            report: response.report,
-            staffComment: response.staffComment || null  // ← 修正箇所
-          };
-        }
-      }
-
-        return null; // 該当データが見つからなかった場合
-      } catch (error) {
-        console.error('前回レポート取得エラー:', error);
-        return null;
-      }
-    }
 
   render() {
     const content = document.getElementById('app-content');
@@ -420,24 +393,6 @@ export default class UserModule extends BaseModule {
     await this.calendar.refresh();
     this.app.showNotification('カレンダーを更新しました', 'info');
   }
-
-  
-  // * 前回出勤記録の確認
- 
-  async checkAndShowLastReportModal() {
-    if (this.state.currentAttendance && this.state.currentAttendance.clock_in) {
-      return;
-    }
-
-    const lastReport = await this.attendanceHandler.getLastReport();
-    if (lastReport) {
-      this.state.lastReportData = lastReport;
-      this.lastReportModal.show(lastReport, () => {
-        this.state.hasConfirmedLastReport = true;
-      });
-    }
-  }
-  
 
   /**
    * 未読コメントチェック

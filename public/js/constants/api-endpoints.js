@@ -11,8 +11,10 @@ export const API_ENDPOINTS = {
   
   // 出勤管理（共通）
   ATTENDANCE: {
+    TODAY: '/api/attendance/today',
     CLOCK_IN: '/api/attendance/clock-in',
-    CLOCK_OUT: '/api/attendance/clock-out'
+    CLOCK_OUT: '/api/attendance/clock-out',
+    BY_DATE: (date) => `/api/attendance/${date}`
   },
   
     // 申し送り（追加）
@@ -24,16 +26,18 @@ export const API_ENDPOINTS = {
   // 利用者用
   USER: {
     STATUS: '/api/user/status',
-    ATTENDANCE_TODAY: '/api/user/attendance/today',
     ATTENDANCE: (date) => `/api/user/attendance/${date}`,
+    REPORT_SUBMIT: '/api/user/report', // 修正：/submitを削除
+    REPORTS: '/api/user/reports',
+    COMMENT: (date) => `/api/user/comment/${date}`,
+    ATTENDANCE_TODAY: '/api/user/attendance/today',
+    REPORT: '/api/user/report',
+    REPORT_BY_DATE: (date) => `/api/user/report/${date}`,
     BREAK_START: '/api/user/break/start',
     BREAK_END: '/api/user/break/end',
     BREAK_STATUS: (date) => `/api/user/break/status/${date}`,
-    REPORT_SUBMIT: '/api/user/report', // 修正：/submitを削除
-    REPORT: (date) => `/api/user/report/${date}`,
-    REPORT_BY_DATE: (date) => `/api/user/report/${date}`, // 追加
-    REPORTS: '/api/user/reports',
-    COMMENT: (date) => `/api/user/comment/${date}`,
+    STAFF_COMMENT_UNREAD: '/api/user/staff-comment/unread',
+    STAFF_COMMENT_MARK_READ: '/api/user/staff-comment/mark-read',
     LAST_RECORD: '/api/user/last-record'
   },
   

@@ -26,13 +26,24 @@ export default class BaseModule {
         this.eventListeners.get(element).push({ event, handler });
     }
 
-    // IDでイベントリスナー追加
     addEventListenerById(elementId, event, handler) {
-        const element = document.getElementById(elementId);
-        if (element) {
-            this.addEventListener(element, event, handler);
-        }
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.addEventListener(event, handler);
+      this.eventListeners.push({ element, event, handler });
     }
+  }
+
+  /**
+   * イベントリスナーをセレクターで追加
+   */
+  addEventListenerBySelector(selector, event, handler) {
+    const elements = document.querySelectorAll(selector);
+    elements.forEach(element => {
+      element.addEventListener(event, handler);
+      this.eventListeners.push({ element, event, handler });
+    });
+  }
 
     // クリーンアップ
     destroy() {
@@ -136,4 +147,16 @@ export default class BaseModule {
             }
         };
     }
+
+      async init() {
+    throw new Error('init() must be implemented by subclass');
+  }
+
+     destroy() {
+    // イベントリスナーの削除
+    this.eventListeners.forEach(({ element, event, handler }) => {
+      element.removeEventListener(event, handler);
+    });
+    this.eventListeners = [];
+  }
 }
