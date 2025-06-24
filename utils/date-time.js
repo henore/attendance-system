@@ -49,7 +49,6 @@ const formatDate = (date, options = {}) => {
     month: 'long',
     day: 'numeric',
     weekday: 'long',
-    timeZone: 'Asia/Tokyo'
   };
   const dateObj = typeof date === 'string' ? new Date(date) : date;
   return dateObj.toLocaleDateString('ja-JP', { ...defaultOptions, ...options });
