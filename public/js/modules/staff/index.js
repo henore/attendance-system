@@ -36,12 +36,8 @@ export default class StaffModule extends BaseModule {
       this.app.showNotification.bind(this.app),
       this.switchToSection.bind(this)
     );
-    
-    this.lastReportModal = new StaffLastReportModal(
-      (disabled) => this.updateClockInButtonState(disabled),
-      this.showNotification.bind(this)
-    );
-    
+   
+   
     this.beforeUnloadHandler = null;
   }
 
