@@ -4,6 +4,7 @@
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { MESSAGES } from '../../constants/labels.js';
 import { formatAppetite, formatSleepQuality, formatInterviewRequest, formatMedicationTime } from '../../utils/formatter.js';
+import { getCurrentDate } from '../../utils/date-time.js';
 
 export class UserReportHandler {
   constructor(apiCall, showNotification) {
@@ -19,9 +20,7 @@ export class UserReportHandler {
    * @returns {string} YYYY-MM-DD形式
    */
   getTodayDate() {
-    const now = new Date();
-    const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-    return japanTime.toISOString().split('T')[0];
+    const now = getCurrentDate();
   }
 
   /**

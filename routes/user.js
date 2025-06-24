@@ -1,34 +1,16 @@
 // routes/user.js
-// 利用者API（休憩処理修正版）
+// 利用者API - JST統一版
 
 const express = require('express');
 const router = express.Router();
-
-// 日本時間を取得する関数
-const getJapanTime = () => {
-    const now = new Date();
-    const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-    return japanTime.toISOString().slice(11, 16); // HH:MM形式
-};
-
-const getJapanDate = () => {
-    const now = new Date();
-    const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-    return japanTime.toISOString().split('T')[0];
-};
-
-// 時間を分に変換
-const timeToMinutes = (timeStr) => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
-};
+const { getCurrentDate, getCurrentTime, timeToMinutes } = require('../utils/date-time');
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     // 今日の出勤状況取得
     router.get('/attendance/today', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
-            const today = getJapanDate();
+            const today = getCurrentDate();
             
             const attendance = await dbGet(
                 'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
@@ -59,7 +41,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     router.post('/report', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
-            const today = getJapanDate();
+            const today = getCurrentDate();
             
             console.log('[日報API] リクエストボディ:', req.body);
             console.log('[日報API] ユーザーID:', userId);
@@ -177,8 +159,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         try {
             const userId = req.session.user.id;
             const user = req.session.user;
-            const today = getJapanDate();
-            const currentTime = getJapanTime();
+            const today = getCurrentDate();
+            const currentTime = getCurrentTime();
             
             // 出勤チェック
             const attendance = await dbGet(
@@ -268,8 +250,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     router.post('/break/end', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
-            const today = getJapanDate();
-            const currentTime = getJapanTime();
+            const today = getCurrentDate();
+            const currentTime = getCurrentTime();
             
             // 進行中の休憩記録取得
             const breakRecord = await dbGet(
@@ -394,6 +376,41 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             res.status(500).json({ 
                 success: false, 
                 error: 'コメント既読処理でエラーが発生しました' 
+            });
+        }
+    });
+
+    // 前回の未日報記録取得
+    router.get('/last-record', requireAuth, async (req, res) => {
+        try {
+            const userId = req.session.user.id;
+            const today = getCurrentDate();
+            
+            // 最新の未日報記録を取得（今日を除く、退勤済みで日報なし）
+            const lastRecord = await dbGet(`
+                SELECT a.* 
+                FROM attendance a
+                LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
+                WHERE a.user_id = ? 
+                  AND a.date < ?
+                  AND a.clock_out IS NOT NULL
+                  AND (dr.id IS NULL OR a.has_report = 0)
+                ORDER BY a.date DESC
+                LIMIT 1
+            `, [userId, today]);
+            
+            console.log(`[前回記録確認] ユーザーID: ${userId}, 今日: ${today}, 前回記録:`, lastRecord);
+            
+            res.json({
+                success: true,
+                lastRecord: lastRecord || null
+            });
+            
+        } catch (error) {
+            console.error('前回記録取得エラー:', error);
+            res.status(500).json({ 
+                success: false, 
+                error: '前回記録の取得に失敗しました' 
             });
         }
     });

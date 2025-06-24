@@ -54,7 +54,7 @@ export class UserAttendanceHandler extends AttendanceHandler {
    */
   async getLastReport() {
     try {
-      const today = new Date();
+      const today = getCurrentDate();
       let lastReportFound = null;
       
       // 過去30日間をチェック

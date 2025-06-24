@@ -1,6 +1,9 @@
-// routes/handover.js（ルート修正版）
+// routes/handover.js
+// 申し送りルート - JST統一版
+
 const express = require('express');
 const router = express.Router();
+const { getHandoverDateTime } = require('../utils/date-time');
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
   
@@ -79,17 +82,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         }
       }
 
-      // 日本時間で現在時刻を取得
-      const now = new Date();
-      const japanTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-      const formattedTime = japanTime.toLocaleString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).replace(/\//g, '/');
+      // JST統一モジュールから日本時間を取得
+      const formattedTime = getHandoverDateTime();
 
       // 記入者情報を内容に追記（改行なし）
       const contentWithAuthor = `${content.trim()} - ${req.session.user.name} (${formattedTime})`;

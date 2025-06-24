@@ -1,5 +1,5 @@
 // server.js
-// Node.js Express サーバー
+// Node.js Express サーバー - JST統一版
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -8,6 +8,7 @@ const path = require('path');
 const morgan = require('morgan');
 const helmet = require('helmet');
 const cors = require('cors');
+const { getCurrentDate, getCurrentTime } = require('./utils/date-time');
 
 // Express アプリケーション作成
 const app = express();
@@ -151,14 +152,12 @@ app.use('/api/admin', requireAuth, requireRole(['admin']), adminRouter);
 app.use('/api/attendance', requireAuth, attendanceRouter);
 app.use('/api/handover', requireAuth, handoverRouter);
 
-// サーバー日付取得エンドポイント（日本時間）
+// サーバー日付取得エンドポイント（JST統一モジュール使用）
 app.get('/api/server-date', requireAuth, (req, res) => {
-  const now = new Date();
-  const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
   res.json({
     success: true,
-    serverDate: japanTime.toISOString().split('T')[0],
-    serverTime: japanTime.toISOString().slice(11, 16)
+    serverDate: getCurrentDate(),
+    serverTime: getCurrentTime()
   });
 });
 
@@ -182,6 +181,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
     console.log(`🚀 サーバー起動: http://localhost:${PORT}`);
     console.log(`📊 環境: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📅 サーバー日時(JST): ${getCurrentDate()} ${getCurrentTime()}`);
 });
 
 // プロセス終了時の処理

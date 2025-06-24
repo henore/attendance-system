@@ -1,34 +1,9 @@
 // routes/attendance.js
-// 共通の出勤管理ルート（時間丸め機能修正版）
+// 共通の出勤管理ルート - JST統一版
 
 const express = require('express');
 const router = express.Router();
-
-// 日本時間を取得する関数
-const getJapanTime = () => {
-  const now = new Date();
-  const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-  return japanTime.toISOString().slice(11, 16); // HH:MM形式
-};
-
-const getJapanDate = () => {
-  const now = new Date();
-  const japanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-  return japanTime.toISOString().split('T')[0];
-};
-
-// 時間を分に変換
-const timeToMinutes = (timeStr) => {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  return hours * 60 + minutes;
-};
-
-// 分を時間文字列に変換
-const minutesToTime = (minutes) => {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-};
+const { getCurrentDate, getCurrentTime, timeToMinutes, minutesToTime } = require('../utils/date-time');
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
   
@@ -36,7 +11,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
   router.get('/today', async (req, res) => {
     try {
       const userId = req.session.user.id;
-      const today = getJapanDate();
+      const today = getCurrentDate();
       
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
@@ -61,8 +36,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     try {
       const userId = req.session.user.id;
       const userRole = req.session.user.role;
-      const today = getJapanDate();
-      let currentTime = getJapanTime();
+      const today = getCurrentDate();
+      let currentTime = getCurrentTime();
       
       // 既存の出勤記録確認
       const existing = await dbGet(
@@ -138,8 +113,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         });
       }
       
-      const today = getJapanDate();
-      let currentTime = getJapanTime();
+      const today = getCurrentDate();
+      let currentTime = getCurrentTime();
       
       // 既存の出勤記録確認
       const attendance = await dbGet(

@@ -1,9 +1,10 @@
 // routes/admin.js
-// 管理者API - 修正版（休憩データ統合対応）
+// 管理者API - JST統一版
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
+const { getCurrentDate } = require('../utils/date-time');
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // ユーザー登録
@@ -130,7 +131,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // 今日の全体状況取得
     router.get('/status/today', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getCurrentDate();
             
             const users = await dbAll(`
                 SELECT 

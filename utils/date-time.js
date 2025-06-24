@@ -1,12 +1,12 @@
-// public/js/utils/date-time.js
+// utils/date-time.js
 // 日本時間（JST）に統一した日時関連のユーティリティ関数
-// フロントエンド用（ESモジュール形式）
+// CommonJS形式で全てのサーバーサイドコードから利用可能
 
 /**
  * JSTの現在日時を取得
  * @returns {Date} JST日時のDateオブジェクト
  */
-export const getJSTNow = () => {
+const getJSTNow = () => {
   const now = new Date();
   // UTCからJSTへの変換（+9時間）
   const utcTime = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
@@ -18,7 +18,7 @@ export const getJSTNow = () => {
  * JSTの現在日付を YYYY-MM-DD 形式で取得
  * @returns {string}
  */
-export const getCurrentDate = () => {
+const getCurrentDate = () => {
   const jst = getJSTNow();
   const year = jst.getFullYear();
   const month = String(jst.getMonth() + 1).padStart(2, '0');
@@ -30,7 +30,7 @@ export const getCurrentDate = () => {
  * JSTの現在時刻を HH:MM 形式で取得
  * @returns {string}
  */
-export const getCurrentTime = () => {
+const getCurrentTime = () => {
   const jst = getJSTNow();
   const hours = String(jst.getHours()).padStart(2, '0');
   const minutes = String(jst.getMinutes()).padStart(2, '0');
@@ -43,7 +43,7 @@ export const getCurrentTime = () => {
  * @param {Object} options 
  * @returns {string}
  */
-export const formatDate = (date, options = {}) => {
+const formatDate = (date, options = {}) => {
   const defaultOptions = {
     year: 'numeric',
     month: 'long',
@@ -60,7 +60,7 @@ export const formatDate = (date, options = {}) => {
  * @param {string} timeStr HH:MM形式
  * @returns {number}
  */
-export const timeToMinutes = (timeStr) => {
+const timeToMinutes = (timeStr) => {
   if (!timeStr) return 0;
   const [hours, minutes] = timeStr.split(':').map(Number);
   return hours * 60 + minutes;
@@ -71,7 +71,7 @@ export const timeToMinutes = (timeStr) => {
  * @param {number} minutes 
  * @returns {string} HH:MM形式
  */
-export const minutesToTime = (minutes) => {
+const minutesToTime = (minutes) => {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
@@ -84,7 +84,7 @@ export const minutesToTime = (minutes) => {
  * @param {number} breakMinutes 休憩時間（分）
  * @returns {number|null}
  */
-export const calculateWorkHours = (clockIn, clockOut, breakMinutes = 0) => {
+const calculateWorkHours = (clockIn, clockOut, breakMinutes = 0) => {
   if (!clockIn || !clockOut) return null;
   
   try {
@@ -113,7 +113,7 @@ export const calculateWorkHours = (clockIn, clockOut, breakMinutes = 0) => {
  * @param {string} endTime 
  * @returns {number}
  */
-export const calculateBreakDuration = (startTime, endTime) => {
+const calculateBreakDuration = (startTime, endTime) => {
   if (!startTime || !endTime) return 0;
   
   try {
@@ -139,7 +139,7 @@ export const calculateBreakDuration = (startTime, endTime) => {
  * @param {string} type 'in' or 'out'
  * @returns {string}
  */
-export const adjustTime = (time, type) => {
+const adjustTime = (time, type) => {
   const [h, m] = time.split(':').map(Number);
   
   if (type === 'in') {
@@ -159,7 +159,7 @@ export const adjustTime = (time, type) => {
  * @param {number} month 1-12
  * @returns {number}
  */
-export const getDaysInMonth = (year, month) => {
+const getDaysInMonth = (year, month) => {
   return new Date(year, month, 0).getDate();
 };
 
@@ -169,7 +169,7 @@ export const getDaysInMonth = (year, month) => {
  * @param {Date|string} date2 
  * @returns {number}
  */
-export const getDaysDifference = (date1, date2) => {
+const getDaysDifference = (date1, date2) => {
   const d1 = new Date(date1);
   const d2 = new Date(date2);
   const diffTime = Math.abs(d2 - d1);
@@ -182,7 +182,7 @@ export const getDaysDifference = (date1, date2) => {
  * @param {string} timeStr HH:MM形式（オプション）
  * @returns {Date}
  */
-export const parseJSTDate = (dateStr, timeStr = '00:00') => {
+const parseJSTDate = (dateStr, timeStr = '00:00') => {
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hours, minutes] = timeStr.split(':').map(Number);
   
@@ -197,7 +197,7 @@ export const parseJSTDate = (dateStr, timeStr = '00:00') => {
  * @param {string} format 'date' | 'time' | 'datetime'
  * @returns {string}
  */
-export const formatDateTime = (date, format = 'datetime') => {
+const formatDateTime = (date, format = 'datetime') => {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
   const jst = new Date(dateObj.getTime() + (9 * 60 * 60 * 1000));
   
@@ -219,63 +219,10 @@ export const formatDateTime = (date, format = 'datetime') => {
 };
 
 /**
- * 曜日を取得（日本語）
- * @param {Date|string} date 
- * @returns {string}
- */
-export const getJapaneseDayOfWeek = (date) => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  const days = ['日', '月', '火', '水', '木', '金', '土'];
-  return days[dateObj.getDay()];
-};
-
-/**
- * 年月から月初・月末の日付を取得
- * @param {number} year 
- * @param {number} month 
- * @returns {{startDate: string, endDate: string}}
- */
-export const getMonthDateRange = (year, month) => {
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
-  const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
-  
-  return { startDate, endDate };
-};
-
-/**
- * 現在時刻が指定時刻の範囲内かチェック
- * @param {string} startTime HH:MM形式
- * @param {string} endTime HH:MM形式
- * @returns {boolean}
- */
-export const isTimeInRange = (startTime, endTime) => {
-  const now = getCurrentTime();
-  const nowMinutes = timeToMinutes(now);
-  const startMinutes = timeToMinutes(startTime);
-  const endMinutes = timeToMinutes(endTime);
-  
-  return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
-};
-
-/**
- * 時刻を読みやすい形式に変換
- * @param {string} time HH:MM形式
- * @returns {string} 例: "午前9時00分"
- */
-export const formatTimeJapanese = (time) => {
-  const [hours, minutes] = time.split(':').map(Number);
-  const period = hours < 12 ? '午前' : '午後';
-  const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-  
-  return `${period}${displayHours}時${String(minutes).padStart(2, '0')}分`;
-};
-
-/**
  * 申し送り用の日本時間フォーマット
  * @returns {string} YYYY/MM/DD HH:MM形式
  */
-export const getHandoverDateTime = () => {
+const getHandoverDateTime = () => {
   const jst = getJSTNow();
   const year = jst.getFullYear();
   const month = String(jst.getMonth() + 1).padStart(2, '0');
@@ -284,4 +231,22 @@ export const getHandoverDateTime = () => {
   const minutes = String(jst.getMinutes()).padStart(2, '0');
   
   return `${year}/${month}/${day} ${hours}:${minutes}`;
+};
+
+// CommonJS形式でエクスポート
+module.exports = {
+  getJSTNow,
+  getCurrentDate,
+  getCurrentTime,
+  formatDate,
+  timeToMinutes,
+  minutesToTime,
+  calculateWorkHours,
+  calculateBreakDuration,
+  adjustTime,
+  getDaysInMonth,
+  getDaysDifference,
+  parseJSTDate,
+  formatDateTime,
+  getHandoverDateTime
 };
