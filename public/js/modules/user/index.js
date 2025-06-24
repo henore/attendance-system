@@ -3,9 +3,7 @@ import { UserAttendanceHandler } from './attendance.js';
 import { UserReportHandler } from './report.js';
 import { UserBreakHandler } from './break.js';
 import { UserAttendanceCalendar } from './calendar.js';
-import { modalManager } from '../shared/modal-manager.js';
 import { LastReportModal } from './last-report-modal.js';
-import { MESSAGES } from '../../constants/labels.js';
 import { TermsModal } from './terms-modal.js';
 
 export default class UserModule extends BaseModule {
@@ -425,8 +423,8 @@ export default class UserModule extends BaseModule {
     this.app.showNotification('カレンダーを更新しました', 'info');
   }
 
-  /**
-   * 前回出勤記録の確認
+  
+  // * 前回出勤記録の確認
  
   async checkAndShowLastReportModal() {
     if (this.state.currentAttendance && this.state.currentAttendance.clock_in) {
@@ -441,7 +439,7 @@ export default class UserModule extends BaseModule {
       });
     }
   }
-  */
+  
 
   /**
    * 未読コメントチェック
