@@ -2,7 +2,7 @@
 import BaseModule from '../../base-module.js';
 import { StaffAttendanceUI } from './attendance.js';
 import { SharedAttendanceManagement } from '../shared/attendance-management.js';
-import { StaffAttendanceBook } from './attendance-book.js';
+import { StaffAttendanceBook } from './calendar.js';
 import SharedMonthlyReport from '../shared/monthly-report.js';
 import { StaffReportNotification } from './report-notification.js';
 import { StaffLastReportModal } from './last-report-modal.js';
