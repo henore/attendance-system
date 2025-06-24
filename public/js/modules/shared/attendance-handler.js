@@ -166,4 +166,75 @@ export class AttendanceHandler {
       }
     }
   }
+
+  /**
+   * 休憩開始処理
+   * @param {string} endpoint 
+   * @param {boolean} isWorking 
+   * @returns {Promise<Object>}
+   */
+  async startBreak(endpoint, isWorking) {
+    if (!isWorking) {
+      this.showNotification('出勤中のみ休憩できます', 'warning');
+      return { success: false };
+    }
+
+    try {
+      const response = await this.apiCall(endpoint, { method: 'POST' });
+
+      if (response && response.success) {
+        const message = response.message || MESSAGES.ATTENDANCE.BREAK_START_SUCCESS(response.startTime || getCurrentTime());
+        this.showNotification(message, 'info');
+
+        return {
+          success: true,
+          startTime: response.startTime,
+          isCompleted: response.isCompleted || false
+        };
+      } else {
+        throw new Error('休憩開始処理のレスポンスが不正です');
+      }
+    } catch (error) {
+      console.error('[休憩開始処理] エラー:', error);
+      this.showNotification(error.message || '休憩開始処理でエラーが発生しました', 'danger');
+      return { success: false };
+    }
+  }
+
+  /**
+   * 休憩終了処理
+   * @param {string} endpoint 
+   * @param {boolean} isOnBreak 
+   * @returns {Promise<Object>}
+   */
+  async endBreak(endpoint, isOnBreak) {
+    if (!isOnBreak) {
+      this.showNotification('休憩中ではありません', 'warning');
+      return { success: false };
+    }
+
+    try {
+      const response = await this.apiCall(endpoint, { method: 'POST' });
+
+      if (response && response.success) {
+        const message = response.message || MESSAGES.ATTENDANCE.BREAK_END_SUCCESS(response.endTime || getCurrentTime());
+        this.showNotification(message, 'success');
+
+        return {
+          success: true,
+          endTime: response.endTime,
+          duration: response.duration
+        };
+      } else {
+        // レスポンスが失敗でも処理を続行
+        const message = response.error || '休憩を終了しました';
+        this.showNotification(message, 'info');
+        return { success: true };
+      }
+    } catch (error) {
+      console.error('[休憩終了処理] エラー:', error);
+      this.showNotification(error.message || '休憩終了処理でエラーが発生しました', 'danger');
+      return { success: false };
+    }
+  }
 }
