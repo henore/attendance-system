@@ -1,4 +1,4 @@
-// /public/js/base-module.js
+// /public/js/base-module.jsMore actions
 // 基底モジュールクラス
 
 export default class BaseModule {
@@ -16,9 +16,9 @@ export default class BaseModule {
     // イベントリスナー管理
     addEventListener(element, event, handler) {
         if (!element) return;
-        
+
         element.addEventListener(event, handler);
-        
+
         // クリーンアップのために記録
         if (!this.eventListeners.has(element)) {
             this.eventListeners.set(element, []);
@@ -26,35 +26,24 @@ export default class BaseModule {
         this.eventListeners.get(element).push({ event, handler });
     }
 
+     // IDでイベントリスナー追加Add commentMore actions
     addEventListenerById(elementId, event, handler) {
-    const element = document.getElementById(elementId);
-    if (element) {
-      element.addEventListener(event, handler);
-      this.eventListeners.push({ element, event, handler });
+        const element = document.getElementById(elementId);
+        if (element) {
+            this.addEventListener(element, event, handler);
+        }
     }
-  }
-
-  /**
-   * イベントリスナーをセレクターで追加
-   */
-  addEventListenerBySelector(selector, event, handler) {
-    const elements = document.querySelectorAll(selector);
-    elements.forEach(element => {
-      element.addEventListener(event, handler);
-      this.eventListeners.push({ element, event, handler });
-    });
-  }
 
     // クリーンアップ
     destroy() {
-        // 登録されたイベントリスナーを全て削除
+        // 登録されたイベントリスナーを全て削除More actions
         this.eventListeners.forEach((listeners, element) => {
             listeners.forEach(({ event, handler }) => {
                 element.removeEventListener(event, handler);
             });
         });
         this.eventListeners.clear();
-        
+
         console.log(`${this.constructor.name} destroyed`);
     }
 
@@ -68,7 +57,7 @@ export default class BaseModule {
     // ローディング表示
     showLoading(container, message = '読み込み中...') {
         if (!container) return;
-        
+
         container.innerHTML = `
             <div class="text-center p-4">
                 <div class="spinner-border" role="status">
@@ -82,7 +71,7 @@ export default class BaseModule {
     // 空の状態表示
     showEmptyState(container, message = 'データがありません', icon = 'fa-inbox') {
         if (!container) return;
-        
+
         container.innerHTML = `
             <div class="text-center p-5">
                 <i class="fas ${icon} fa-3x text-muted mb-3"></i>
@@ -94,7 +83,7 @@ export default class BaseModule {
     // エラー状態表示
     showErrorState(container, message = 'エラーが発生しました') {
         if (!container) return;
-        
+
         container.innerHTML = `
             <div class="alert alert-danger">
                 <i class="fas fa-exclamation-triangle"></i> ${message}
@@ -108,7 +97,7 @@ export default class BaseModule {
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
-        
+
         return format
             .replace('YYYY', year)
             .replace('MM', month)
@@ -148,15 +137,4 @@ export default class BaseModule {
         };
     }
 
-      async init() {
-    throw new Error('init() must be implemented by subclass');
-  }
-
-     destroy() {
-    // イベントリスナーの削除
-    this.eventListeners.forEach(({ element, event, handler }) => {
-      element.removeEventListener(event, handler);
-    });
-    this.eventListeners = [];
-  }
-}
+    }
