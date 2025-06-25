@@ -25,7 +25,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             res.json({
                 success: true,
                 attendance: attendance || null,
-                report: report || null
+                report: report ? { ...report, date: today } : null
             });
             
         } catch (error) {
