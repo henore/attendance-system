@@ -20,7 +20,7 @@ export class UserReportHandler {
    * @returns {string} YYYY-MM-DD形式
    */
   getTodayDate() {
-    const now = getCurrentDate();
+    return getCurrentDate();
   }
 
   /**
