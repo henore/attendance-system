@@ -779,5 +779,121 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
+    // 出勤記録削除（管理者のみ）
+    router.delete('/attendance/:recordId', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { recordId } = req.params;
+            const { reason } = req.body;
+            
+            // バリデーション
+            if (!reason || reason.trim() === '') {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '削除理由を入力してください' 
+                });
+            }
+            
+            // 既存記録の確認
+            const attendance = await dbGet(
+                `SELECT a.*, u.name as user_name, u.role as user_role 
+                 FROM attendance a 
+                 JOIN users u ON a.user_id = u.id 
+                 WHERE a.id = ?`,
+                [recordId]
+            );
+            
+            if (!attendance) {
+                return res.status(404).json({ 
+                    success: false,
+                    error: '出勤記録が見つかりません' 
+                });
+            }
+            
+            // トランザクション開始
+            await dbRun('BEGIN TRANSACTION');
+            
+            try {
+                // 監査ログに記録（削除前）
+                await dbRun(
+                    `INSERT INTO audit_log (
+                        admin_id, action_type, target_id, target_type,
+                        old_value, reason, ip_address
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        req.session.user.id,
+                        'attendance_deletion',
+                        recordId,
+                        'attendance',
+                        JSON.stringify({
+                            user_id: attendance.user_id,
+                            user_name: attendance.user_name,
+                            user_role: attendance.user_role,
+                            date: attendance.date,
+                            clock_in: attendance.clock_in,
+                            clock_out: attendance.clock_out,
+                            status: attendance.status,
+                            break_start: attendance.break_start,
+                            break_end: attendance.break_end
+                        }),
+                        reason,
+                        req.ip
+                    ]
+                );
+                
+                // 関連する休憩記録も削除（利用者の場合）
+                if (attendance.user_role === 'user') {
+                    await dbRun(
+                        'DELETE FROM break_records WHERE user_id = ? AND date = ?',
+                        [attendance.user_id, attendance.date]
+                    );
+                }
+                
+                // 関連する日報がある場合は警告（削除はしない）
+                const report = await dbGet(
+                    'SELECT id FROM daily_reports WHERE user_id = ? AND date = ?',
+                    [attendance.user_id, attendance.date]
+                );
+                
+                const comment = await dbGet(
+                    'SELECT id FROM staff_comments WHERE user_id = ? AND date = ?',
+                    [attendance.user_id, attendance.date]
+                );
+                
+                // 出勤記録を削除
+                await dbRun('DELETE FROM attendance WHERE id = ?', [recordId]);
+                
+                // トランザクションコミット
+                await dbRun('COMMIT');
+                
+                // レスポンス
+                const warnings = [];
+                if (report) {
+                    warnings.push('関連する日報が存在します。日報は削除されていません。');
+                }
+                if (comment) {
+                    warnings.push('関連するスタッフコメントが存在します。コメントは削除されていません。');
+                }
+                
+                res.json({ 
+                    success: true, 
+                    message: `${attendance.user_name}さんの${attendance.date}の出勤記録を削除しました`,
+                    warnings: warnings.length > 0 ? warnings : undefined
+                });
+                
+            } catch (error) {
+                // ロールバック
+                await dbRun('ROLLBACK');
+                throw error;
+            }
+            
+        } catch (error) {
+            console.error('出勤記録削除エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: '出勤記録の削除に失敗しました' 
+            });
+        }
+    });
+
     return router;
 };

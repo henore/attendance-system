@@ -75,6 +75,7 @@ export const API_ENDPOINTS = {
     EXPORT_CSV: '/api/admin/export/csv',
     AUDIT_LOG: '/api/admin/audit-log',
     REGISTER: '/api/admin/register', // 追加
+    ATTENDANCE_DELETE: (recordId) => `/api/admin/attendance/${recordId}`,//出勤記録削除用
     BREAK_STATUS: (userId, date) => 
         `/api/admin/user/${userId}/break/status/${date}` // 追加
   }
