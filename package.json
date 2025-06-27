@@ -9,14 +9,14 @@
     "init-db": "node scripts/init-db.js"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
-    "sqlite3": "^5.1.6",
-    "bcryptjs": "^2.4.3",
-    "dotenv": "^16.0.3",
-    "morgan": "^1.10.0",
     "helmet": "^7.0.0",
-    "cors": "^2.8.5"
+    "morgan": "^1.10.0",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

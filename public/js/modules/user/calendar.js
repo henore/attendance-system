@@ -472,7 +472,14 @@ export class UserAttendanceCalendar {
           <label class="past-form-label">作業内容</label>
           <div class="past-form-textarea">${report.work_content || ''}</div>
         </div>
-        
+          ${report.external_work_location ? `
+          <div class="past-form-section">
+            <label class="past-form-label">
+              <i class="fas fa-building"></i> 施設外就労先
+            </label>
+            <div class="past-form-value text-info">${report.external_work_location}</div>
+          </div>
+        ` : ''}
         <div class="row mb-3">
           <div class="col-4">
             <label class="past-form-label">体温</label>

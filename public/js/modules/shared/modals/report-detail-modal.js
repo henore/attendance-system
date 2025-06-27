@@ -217,7 +217,15 @@ export class ReportDetailModal {
           <label class="past-form-label"><i class="fas fa-tasks"></i> 作業内容</label>
           <div class="text-content">${report.work_content || ''}</div>
         </div>
-
+        <!-- 施設外就労先 -->
+        ${report.external_work_location ? `
+          <div class="mb-3">
+            <label class="past-form-label">
+              <i class="fas fa-building text-info"></i> 施設外就労先
+            </label>
+            <div class="past-form-value text-info">${report.external_work_location}</div>
+          </div>
+        ` : ''}
         <!-- 健康状態 -->
         <div class="row mb-3">
           <div class="col-3">

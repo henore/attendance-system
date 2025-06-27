@@ -1,5 +1,5 @@
 // routes/user.js
-// 利用者API - JST統一版
+// 利用者API - JST統一版（施設外就労先対応）
 
 const express = require('express');
 const router = express.Router();
@@ -37,7 +37,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         }
     });
     
-    // 日報提出
+    // 日報提出（施設外就労先対応版）
     router.post('/report', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
@@ -49,6 +49,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             
             const {
                 workContent,
+                externalWorkLocation,  // 追加
                 temperature,
                 appetite,
                 medicationTime,
@@ -58,6 +59,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 reflection,
                 interviewRequest
             } = req.body;
+            
+            console.log('[日報API] 分割代入後 - workContent:', workContent);
+            console.log('[日報API] 分割代入後 - externalWorkLocation:', externalWorkLocation);
+            console.log('[日報API] 分割代入後 - temperature:', temperature);
             
             // 出勤記録確認
             const attendance = await dbGet(
@@ -74,18 +79,23 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 });
             }
             
-            // 日報登録または更新
-            await dbRun(`
-                INSERT OR REPLACE INTO daily_reports (
-                    user_id, date, work_content, temperature, appetite,
-                    medication_time, bedtime, wakeup_time, sleep_quality,
-                    reflection, interview_request
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                userId, today, workContent, temperature, appetite,
+            // 日報登録または更新（施設外就労先対応版）
+            const sqlParams = [
+                userId, today, workContent, externalWorkLocation || null, temperature, appetite,
                 medicationTime || null, bedtime || null, wakeupTime || null, 
                 sleepQuality, reflection || '', interviewRequest || null
-            ]);
+            ];
+            
+            console.log('[日報API] SQL実行パラメータ:', sqlParams);
+            console.log('[日報API] externalWorkLocation値:', externalWorkLocation || null);
+            
+            await dbRun(`
+                INSERT OR REPLACE INTO daily_reports (
+                    user_id, date, work_content, external_work_location, temperature, appetite,
+                    medication_time, bedtime, wakeup_time, sleep_quality,
+                    reflection, interview_request
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, sqlParams);
             
             // 出勤記録の日報フラグ更新
             await dbRun(

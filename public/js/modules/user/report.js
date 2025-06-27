@@ -1,5 +1,5 @@
 // modules/user/report.js
-// 利用者の日報機能ハンドラー（日付変更対応修正版）
+// 利用者の日報機能ハンドラー（施設外就労先対応完全版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { MESSAGES } from '../../constants/labels.js';
@@ -136,12 +136,15 @@ export class UserReportHandler {
   }
 
   /**
-   * 日報フォームを生成
+   * 日報フォームを生成（施設外就労先対応完全版）
    * @param {Object} existingReport 
    * @returns {string}
    */
   generateReportForm(existingReport = null) {
     const report = existingReport || {};
+    
+    console.log('[日報フォーム生成] existingReport:', existingReport);
+    console.log('[日報フォーム生成] external_work_location値:', report.external_work_location);
     
     return `
       <form id="reportForm">
@@ -152,6 +155,18 @@ export class UserReportHandler {
             </label>
             <textarea class="form-control" id="workContent" rows="1" 
                       placeholder="今日行った作業内容を記入してください..." required>${report.work_content || ''}</textarea>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-12 mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="externalWorkLocation" 
+                     ${report.external_work_location ? 'checked' : ''}>
+              <label class="form-check-label" for="externalWorkLocation">
+                <i class="fas fa-building"></i> 施設外就労先名：PC作業（暫定）
+              </label>
+            </div>
           </div>
         </div>
         
@@ -264,67 +279,69 @@ export class UserReportHandler {
       </div>
     `;
   }
-   /**
-   * 日報を提出（エラーハンドリング強化版）
+
+  /**
+   * 日報を提出（施設外就労先対応版）
    * @param {Event} event 
    */
-    async submitReport(event) {
-      event.preventDefault();
-      
-      console.log('[日報提出] 開始');
-      console.log('[日報提出] currentAttendance:', this.currentAttendance);
-      
-      // 出勤情報の再確認・復元
-      if (!this.currentAttendance) {
-        const form = event.target;
-        if (form.dataset.attendance) {
-          try {
-            this.currentAttendance = JSON.parse(form.dataset.attendance);
-            console.log('[日報提出] フォームから出勤情報を復元:', this.currentAttendance);
-          } catch (e) {
-            console.error('[日報提出] 出勤情報の復元エラー:', e);
-          }
+  async submitReport(event) {
+    event.preventDefault();
+    
+    console.log('[日報提出] 開始');
+    console.log('[日報提出] currentAttendance:', this.currentAttendance);
+    
+    // 出勤情報の再確認・復元
+    if (!this.currentAttendance) {
+      const form = event.target;
+      if (form.dataset.attendance) {
+        try {
+          this.currentAttendance = JSON.parse(form.dataset.attendance);
+          console.log('[日報提出] フォームから出勤情報を復元:', this.currentAttendance);
+        } catch (e) {
+          console.error('[日報提出] 出勤情報の復元エラー:', e);
         }
-      }
-      
-      // 出勤情報の検証
-      if (!this.validateAttendanceForReport()) {
-        return;
-      }
-
-      const formData = this.collectFormData();
-      console.log('[日報提出] フォームデータ:', formData);
-      
-      try {
-        const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_SUBMIT, {
-          method: 'POST',
-          body: JSON.stringify(formData)
-        });
-
-        console.log('[日報提出] 成功レスポンス:', response);
-        
-        this.hasTodayReport = true;
-        this.showNotification(MESSAGES.REPORT.SUBMIT_SUCCESS, 'success');
-
-        // コールバックを実行
-        if (this.onReportSubmit) {
-          this.onReportSubmit();
-        }
-        
-        // フォームを再読み込み
-        const container = document.getElementById('reportFormContainer');
-        if (container) {
-          await this.loadForm(container, this.currentAttendance);
-        }
-        
-      } catch (error) {
-        console.error('[日報提出] エラー:', error);
-        this.showNotification(
-          error.message || MESSAGES.REPORT.SUBMIT_ERROR, 
-          'danger'
-        );
       }
     }
+    
+    // 出勤情報の検証
+    if (!this.validateAttendanceForReport()) {
+      return;
+    }
+
+    const formData = this.collectFormData();
+    console.log('[日報提出] フォームデータ:', formData);
+    console.log('[日報提出] externalWorkLocationの値:', formData.externalWorkLocation);
+    
+    try {
+      const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_SUBMIT, {
+        method: 'POST',
+        body: JSON.stringify(formData)
+      });
+
+      console.log('[日報提出] 成功レスポンス:', response);
+      
+      this.hasTodayReport = true;
+      this.showNotification(MESSAGES.REPORT.SUBMIT_SUCCESS, 'success');
+
+      // コールバックを実行
+      if (this.onReportSubmit) {
+        this.onReportSubmit();
+      }
+      
+      // フォームを再読み込み
+      const container = document.getElementById('reportFormContainer');
+      if (container) {
+        await this.loadForm(container, this.currentAttendance);
+      }
+      
+    } catch (error) {
+      console.error('[日報提出] エラー:', error);
+      this.showNotification(
+        error.message || MESSAGES.REPORT.SUBMIT_ERROR, 
+        'danger'
+      );
+    }
+  }
 
   /**
    * 日報提出時の出勤情報検証
@@ -355,12 +372,19 @@ export class UserReportHandler {
   }
 
   /**
-   * フォームデータを収集
+   * フォームデータを収集（施設外就労先対応版）
    * @returns {Object}
    */
   collectFormData() {
-    return {
+    const checkbox = document.getElementById('externalWorkLocation');
+    const isChecked = checkbox ? checkbox.checked : false;
+    
+    console.log('[日報フロント] チェックボックス要素:', checkbox);
+    console.log('[日報フロント] チェック状態:', isChecked);
+    
+    const formData = {
       workContent: document.getElementById('workContent').value,
+      externalWorkLocation: isChecked ? 'PC作業（暫定）' : null,
       temperature: parseFloat(document.getElementById('temperature').value),
       appetite: document.getElementById('appetite').value,
       medicationTime: document.getElementById('medicationTime').value ? parseInt(document.getElementById('medicationTime').value) : null,
@@ -370,6 +394,9 @@ export class UserReportHandler {
       reflection: document.getElementById('reflection').value,
       interviewRequest: document.getElementById('interviewRequest').value
     };
+    
+    console.log('[日報フロント] 送信データ:', formData);
+    return formData;
   }
 
   /**
@@ -421,7 +448,7 @@ export class UserReportHandler {
   }
 
   /**
-   * 日報内容の表示を生成
+   * 日報内容の表示を生成（施設外就労先対応版）
    * @param {Object} report 
    * @returns {string}
    */
@@ -431,6 +458,15 @@ export class UserReportHandler {
         <label class="past-form-label">作業内容</label>
         <div class="past-form-textarea">${report.work_content || ''}</div>
       </div>
+      
+      ${report.external_work_location ? `
+        <div class="past-form-section">
+          <label class="past-form-label">
+            <i class="fas fa-building"></i> 施設外就労先
+          </label>
+          <div class="past-form-value text-info">${report.external_work_location}</div>
+        </div>
+      ` : ''}
       
       <div class="past-health-grid">
         <div class="past-form-section">
