@@ -128,62 +128,92 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
   });
 
-  // 出勤記録検索
-  router.get('/attendance/search', async (req, res) => {
-    try {
-      const { date, userId } = req.query;
-      
-      if (!date) {
-        return res.status(400).json({ success: false, error: '日付が指定されていません' });
-      }
-      
-      let query = `
-        SELECT 
-          a.id, a.user_id, a.date, a.clock_in, a.clock_out, a.status,
-          a.break_start, a.break_end,
-          u.name as user_name, u.role as user_role, u.service_type,
-          dr.id as report_id,
-          sc.id as comment_id,
-          br.start_time as break_start_time,
-          br.end_time as break_end_time,
-          br.duration as break_duration
-        FROM attendance a
-        JOIN users u ON a.user_id = u.id
-        LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
-        LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
-        LEFT JOIN break_records br ON a.user_id = br.user_id AND a.date = br.date
-        WHERE a.date = ? AND u.role = 'user'
-      `;
-      
-      const params = [date];
-      
-      if (userId) {
-        query += ' AND a.user_id = ?';
-        params.push(userId);
-      }
-      
-      query += ' ORDER BY u.name';
-      
-      const records = await dbAll(query, params);
-      
-      // 休憩情報を統合
-      const processedRecords = records.map(record => {
-        if (record.break_start_time || record.break_end_time) {
-          record.break = {
-            start: record.break_start_time,
-            end: record.break_end_time,
-            duration: record.break_duration
-          };
-        }
-        return record;
-      });
-      
-      res.json({ success: true, records: processedRecords });
-    } catch (error) {
-      console.error('出勤記録検索エラー:', error);
-      res.status(500).json({ success: false, error: '出勤記録の検索に失敗しました' });
+// 出勤記録検索（認証追加版）
+router.get('/attendance/search', async (req, res) => {
+  try {
+    const { date, userId } = req.query;
+    
+    if (!date) {
+      return res.status(400).json({ success: false, error: '日付が指定されていません' });
     }
-  });
+    
+    // Admin版と同様の構造に変更：usersテーブルから開始してLEFT JOIN
+    let query = `
+      SELECT 
+        u.id as user_id,
+        u.name as user_name,
+        u.role as user_role,
+        u.service_type,
+        a.id,
+        a.date,
+        a.clock_in,
+        a.clock_out,
+        a.status,
+        a.break_start,
+        a.break_end,
+        dr.id as report_id,
+        sc.id as comment_id,
+        br.start_time as break_start_time,
+        br.end_time as break_end_time,
+        br.duration as break_duration
+      FROM users u
+      LEFT JOIN attendance a ON u.id = a.user_id AND a.date = ?
+      LEFT JOIN daily_reports dr ON u.id = dr.user_id AND dr.date = ?
+      LEFT JOIN staff_comments sc ON u.id = sc.user_id AND sc.date = ?
+      LEFT JOIN break_records br ON u.id = br.user_id AND br.date = ?
+      WHERE u.role = 'user' AND u.is_active = 1
+    `;
+    
+    const params = [date, date, date, date];
+    
+    if (userId) {
+      query += ' AND u.id = ?';
+      params.push(userId);
+    }
+    
+    query += ' ORDER BY u.name';
+    
+    const records = await dbAll(query, params);
+    
+    // 休憩情報を統合（利用者のみ対象）
+    const processedRecords = records.map(record => {
+      // dateを明示的に設定（LEFT JOINでattendanceがnullの場合もあるため）
+      const processedRecord = {
+        id: record.id,
+        user_id: record.user_id,
+        user_name: record.user_name,
+        user_role: record.user_role,
+        service_type: record.service_type,
+        date: date, // 検索日付を使用
+        clock_in: record.clock_in,
+        clock_out: record.clock_out,
+        status: record.status || null,
+        report_id: record.report_id,
+        comment_id: record.comment_id
+      };
+      
+      // 休憩記録の処理
+      if (record.break_start_time || record.break_end_time) {
+        processedRecord.break = {
+          start: record.break_start_time,
+          end: record.break_end_time,
+          duration: record.break_duration
+        };
+        // attendance-management.jsで期待される形式にも対応
+        processedRecord.break_start_time = record.break_start_time;
+        processedRecord.break_end_time = record.break_end_time;
+        processedRecord.break_duration = record.break_duration;
+      }
+      
+      return processedRecord;
+    });
+    
+    res.json({ success: true, records: processedRecords });
+  } catch (error) {
+    console.error('出勤記録検索エラー:', error);
+    res.status(500).json({ success: false, error: '出勤記録の検索に失敗しました' });
+  }
+});
 
   // 日報詳細取得
   router.get('/reports/:userId/:date', async (req, res) => {

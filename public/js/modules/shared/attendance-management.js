@@ -315,51 +315,63 @@ export class SharedAttendanceManagement {
   }
 
   async searchAttendanceRecords() {
-    try {
-      const searchDate = this.container.querySelector('#searchDate').value;
-      const searchUser = this.container.querySelector('#searchUser').value;
-      
-      const params = new URLSearchParams({ date: searchDate });
-      
-      if (this.userRole === 'admin') {
-        const searchRole = this.container.querySelector('#searchRole');
-        if (searchRole && searchRole.value) {
-          params.append('role', searchRole.value);
-        }
+  try {
+    const searchDate = this.container.querySelector('#searchDate').value;
+    const searchUser = this.container.querySelector('#searchUser').value;
+    
+    const params = new URLSearchParams({ date: searchDate });
+    
+    if (this.userRole === 'admin') {
+      const searchRole = this.container.querySelector('#searchRole');
+      if (searchRole && searchRole.value) {
+        params.append('role', searchRole.value);
       }
-      
-      if (searchUser) params.append('userId', searchUser);
-
-      const endpoint = this.userRole === 'admin' ? 
-        API_ENDPOINTS.ADMIN.ATTENDANCE_SEARCH : 
-        API_ENDPOINTS.STAFF.ATTENDANCE_SEARCH;
-        
-      const response = await this.parent.callApi(`${endpoint}?${params}`);
-      let records = response.records || [];
-      
-      // 休憩データの整形（シンプル化）
-      this.currentRecords = records.map(record => {
-        // 既存の複雑な処理を削除し、シンプルに
-        if (record.user_role === 'user') {
-          // 利用者は break_records のデータを使用
-          if (record.br_start || record.break_start_time) {
-            record.break_start_time = record.br_start || record.break_start_time;
-            record.break_end_time = record.br_end || record.break_end_time;
-            record.break_duration = record.br_duration || record.break_duration;
-          }
-        }
-        // スタッフ・管理者はそのまま attendance テーブルのデータを使用
-        return record;
-      });
-      
-      this.updateSearchSummary(this.currentRecords, searchDate);
-      this.updateRecordsList(this.currentRecords);
-      
-    } catch (error) {
-      console.error('出勤記録検索エラー:', error);
-      this.showRecordsError('出勤記録の検索に失敗しました');
     }
+    
+    if (searchUser) params.append('userId', searchUser);
+
+    const endpoint = this.userRole === 'admin' ? 
+      API_ENDPOINTS.ADMIN.ATTENDANCE_SEARCH : 
+      API_ENDPOINTS.STAFF.ATTENDANCE_SEARCH;
+    
+    console.log('[DEBUG] APIエンドポイント:', endpoint);
+    console.log('[DEBUG] クエリパラメータ:', params.toString());
+    
+    // this.parent.callApi の代わりに this.app.apiCall を直接使用
+    const response = await this.app.apiCall(`${endpoint}?${params}`);
+    
+    console.log('[DEBUG] APIレスポンス:', response);
+    
+    let records = response.records || [];
+    console.log('[DEBUG] 取得レコード数:', records.length);
+    
+    if (records.length > 0) {
+      console.log('[DEBUG] 最初のレコード:', records[0]);
+    }
+    
+    // 休憩データの整形
+    this.currentRecords = records.map(record => {
+      if (record.user_role === 'user' && record.br_start) {
+        record.break_start_time = record.br_start;
+        record.break_end_time = record.br_end;
+        record.break_duration = record.br_duration;
+        console.log('[DEBUG] 休憩データマッピング:', {
+          user: record.user_name,
+          break_start_time: record.break_start_time,
+          break_end_time: record.break_end_time
+        });
+      }
+      return record;
+    });
+    
+    this.updateSearchSummary(this.currentRecords, searchDate);
+    this.updateRecordsList(this.currentRecords);
+    
+  } catch (error) {
+    console.error('[ERROR] 出勤記録検索エラー:', error);
+    this.showRecordsError('出勤記録の検索に失敗しました');
   }
+}
 
   updateSearchSummary(records, searchDate) {
     const summaryContainer = this.container.querySelector('#searchSummary');

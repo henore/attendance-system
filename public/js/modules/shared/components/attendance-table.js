@@ -52,8 +52,27 @@ export class AttendanceTable {
    * テーブルヘッダー生成
    */
   generateTableHeader(options) {
-    const { showDate, showOperations } = options;
+    const { showDate, showOperations, context } = options;
     
+    // 月別出勤簿用のヘッダー
+    if (context === 'monthly') {
+      return `
+        <thead class="table-primary">
+          <tr>
+            ${showDate ? '<th width="5%">日</th><th width="5%">曜</th>' : ''}
+            <th width="10%">出勤</th>
+            <th width="10%">退勤</th>
+            <th width="15%">休憩</th>
+            <th width="8%">実働</th>
+            <th width="8%">状態</th>
+            <th width="15%">日報・コメント</th>
+            ${showOperations ? '<th width="24%">操作</th>' : ''}
+          </tr>
+        </thead>
+      `;
+    }
+    
+    // 通常の出勤管理用ヘッダー
     return `
       <thead class="table-light">
         <tr>
@@ -78,23 +97,18 @@ export class AttendanceTable {
   generateTableRow(record, options) {
     const { showDate, showOperations, context, currentDate } = options;
     
-    // 基本情報
+    // 月別出勤簿用の特別な処理
+    if (context === 'monthly') {
+      return this.generateMonthlyTableRow(record, options);
+    }
+    
+    // 通常の出勤管理用の行生成
     const roleClass = this.getRoleColor(record.user_role);
     const roleDisplay = this.getRoleDisplayName(record.user_role);
-    
-    // 休憩時間表示（シンプル化）
     const breakDisplay = this.formatBreakTime(record);
-    
-    // 実働時間計算
     const workHours = this.calculateWorkDuration(record);
-    
-    // ステータス表示
     const statusBadge = this.getStatusBadge(record.status || 'normal');
-    
-    // 日報・コメント状況
     const reportStatus = this.getReportCommentStatus(record);
-    
-    // 操作ボタン
     const operations = showOperations ? 
       this.generateOperationButtons(record, context, currentDate) : '';
 
@@ -115,12 +129,68 @@ export class AttendanceTable {
   }
 
   /**
+   * 月別出勤簿用のテーブル行生成
+   */
+  generateMonthlyTableRow(record, options) {
+    const { showOperations } = options;
+    
+    // 休憩時間表示
+    const breakDisplay = this.formatBreakTime(record);
+    
+    // 実働時間計算
+    const workHours = this.calculateWorkDuration(record);
+    
+    // ステータス表示
+    const statusBadge = record.clock_in ? 
+      this.getStatusBadge(record.status || 'normal') : '-';
+    
+    // 日報・コメント状況
+    const reportStatus = this.getReportCommentStatus(record);
+    
+    // 操作ボタン
+    const operations = showOperations ? 
+      this.generateOperationButtons(record, 'monthly', record.date) : '';
+
+    // 行クラス（日曜・土曜の色付け）
+    let rowClass = '';
+    if (record.dayOfWeek === 0) rowClass = 'table-danger';
+    else if (record.dayOfWeek === 6) rowClass = 'table-info';
+
+    return `
+      <tr class="${rowClass}">
+        <td class="text-center">${record.day}</td>
+        <td class="text-center">${record.dayName}</td>
+        <td class="text-center">${record.clock_in || '-'}</td>
+        <td class="text-center">${record.clock_out || '-'}</td>
+        <td class="text-center small">${breakDisplay}</td>
+        <td class="text-center">${workHours ? workHours + 'h' : '-'}</td>
+        <td class="text-center">${statusBadge}</td>
+        <td class="text-center">${reportStatus}</td>
+        ${showOperations ? `<td class="text-center">${operations}</td>` : ''}
+      </tr>
+    `;
+  }
+
+  /**
    * 休憩時間のフォーマット（シンプル版）
    */
   formatBreakTime(record) {
+    console.log('[DEBUG formatBreakTime] レコード:', {
+      user_name: record.user_name,
+      user_role: record.user_role,
+      break_start: record.break_start,
+      break_end: record.break_end,
+      break_start_time: record.break_start_time,
+      break_end_time: record.break_end_time,
+      br_start: record.br_start,
+      br_end: record.br_end,
+      break: record.break
+    });
+    
     // スタッフ・管理者の場合
     if (record.user_role === 'staff' || record.user_role === 'admin') {
       if (record.break_start) {
+        console.log('[DEBUG] スタッフ/管理者の休憩:', record.break_start, record.break_end);
         return record.break_end ? 
           `${record.break_start}〜${record.break_end}` : 
           `${record.break_start}〜`;
@@ -128,14 +198,26 @@ export class AttendanceTable {
     }
     // 利用者の場合
     else if (record.user_role === 'user') {
-      // break_recordsテーブルのデータ
-      if (record.break_start_time || (record.break && record.break.start)) {
-        const start = record.break_start_time || record.break.start;
-        const end = record.break_end_time || record.break.end;
-        return end ? `${start}〜${end}` : `${start}〜`;
+      // break_recordsテーブルのデータ（複数のパターンをチェック）
+      if (record.break_start_time) {
+        console.log('[DEBUG] 利用者の休憩(break_start_time):', record.break_start_time, record.break_end_time);
+        return record.break_end_time ? 
+          `${record.break_start_time}〜${record.break_end_time}` : 
+          `${record.break_start_time}〜`;
+      } else if (record.br_start) {
+        console.log('[DEBUG] 利用者の休憩(br_start):', record.br_start, record.br_end);
+        return record.br_end ? 
+          `${record.br_start}〜${record.br_end}` : 
+          `${record.br_start}〜`;
+      } else if (record.break && record.break.start) {
+        console.log('[DEBUG] 利用者の休憩(break.start):', record.break.start, record.break.end);
+        return record.break.end ? 
+          `${record.break.start}〜${record.break.end}` : 
+          `${record.break.start}〜`;
       }
     }
     
+    console.log('[DEBUG] 休憩なし');
     return '-';
   }
 
@@ -312,11 +394,10 @@ export class AttendanceTable {
    */
   formatDateCell(date) {
     const d = new Date(date);
-    const month = d.getMonth() + 1;
     const day = d.getDate();
     const weekday = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
     
-    return `${month}/${day}(${weekday})`;
+    return `${day}(${weekday})`;
   }
 
   // ヘルパーメソッド（親モジュールのメソッドを利用）
