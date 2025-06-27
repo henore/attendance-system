@@ -448,6 +448,57 @@ export class UserReportHandler {
   }
 
   /**
+   * 就寝時間と起床時間から睡眠時間を計算
+   * @param {string} bedtime HH:MM形式
+   * @param {string} wakeupTime HH:MM形式
+   * @returns {string} 睡眠時間の表示文字列
+   */
+  calculateSleepHours(bedtime, wakeupTime) {
+    if (!bedtime || !wakeupTime) return '-';
+    
+    try {
+      const [bedHours, bedMinutes] = bedtime.split(':').map(Number);
+      const [wakeHours, wakeMinutes] = wakeupTime.split(':').map(Number);
+      
+      // 分に変換
+      const bedTotalMinutes = bedHours * 60 + bedMinutes;
+      const wakeTotalMinutes = wakeHours * 60 + wakeMinutes;
+      
+      let sleepMinutes;
+      
+      // 日をまたぐ場合を考慮
+      if (wakeTotalMinutes >= bedTotalMinutes) {
+        // 同日内（例：22:00就寝 → 06:00起床は不可能なので翌日とみなす）
+        if (bedTotalMinutes > 12 * 60 && wakeTotalMinutes < 12 * 60) {
+          // 夜遅く就寝して朝早く起床（通常パターン）
+          sleepMinutes = (24 * 60 - bedTotalMinutes) + wakeTotalMinutes;
+        } else {
+          // 同日内（昼寝など）
+          sleepMinutes = wakeTotalMinutes - bedTotalMinutes;
+        }
+      } else {
+        // 日をまたぐ場合
+        sleepMinutes = (24 * 60 - bedTotalMinutes) + wakeTotalMinutes;
+      }
+      
+      const hours = Math.floor(sleepMinutes / 60);
+      const minutes = sleepMinutes % 60;
+      
+      if (hours === 0) {
+        return `${minutes}分`;
+      } else if (minutes === 0) {
+        return `${hours}時間`;
+      } else {
+        return `${hours}時間${minutes}分`;
+      }
+      
+    } catch (error) {
+      console.error('睡眠時間計算エラー:', error);
+      return '-';
+    }
+  }
+
+  /**
    * 日報内容の表示を生成（施設外就労先対応版）
    * @param {Object} report 
    * @returns {string}
@@ -491,6 +542,10 @@ export class UserReportHandler {
         <div class="past-form-section">
           <label class="past-form-label">起床時間</label>
           <div class="past-form-value">${report.wakeup_time || '-'}</div>
+        </div>
+        <div class="past-form-section">
+          <label class="past-form-label">睡眠時間</label>
+          <div class="past-form-value">${this.calculateSleepHours(report.bedtime, report.wakeup_time)}</div>
         </div>
         <div class="past-form-section">
           <label class="past-form-label">睡眠状態</label>

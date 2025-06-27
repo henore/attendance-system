@@ -431,8 +431,6 @@ async loadData() {
   }
 }
 
-  // shared/attendance-management.js の searchAttendanceRecords メソッド強化版
-
 async searchAttendanceRecords() {
   try {
     const searchDate = this.container.querySelector('#searchDate').value;
@@ -441,19 +439,23 @@ async searchAttendanceRecords() {
     
     const params = new URLSearchParams({ date: searchDate });
     
-    // admin画面の特別処理：adminロールを除外
-    if (this.userRole === 'admin') {
+    // スタッフ画面と管理者画面で異なる制御
+    if (this.userRole === 'staff') {
+      // スタッフ画面：利用者のみ表示（デフォルト）
+      if (searchRole && searchRole.value) {
+        params.append('role', searchRole.value);
+      } else {
+        // 何も選択されていない場合は利用者のみ
+        params.append('role', 'user');
+      }
+    } else if (this.userRole === 'admin') {
+      // 管理者画面：adminロールを除外
       if (searchRole && searchRole.value) {
         // 特定の権限が選択されている場合
         params.append('role', searchRole.value);
       } else {
         // 「利用者・スタッフ」が選択されている場合はadminを除外
         params.append('excludeAdmin', 'true');
-      }
-    } else {
-      // staff画面では従来通り
-      if (searchRole && searchRole.value) {
-        params.append('role', searchRole.value);
       }
     }
     
@@ -482,6 +484,12 @@ async searchAttendanceRecords() {
     
     let records = response.records || [];
     console.log('[DEBUG] 取得レコード数:', records.length);
+    
+    // スタッフ画面では利用者のみにフィルタリング（追加の安全策）
+    if (this.userRole === 'staff') {
+      records = records.filter(record => record.user_role === 'user');
+      console.log('[DEBUG] スタッフ画面フィルタ後:', records.length, '件');
+    }
     
     if (records.length > 0) {
       console.log('[DEBUG] 最初のレコード:', records[0]);

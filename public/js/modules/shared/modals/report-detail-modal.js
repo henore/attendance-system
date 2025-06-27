@@ -1,5 +1,5 @@
 // public/js/modules/shared/modals/report-detail-modal.js
-// 日報詳細表示とコメント編集機能の統合モーダル
+// 日報詳細表示とコメント編集機能の統合モーダル（完全修正版）
 
 import { API_ENDPOINTS } from '../../../constants/api-endpoints.js';
 import { modalManager } from '../modal-manager.js';
@@ -76,15 +76,19 @@ export class ReportDetailModal {
    * イベントリスナー設定
    */
   setupEventListeners() {
-    // コメント保存ボタン
+    // コメント保存ボタン（Arrow Functionでthisを保持）
     if (this.canComment) {
       const saveBtn = document.getElementById(`${this.modalId}SaveCommentBtn`);
       if (saveBtn) {
-        saveBtn.addEventListener('click', () => this.saveComment());
+        saveBtn.addEventListener('click', () => {
+          console.log('[イベントリスナー] コメント保存ボタンクリック');
+          console.log('[イベントリスナー] this.currentData確認:', this.currentData);
+          this.saveComment();
+        });
       }
     }
     
-    // モーダル内のイベント委譲
+    // モーダル内のイベント委譲（Arrow Functionでthisを保持）
     const modalContent = document.getElementById(`${this.modalId}Content`);
     if (modalContent) {
       modalContent.addEventListener('input', (e) => {
@@ -96,27 +100,44 @@ export class ReportDetailModal {
   }
 
   /**
-   * 日報詳細を表示
+   * 日報詳細を表示（バグ修正版）
    */
   async show(userId, userName, date) {
     try {
+      console.log('[日報詳細] 表示開始:', { userId, userName, date });
+      
+      // パラメータ検証
+      if (!userId || !date) {
+        console.error('[日報詳細] 必須パラメータが不足:', { userId, userName, date });
+        this.app.showNotification('表示に必要な情報が不足しています', 'warning');
+        return;
+      }
+      
       // データ取得
       const response = await this.app.apiCall(
         API_ENDPOINTS.STAFF.REPORT(userId, date)
       );
       
-      if (!response.report) {
+      console.log('[日報詳細] APIレスポンス:', response);
+      
+      if (!response || !response.report) {
         this.app.showNotification('この日の日報はありません', 'info');
         return;
       }
       
-      // 現在のデータを保存
+      // 現在のデータを保存（完全性チェック付き）
       this.currentData = {
-        userId,
-        userName,
-        date,
-        ...response
+        userId: userId,
+        userName: userName || 'ユーザー',
+        date: date,
+        user: response.user || {},
+        attendance: response.attendance || null,
+        report: response.report || {},
+        comment: response.comment || null,
+        breakRecord: response.breakRecord || null
       };
+      
+      console.log('[日報詳細] currentData設定完了:', this.currentData);
       
       // モーダルコンテンツを更新
       this.updateModalContent();
@@ -127,6 +148,9 @@ export class ReportDetailModal {
     } catch (error) {
       console.error('日報詳細取得エラー:', error);
       this.app.showNotification('日報の取得に失敗しました', 'danger');
+      
+      // エラー時はcurrentDataをリセット
+      this.currentData = null;
     }
   }
 
@@ -160,7 +184,7 @@ export class ReportDetailModal {
   }
 
   /**
-   * 詳細コンテンツ生成（monthly-report.jsの表示を維持）
+   * 詳細コンテンツ生成（月別レポート表示を維持）
    */
   generateDetailContent() {
     const { user, attendance, report, comment, breakRecord } = this.currentData;
@@ -217,6 +241,7 @@ export class ReportDetailModal {
           <label class="past-form-label"><i class="fas fa-tasks"></i> 作業内容</label>
           <div class="text-content">${report.work_content || ''}</div>
         </div>
+
         <!-- 施設外就労先 -->
         ${report.external_work_location ? `
           <div class="mb-3">
@@ -226,6 +251,7 @@ export class ReportDetailModal {
             <div class="past-form-value text-info">${report.external_work_location}</div>
           </div>
         ` : ''}
+
         <!-- 健康状態 -->
         <div class="row mb-3">
           <div class="col-3">
@@ -242,7 +268,7 @@ export class ReportDetailModal {
           </div>
           <div class="col-3">
             <label class="past-form-label"><i class="fas fa-bed"></i> 睡眠時間</label>
-            <div class="past-form-value">${report.sleep_hours ? report.sleep_hours + '時間' : '-'}</div>
+            <div class="past-form-value">${this.calculateSleepHours(report.bedtime, report.wakeup_time)}</div>
           </div>
         </div>
 
@@ -362,20 +388,43 @@ export class ReportDetailModal {
    * コメントエリアの設定
    */
   setupCommentArea() {
+    console.log('[setupCommentArea] 開始 - currentData:', this.currentData);
+    
     const textarea = document.getElementById('staffCommentTextarea');
     const saveBtn = document.getElementById(`${this.modalId}SaveCommentBtn`);
     
-    if (!textarea || !saveBtn) return;
+    if (!textarea || !saveBtn) {
+      console.log('[setupCommentArea] textarea または saveBtn が見つかりません');
+      return;
+    }
+    
+    // currentDataの存在確認
+    if (!this.currentData) {
+      console.error('[setupCommentArea] currentDataが存在しません');
+      return;
+    }
     
     // 編集可否の判定
     const { comment } = this.currentData;
     const isEditable = !comment || this.userRole === 'admin';
+    
+    console.log('[setupCommentArea] 編集可否:', isEditable);
     
     // 保存ボタンの表示制御
     saveBtn.style.display = isEditable ? 'inline-block' : 'none';
     
     // 初期文字数カウント
     this.updateCharCount(textarea.value.length);
+    
+    // 保存ボタンのイベントリスナーを再設定（重複回避）
+    const newSaveBtn = saveBtn.cloneNode(true);
+    saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+    
+    newSaveBtn.addEventListener('click', () => {
+      console.log('[新しいイベントリスナー] コメント保存ボタンクリック');
+      console.log('[新しいイベントリスナー] this.currentData確認:', this.currentData);
+      this.saveComment();
+    });
   }
 
   /**
@@ -396,19 +445,51 @@ export class ReportDetailModal {
   }
 
   /**
-   * コメント保存
+   * コメント保存（強化デバッグ版）
    */
   async saveComment() {
+    console.log('[コメント保存] メソッド開始');
+    console.log('[コメント保存] this:', this);
+    console.log('[コメント保存] this.currentData:', this.currentData);
+    console.log('[コメント保存] modalId:', this.modalId);
+    
     try {
       const textarea = document.getElementById('staffCommentTextarea');
       const comment = textarea ? textarea.value.trim() : '';
+      
+      console.log('[コメント保存] textarea:', textarea);
+      console.log('[コメント保存] comment値:', comment);
       
       if (!comment) {
         this.app.showNotification('コメントを入力してください', 'warning');
         return;
       }
       
+      // currentDataの存在チェック
+      if (!this.currentData) {
+        console.error('[コメント保存] currentDataが存在しません');
+        console.error('[コメント保存] this全体:', this);
+        
+        // 緊急回避：モーダルのタイトルからデータを復元
+        const titleElement = document.getElementById(`${this.modalId}Title`);
+        if (titleElement) {
+          console.log('[コメント保存] タイトル要素:', titleElement.innerHTML);
+        }
+        
+        this.app.showNotification('データが正しく読み込まれていません。モーダルを閉じて再度開いてください。', 'danger');
+        return;
+      }
+      
       const { userId, userName, date } = this.currentData;
+      
+      // 必須データの存在チェック
+      if (!userId || !date) {
+        console.error('[コメント保存] 必須データが不足しています:', { userId, userName, date });
+        this.app.showNotification('必要なデータが不足しています', 'danger');
+        return;
+      }
+      
+      console.log('[コメント保存] データ確認:', { userId, userName, date, comment });
       
       // API呼び出し
       await this.app.apiCall(API_ENDPOINTS.STAFF.COMMENT, {
@@ -420,19 +501,70 @@ export class ReportDetailModal {
         })
       });
       
-      this.app.showNotification(`${userName}さんの日報にコメントを記入しました`, 'success');
+      this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
       
       // モーダルを閉じる
       modalManager.hide(this.modalId);
       
       // 親モジュールに通知（画面更新など）
-      if (this.parent.onCommentSaved) {
+      if (this.parent && this.parent.onCommentSaved) {
         this.parent.onCommentSaved();
       }
       
     } catch (error) {
       console.error('コメント保存エラー:', error);
       this.app.showNotification(error.message || 'コメントの保存に失敗しました', 'danger');
+    }
+  }
+
+  /**
+   * 就寝時間と起床時間から睡眠時間を計算
+   * @param {string} bedtime HH:MM形式
+   * @param {string} wakeupTime HH:MM形式
+   * @returns {string} 睡眠時間の表示文字列
+   */
+  calculateSleepHours(bedtime, wakeupTime) {
+    if (!bedtime || !wakeupTime) return '-';
+    
+    try {
+      const [bedHours, bedMinutes] = bedtime.split(':').map(Number);
+      const [wakeHours, wakeMinutes] = wakeupTime.split(':').map(Number);
+      
+      // 分に変換
+      const bedTotalMinutes = bedHours * 60 + bedMinutes;
+      const wakeTotalMinutes = wakeHours * 60 + wakeMinutes;
+      
+      let sleepMinutes;
+      
+      // 日をまたぐ場合を考慮
+      if (wakeTotalMinutes >= bedTotalMinutes) {
+        // 同日内（例：22:00就寝 → 06:00起床は不可能なので翌日とみなす）
+        if (bedTotalMinutes > 12 * 60 && wakeTotalMinutes < 12 * 60) {
+          // 夜遅く就寝して朝早く起床（通常パターン）
+          sleepMinutes = (24 * 60 - bedTotalMinutes) + wakeTotalMinutes;
+        } else {
+          // 同日内（昼寝など）
+          sleepMinutes = wakeTotalMinutes - bedTotalMinutes;
+        }
+      } else {
+        // 日をまたぐ場合
+        sleepMinutes = (24 * 60 - bedTotalMinutes) + wakeTotalMinutes;
+      }
+      
+      const hours = Math.floor(sleepMinutes / 60);
+      const minutes = sleepMinutes % 60;
+      
+      if (hours === 0) {
+        return `${minutes}分`;
+      } else if (minutes === 0) {
+        return `${hours}時間`;
+      } else {
+        return `${hours}時間${minutes}分`;
+      }
+      
+    } catch (error) {
+      console.error('睡眠時間計算エラー:', error);
+      return '-';
     }
   }
 
@@ -474,5 +606,6 @@ export class ReportDetailModal {
     if (modal) {
       modal.remove();
     }
+    this.currentData = null;
   }
 }

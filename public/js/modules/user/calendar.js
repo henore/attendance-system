@@ -466,13 +466,15 @@ export class UserAttendanceCalendar {
     }
     
     // 日報内容
+    // 日報内容
     if (report) {
       html += `
         <div class="past-form-section">
           <label class="past-form-label">作業内容</label>
           <div class="past-form-textarea">${report.work_content || ''}</div>
         </div>
-          ${report.external_work_location ? `
+        
+        ${report.external_work_location ? `
           <div class="past-form-section">
             <label class="past-form-label">
               <i class="fas fa-building"></i> 施設外就労先
@@ -480,6 +482,7 @@ export class UserAttendanceCalendar {
             <div class="past-form-value text-info">${report.external_work_location}</div>
           </div>
         ` : ''}
+        
         <div class="row mb-3">
           <div class="col-4">
             <label class="past-form-label">体温</label>
@@ -505,6 +508,13 @@ export class UserAttendanceCalendar {
             <div class="past-form-value">${report.wakeup_time || '-'}</div>
           </div>
           <div class="col-4">
+            <label class="past-form-label">睡眠時間</label>
+            <div class="past-form-value">${this.calculateSleepHours(report.bedtime, report.wakeup_time)}</div>
+          </div>
+        </div>
+        
+        <div class="row mb-3">
+          <div class="col-12">
             <label class="past-form-label">睡眠状態</label>
             <div class="past-form-value">${this.formatSleepQuality(report.sleep_quality)}</div>
           </div>
