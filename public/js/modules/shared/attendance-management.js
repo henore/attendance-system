@@ -38,76 +38,94 @@ export class SharedAttendanceManagement {
   }
 
   render() {
-    const isAdminClass = this.userRole === 'admin' ? 'is-admin' : 'is-staff';
-    const today = getCurrentDate();
-    
-    this.container.innerHTML = `
-      <div class="custom-card ${isAdminClass}">
-        <div class="custom-card-header">
-          <h5><i class="fas fa-clock"></i> 出勤記録管理</h5>
-          <button class="btn btn-outline-light btn-sm" id="refreshAttendanceBtn">
-            <i class="fas fa-sync"></i> 更新
-          </button>
-        </div>
-        <div class="card-body">
-          <!-- 検索フィルター -->
-          <div class="row mb-4">
+  const isAdminClass = this.userRole === 'admin' ? 'is-admin' : 'is-staff';
+  const today = getCurrentDate();
+  
+  this.container.innerHTML = `
+    <div class="custom-card ${isAdminClass}">
+      <div class="custom-card-header">
+        <h5><i class="fas fa-clock"></i> 出勤記録管理</h5>
+        <button class="btn btn-outline-light btn-sm" id="refreshAttendanceBtn">
+          <i class="fas fa-sync"></i> 更新
+        </button>
+      </div>
+      <div class="card-body">
+        <!-- 検索フィルター -->
+        <div class="row mb-4">
+          <div class="col-md-3">
+            <label for="searchDate" class="form-label">検索日付</label>
+            <input type="date" class="form-control" id="searchDate" value="${today}">
+          </div>
+          <!-- 権限フィルター：admin画面とstaff画面で異なる設定 -->
+          ${this.userRole === 'admin' ? `
             <div class="col-md-3">
-              <label for="searchDate" class="form-label">検索日付</label>
-              <input type="date" class="form-control" id="searchDate" value="${today}">
-            </div>
-            ${this.userRole === 'admin' ? `
-              <div class="col-md-3">
-                <label for="searchRole" class="form-label">権限</label>
-                <select class="form-control" id="searchRole">
-                  <option value="">全て</option>
-                  <option value="user">利用者</option>
-                  <option value="staff">スタッフ</option>
-                </select>
-              </div>
-            ` : ''}
-            <div class="col-md-3">
-              <label for="searchUser" class="form-label">ユーザー</label>
-              <select class="form-control" id="searchUser">
-                <option value="">全て</option>
+              <label for="searchRole" class="form-label">権限</label>
+              <select class="form-control" id="searchRole">
+                <option value="">利用者・スタッフ</option>
+                <option value="user">利用者のみ</option>
+                <option value="staff">スタッフのみ</option>
               </select>
             </div>
-            <div class="col-md-3 d-flex align-items-end">
-              <button class="btn btn-primary w-100" id="searchAttendanceBtn">
-                <i class="fas fa-search"></i> 検索
-              </button>
+          ` : `
+            <div class="col-md-3">
+              <label for="searchRole" class="form-label">権限</label>
+              <select class="form-control" id="searchRole">
+                <option value="">全て</option>
+                <option value="user" selected>利用者</option>
+                <option value="staff">スタッフ</option>
+              </select>
+            </div>
+          `}
+          <div class="col-md-3">
+            <label for="searchUser" class="form-label">ユーザー</label>
+            <select class="form-control" id="searchUser">
+              <option value="">全て</option>
+            </select>
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-primary w-100" id="searchAttendanceBtn">
+              <i class="fas fa-search"></i> 検索
+            </button>
+          </div>
+        </div>
+        
+        <!-- 表示フィルター -->
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="showOnlyWorkingSwitch" checked>
+              <label class="form-check-label" for="showOnlyWorkingSwitch">
+                出勤者のみ表示
+              </label>
+            </div>
+            <small class="text-muted">
+              ${this.userRole === 'admin' 
+                ? '利用者とスタッフの出勤状況を管理します' 
+                : '利用者の出勤状況に特化した表示です'}
+            </small>
+          </div>
+          <div class="col-md-6 text-end">
+            <div id="searchSummary" class="text-muted">
+              <!-- 検索結果サマリー -->
             </div>
           </div>
-          
-          <!-- 表示フィルター -->
-          <div class="row mb-3">
-            <div class="col-md-6">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="showOnlyWorkingSwitch" checked>
-                <label class="form-check-label" for="showOnlyWorkingSwitch">
-                  出勤者のみ表示
-                </label>
-              </div>
-            </div>
-            <div class="col-md-6 text-end">
-              <div id="searchSummary" class="text-muted">
-                <!-- 検索結果サマリー -->
-              </div>
-            </div>
-          </div>
-          
-          <!-- 出勤記録一覧 -->
-          <div id="attendanceRecordsList">
-            <div class="text-center p-4">
-              <p class="text-muted">検索条件を設定して「検索」ボタンを押してください</p>
-            </div>
+        </div>
+        
+        <!-- 出勤記録一覧 -->
+        <div id="attendanceRecordsList">
+          <div class="text-center p-4">
+            <p class="text-muted">検索条件を設定して「検索」ボタンを押してください</p>
           </div>
         </div>
       </div>
+    </div>
 
-      ${this.userRole === 'admin' ? this.renderAdminModals() : ''}
-    `;
-  }
+    ${this.userRole === 'admin' ? this.renderAdminModals() : ''}
+  `;
+  
+  // デフォルト値を明示的に設定
+  this.showOnlyWorking = true;
+}
 
   renderAdminModals() {
     return `
@@ -216,62 +234,116 @@ export class SharedAttendanceManagement {
   }
 
   setupEventListeners() {
-    // 検索・更新ボタン
-    const searchBtn = this.container.querySelector('#searchAttendanceBtn');
-    const refreshBtn = this.container.querySelector('#refreshAttendanceBtn');
-    const showOnlyWorkingSwitch = this.container.querySelector('#showOnlyWorkingSwitch');
+  // 検索・更新ボタン
+  const searchBtn = this.container.querySelector('#searchAttendanceBtn');
+  const refreshBtn = this.container.querySelector('#refreshAttendanceBtn');
+  const showOnlyWorkingSwitch = this.container.querySelector('#showOnlyWorkingSwitch');
+  
+  searchBtn?.addEventListener('click', () => {
+    console.log('[DEBUG] 検索ボタンクリック');
+    this.searchAttendanceRecords();
+  });
+  
+  refreshBtn?.addEventListener('click', () => {
+    console.log('[DEBUG] 更新ボタンクリック');
+    this.refresh();
+  });
+  
+  showOnlyWorkingSwitch?.addEventListener('change', (e) => {
+    console.log('[DEBUG] 表示フィルター変更:', e.target.checked);
+    this.showOnlyWorking = e.target.checked;
+    this.updateRecordsList(this.currentRecords);
+  });
+
+  // 権限フィルター変更時のユーザーリスト更新
+  const roleSelect = this.container.querySelector('#searchRole');
+  roleSelect?.addEventListener('change', () => {
+    console.log('[DEBUG] 権限フィルター変更:', roleSelect.value);
+    this.updateUserSelectOptions();
+  });
+
+  // 管理者のみの機能
+  if (this.userRole === 'admin') {
+    const editStatusSelect = this.container.querySelector('#editStatus');
+    editStatusSelect?.addEventListener('change', () => this.toggleAbsenceTypeField());
+
+    const saveEditBtn = this.container.querySelector('#saveAttendanceEditBtn');
+    saveEditBtn?.addEventListener('click', () => this.saveAttendanceEdit());
     
-    searchBtn?.addEventListener('click', () => this.searchAttendanceRecords());
-    refreshBtn?.addEventListener('click', () => this.refresh());
-    showOnlyWorkingSwitch?.addEventListener('change', (e) => {
-      this.showOnlyWorking = e.target.checked;
-      this.updateRecordsList(this.currentRecords);
-    });
-
-    // 管理者のみの機能
-    if (this.userRole === 'admin') {
-      const editStatusSelect = this.container.querySelector('#editStatus');
-      editStatusSelect?.addEventListener('change', () => this.toggleAbsenceTypeField());
-
-      const saveEditBtn = this.container.querySelector('#saveAttendanceEditBtn');
-      saveEditBtn?.addEventListener('click', () => this.saveAttendanceEdit());
-      
-      const deleteBtn = this.container.querySelector('#deleteAttendanceBtn');
-      deleteBtn?.addEventListener('click', () => this.deleteAttendance());
-    }
-
-    // 日付変更時の自動検索
-    const dateInput = this.container.querySelector('#searchDate');
-    dateInput?.addEventListener('change', () => {
-      if (this.currentRecords.length > 0) {
-        this.searchAttendanceRecords();
-      }
-    });
-
-    // イベント委譲で動的ボタンを処理
-    this.container.addEventListener('click', (e) => {
-      // 日報詳細ボタン
-      if (e.target.closest('.btn-show-report')) {
-        const btn = e.target.closest('.btn-show-report');
-        const userId = btn.getAttribute('data-user-id');
-        const userName = btn.getAttribute('data-user-name');
-        const date = btn.getAttribute('data-date');
-        this.reportDetailModal.show(userId, userName, date);
-      }
-      
-      // 編集ボタン（管理者のみ）
-      if (this.userRole === 'admin' && e.target.closest('.btn-edit-attendance')) {
-        const btn = e.target.closest('.btn-edit-attendance');
-        this.editAttendance(btn.dataset);
-      }
-    });
+    const deleteBtn = this.container.querySelector('#deleteAttendanceBtn');
+    deleteBtn?.addEventListener('click', () => this.deleteAttendance());
   }
+
+  // 日付変更時の自動検索
+  const dateInput = this.container.querySelector('#searchDate');
+  dateInput?.addEventListener('change', () => {
+    console.log('[DEBUG] 日付変更:', dateInput.value);
+    if (this.currentRecords.length > 0) {
+      this.searchAttendanceRecords();
+    }
+  });
+
+  // イベント委譲で動的ボタンを処理
+  this.container.addEventListener('click', (e) => {
+    // 日報詳細ボタン
+    if (e.target.closest('.btn-show-report')) {
+      const btn = e.target.closest('.btn-show-report');
+      const userId = btn.getAttribute('data-user-id');
+      const userName = btn.getAttribute('data-user-name');
+      const date = btn.getAttribute('data-date');
+      this.reportDetailModal.show(userId, userName, date);
+    }
+    
+    // 編集ボタン（管理者のみ）
+    if (this.userRole === 'admin' && e.target.closest('.btn-edit-attendance')) {
+      const btn = e.target.closest('.btn-edit-attendance');
+      this.editAttendance(btn.dataset);
+    }
+  });
+}
+
+// 権限フィルターに応じてユーザーリストを更新
+async updateUserSelectOptions() {
+  const roleSelect = this.container.querySelector('#searchRole');
+  const userSelect = this.container.querySelector('#searchUser');
+  const selectedRole = roleSelect.value;
+  
+  try {
+    const endpoint = this.userRole === 'admin' ? 
+      API_ENDPOINTS.ADMIN.USERS : 
+      API_ENDPOINTS.STAFF.USERS;
+      
+    const response = await this.parent.callApi(endpoint);
+    
+    if (userSelect && response.users) {
+      let html = '<option value="">全て</option>';
+      
+      const filteredUsers = selectedRole 
+        ? response.users.filter(user => user.role === selectedRole)
+        : response.users;
+      
+      filteredUsers.forEach(user => {
+        const roleDisplay = this.parent.getRoleDisplayName(user.role);
+        html += `<option value="${user.id}">${user.name} (${roleDisplay})</option>`;
+      });
+      
+      userSelect.innerHTML = html;
+    }
+  } catch (error) {
+    console.error('ユーザーリスト更新エラー:', error);
+  }
+}
 
   async show() {
     this.container.style.display = 'block';
     await this.loadData();
     this.registerModals();
-  }
+ 
+    // 初期表示を遅延実行（DOM要素が確実に存在することを保証）
+  setTimeout(() => {
+    this.searchAttendanceRecords();
+  }, 100);
+}
 
   hide() {
     this.container.style.display = 'none';
@@ -287,48 +359,107 @@ export class SharedAttendanceManagement {
     }
   }
 
-  async loadData() {
+async loadData() {
+  try {
+    console.log('[DEBUG] loadData開始 - ユーザー権限:', this.userRole);
+    
     await this.loadUsersForSearch();
-    await this.searchAttendanceRecords();
+    
+    // admin・staff共に初期検索を実行
+    console.log('[DEBUG] 初期検索を自動実行');
+    // 遅延実行でDOM要素の準備を待つ
+    setTimeout(() => {
+      this.searchAttendanceRecords();
+    }, 200);
+    
+  } catch (error) {
+    console.error('[ERROR] データロードエラー:', error);
+    this.parent.showNotification('データの読み込みに失敗しました', 'danger');
   }
+}
 
-  async loadUsersForSearch() {
-    try {
-      const endpoint = this.userRole === 'admin' ? 
-        API_ENDPOINTS.ADMIN.USERS : 
-        API_ENDPOINTS.STAFF.USERS_LIST;
-        
-      const response = await this.parent.callApi(endpoint);
-      const userSelect = this.container.querySelector('#searchUser');
+
+
+ async loadUsersForSearch() {
+  try {
+    console.log('[DEBUG] ユーザーリスト読み込み開始');
+    
+    const endpoint = this.userRole === 'admin' ? 
+      API_ENDPOINTS.ADMIN.USERS : 
+      API_ENDPOINTS.STAFF.USERS;
       
-      if (userSelect && response.users) {
-        let html = '<option value="">全て</option>';
-        response.users.forEach(user => {
-          const roleDisplay = this.parent.getRoleDisplayName(user.role);
-          html += `<option value="${user.id}">${user.name} (${roleDisplay})</option>`;
-        });
-        userSelect.innerHTML = html;
-      }
-    } catch (error) {
-      console.error('ユーザー読み込みエラー:', error);
+    console.log('[DEBUG] ユーザー取得エンドポイント:', endpoint);
+    
+    const response = await this.parent.callApi(endpoint);
+    
+    console.log('[DEBUG] ユーザー取得レスポンス:', response);
+    
+    const userSelect = this.container.querySelector('#searchUser');
+    
+    if (userSelect && response.users) {
+      let html = '<option value="">全て</option>';
+      
+      // admin画面では管理者を除外
+      const filteredUsers = this.userRole === 'admin' 
+        ? response.users.filter(user => user.role !== 'admin')
+        : response.users;
+      
+      // 利用者、スタッフの順で表示
+      const sortedUsers = filteredUsers.sort((a, b) => {
+        const roleOrder = { 'user': 1, 'staff': 2 };
+        const aOrder = roleOrder[a.role] || 3;
+        const bOrder = roleOrder[b.role] || 3;
+        
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+        // 同じ権限内では名前順
+        return a.name.localeCompare(b.name);
+      });
+      
+      sortedUsers.forEach(user => {
+        const roleDisplay = this.parent.getRoleDisplayName(user.role);
+        html += `<option value="${user.id}">${user.name} (${roleDisplay})</option>`;
+      });
+      
+      userSelect.innerHTML = html;
+      console.log('[DEBUG] ユーザーリスト設定完了:', filteredUsers.length, '件');
     }
+  } catch (error) {
+    console.error('[ERROR] ユーザー読み込みエラー:', error);
+    this.parent.showNotification('ユーザーリストの読み込みに失敗しました', 'warning');
   }
+}
 
-  async searchAttendanceRecords() {
+  // shared/attendance-management.js の searchAttendanceRecords メソッド強化版
+
+async searchAttendanceRecords() {
   try {
     const searchDate = this.container.querySelector('#searchDate').value;
     const searchUser = this.container.querySelector('#searchUser').value;
+    const searchRole = this.container.querySelector('#searchRole');
     
     const params = new URLSearchParams({ date: searchDate });
     
+    // admin画面の特別処理：adminロールを除外
     if (this.userRole === 'admin') {
-      const searchRole = this.container.querySelector('#searchRole');
+      if (searchRole && searchRole.value) {
+        // 特定の権限が選択されている場合
+        params.append('role', searchRole.value);
+      } else {
+        // 「利用者・スタッフ」が選択されている場合はadminを除外
+        params.append('excludeAdmin', 'true');
+      }
+    } else {
+      // staff画面では従来通り
       if (searchRole && searchRole.value) {
         params.append('role', searchRole.value);
       }
     }
     
-    if (searchUser) params.append('userId', searchUser);
+    if (searchUser) {
+      params.append('userId', searchUser);
+    }
 
     const endpoint = this.userRole === 'admin' ? 
       API_ENDPOINTS.ADMIN.ATTENDANCE_SEARCH : 
@@ -336,11 +467,18 @@ export class SharedAttendanceManagement {
     
     console.log('[DEBUG] APIエンドポイント:', endpoint);
     console.log('[DEBUG] クエリパラメータ:', params.toString());
+    console.log('[DEBUG] ユーザー権限:', this.userRole);
     
-    // this.parent.callApi の代わりに this.app.apiCall を直接使用
     const response = await this.app.apiCall(`${endpoint}?${params}`);
     
     console.log('[DEBUG] APIレスポンス:', response);
+    
+    // recordsプロパティの確認
+    if (!response.records) {
+      console.error('[ERROR] APIレスポンスにrecordsプロパティがありません:', response);
+      this.showRecordsError('APIレスポンス形式が正しくありません');
+      return;
+    }
     
     let records = response.records || [];
     console.log('[DEBUG] 取得レコード数:', records.length);
@@ -349,18 +487,29 @@ export class SharedAttendanceManagement {
       console.log('[DEBUG] 最初のレコード:', records[0]);
     }
     
-    // 休憩データの整形
+    // 休憩データの整形（統一処理）
     this.currentRecords = records.map(record => {
-      if (record.user_role === 'user' && record.br_start) {
-        record.break_start_time = record.br_start;
-        record.break_end_time = record.br_end;
-        record.break_duration = record.br_duration;
-        console.log('[DEBUG] 休憩データマッピング:', {
-          user: record.user_name,
-          break_start_time: record.break_start_time,
-          break_end_time: record.break_end_time
-        });
+      // 利用者の休憩データマッピング
+      if (record.user_role === 'user') {
+        // break_recordsテーブルからのデータ
+        if (record.br_start) {
+          record.break_start_time = record.br_start;
+          record.break_end_time = record.br_end;
+          record.break_duration = record.br_duration;
+          console.log('[DEBUG] 利用者休憩データマッピング:', {
+            user: record.user_name,
+            break_start_time: record.break_start_time,
+            break_end_time: record.break_end_time
+          });
+        }
+        // breakRecordオブジェクトからのデータ
+        else if (record.breakRecord) {
+          record.break_start_time = record.breakRecord.start_time;
+          record.break_end_time = record.breakRecord.end_time;
+          record.break_duration = record.breakRecord.duration;
+        }
       }
+      
       return record;
     });
     
@@ -369,18 +518,31 @@ export class SharedAttendanceManagement {
     
   } catch (error) {
     console.error('[ERROR] 出勤記録検索エラー:', error);
-    this.showRecordsError('出勤記録の検索に失敗しました');
+    this.showRecordsError('出勤記録の検索に失敗しました: ' + error.message);
   }
 }
 
   updateSearchSummary(records, searchDate) {
-    const summaryContainer = this.container.querySelector('#searchSummary');
+  const summaryContainer = this.container.querySelector('#searchSummary');
+  
+  const total = records.length;
+  const working = records.filter(r => r.clock_in && !r.clock_out).length;
+  const finished = records.filter(r => r.clock_in && r.clock_out).length;
+  const notWorking = records.filter(r => !r.clock_in).length;
+  
+  // admin画面では利用者とスタッフの内訳を表示
+  if (this.userRole === 'admin') {
+    const users = records.filter(r => r.user_role === 'user').length;
+    const staff = records.filter(r => r.user_role === 'staff').length;
     
-    const total = records.length;
-    const working = records.filter(r => r.clock_in && !r.clock_out).length;
-    const finished = records.filter(r => r.clock_in && r.clock_out).length;
-    const notWorking = records.filter(r => !r.clock_in).length;
-    
+    summaryContainer.innerHTML = `
+      <small>
+        <strong>検索結果: ${total}件</strong><br>
+        出勤中: ${working}件 | 退勤済: ${finished}件 | 未出勤: ${notWorking}件<br>
+        <span class="text-info">利用者: ${users}件 | スタッフ: ${staff}件</span>
+      </small>
+    `;
+  } else {
     summaryContainer.innerHTML = `
       <small>
         検索結果: ${total}件 
@@ -388,6 +550,7 @@ export class SharedAttendanceManagement {
       </small>
     `;
   }
+}
 
   updateRecordsList(records) {
     const recordsList = this.container.querySelector('#attendanceRecordsList');

@@ -318,8 +318,9 @@ export default class StaffModule extends BaseModule {
   }
 
   // 共通メソッド（SharedModulesから使用）
-  callApi(endpoint, options = {}) {
-    return this.app.apiCall(endpoint, options);
+callApi(endpoint, options = {}) {
+  console.log('[StaffModule callApi] 呼び出し:', endpoint, options);
+  return this.app.apiCall(endpoint, options);
   }
 
   showNotification(message, type = 'info') {

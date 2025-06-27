@@ -51,169 +51,166 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
   });
 
-  // スタッフ自身の出勤記録取得
-  router.get('/attendance/:date', async (req, res) => {
-    try {
-      const staffId = req.session.user.id;
-      const { date } = req.params;
-      
-      const attendance = await dbGet(
-        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
-        [staffId, date]
-      );
-      
-      res.json({ 
-        success: true, 
-        attendance: attendance || null 
-      });
-    } catch (error) {
-      console.error('出勤記録取得エラー:', error);
-      res.status(500).json({ success: false, error: '出勤記録の取得に失敗しました' });
-    }
-  });
-
-  // 利用者一覧取得（今日の状況）
-  router.get('/users', async (req, res) => {
-    try {
-      const today = getCurrentDate();
-      
-      const users = await dbAll(`
-        SELECT 
-          u.id, u.name, u.role, u.service_type,
-          a.id as a_id,
-          a.clock_in, a.clock_out, a.status,
-          a.break_start, a.break_end,
-          dr.id as report_id,
-          sc.id as comment_id
-        FROM users u
-        LEFT JOIN attendance a ON u.id = a.user_id AND a.date = ?
-        LEFT JOIN daily_reports dr ON u.id = dr.user_id AND dr.date = ?
-        LEFT JOIN staff_comments sc ON u.id = sc.user_id AND sc.date = ?
-        WHERE u.role = 'user' AND u.is_active = 1
-        ORDER BY u.name
-      `, [today, today, today]);
-      
-      res.json({ success: true, users });
-    } catch (error) {
-      console.error('利用者一覧取得エラー:', error);
-      res.status(500).json({ success: false, error: '利用者一覧の取得に失敗しました' });
-    }
-  });
-
-  // 利用者一覧取得（シンプル版）
-  router.get('/users/list', async (req, res) => {
-    try {
-      const users = await dbAll(`
-        SELECT 
-          u.id, 
-          u.name, 
-          u.role, 
-          u.service_type
-        FROM users u
-        WHERE u.role = 'user' 
-          AND u.is_active = 1
-        ORDER BY u.name
-      `);
-      
-      res.json({ 
-        success: true, 
-        users 
-      });
-    } catch (error) {
-      console.error('利用者一覧取得エラー:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: '利用者一覧の取得に失敗しました' 
-      });
-    }
-  });
-
-// 出勤記録検索（認証追加版）
-router.get('/attendance/search', async (req, res) => {
+  router.get('/attendance/search', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
   try {
-    const { date, userId } = req.query;
+    const { date, role, userId } = req.query;
     
     if (!date) {
-      return res.status(400).json({ success: false, error: '日付が指定されていません' });
+      return res.status(400).json({ 
+        success: false, 
+        error: '日付が指定されていません' 
+      });
     }
     
-    // Admin版と同様の構造に変更：usersテーブルから開始してLEFT JOIN
     let query = `
       SELECT 
-        u.id as user_id,
-        u.name as user_name,
-        u.role as user_role,
-        u.service_type,
-        a.id,
-        a.date,
-        a.clock_in,
-        a.clock_out,
-        a.status,
-        a.break_start,
-        a.break_end,
+        a.id, a.user_id, a.date, a.clock_in, a.clock_out, a.status,
+        a.break_start, a.break_end,
+        u.name as user_name, u.role as user_role, u.service_type,
         dr.id as report_id,
         sc.id as comment_id,
-        br.start_time as break_start_time,
-        br.end_time as break_end_time,
-        br.duration as break_duration
+        br.start_time as br_start, br.end_time as br_end, br.duration as br_duration
       FROM users u
       LEFT JOIN attendance a ON u.id = a.user_id AND a.date = ?
       LEFT JOIN daily_reports dr ON u.id = dr.user_id AND dr.date = ?
       LEFT JOIN staff_comments sc ON u.id = sc.user_id AND sc.date = ?
       LEFT JOIN break_records br ON u.id = br.user_id AND br.date = ?
-      WHERE u.role = 'user' AND u.is_active = 1
+      WHERE u.is_active = 1
     `;
     
     const params = [date, date, date, date];
+    
+    if (role) {
+      query += ' AND u.role = ?';
+      params.push(role);
+    }
     
     if (userId) {
       query += ' AND u.id = ?';
       params.push(userId);
     }
     
-    query += ' ORDER BY u.name';
+    query += ' ORDER BY u.role, u.name';
     
-    const records = await dbAll(query, params);
+    const rawRecords = await dbAll(query, params);
     
-    // 休憩情報を統合（利用者のみ対象）
-    const processedRecords = records.map(record => {
-      // dateを明示的に設定（LEFT JOINでattendanceがnullの場合もあるため）
-      const processedRecord = {
+    // データ処理
+    const processedRecords = rawRecords.map(record => {
+      const processed = {
         id: record.id,
         user_id: record.user_id,
         user_name: record.user_name,
         user_role: record.user_role,
         service_type: record.service_type,
-        date: date, // 検索日付を使用
+        date: date,
         clock_in: record.clock_in,
         clock_out: record.clock_out,
-        status: record.status || null,
+        status: record.status || 'normal',
         report_id: record.report_id,
         comment_id: record.comment_id
       };
       
-      // 休憩記録の処理
-      if (record.break_start_time || record.break_end_time) {
-        processedRecord.break = {
-          start: record.break_start_time,
-          end: record.break_end_time,
-          duration: record.break_duration
-        };
-        // attendance-management.jsで期待される形式にも対応
-        processedRecord.break_start_time = record.break_start_time;
-        processedRecord.break_end_time = record.break_end_time;
-        processedRecord.break_duration = record.break_duration;
+      // 休憩データの統合
+      if (record.user_role === 'staff' || record.user_role === 'admin') {
+        processed.break_start = record.break_start;
+        processed.break_end = record.break_end;
+      } else if (record.user_role === 'user' && record.br_start) {
+        processed.br_start = record.br_start;
+        processed.br_end = record.br_end;
+        processed.br_duration = record.br_duration;
+        processed.break_start_time = record.br_start;
+        processed.break_end_time = record.br_end;
+        processed.break_duration = record.br_duration;
       }
       
-      return processedRecord;
+      return processed;
     });
     
-    res.json({ success: true, records: processedRecords });
+    res.json({ 
+      success: true, 
+      records: processedRecords 
+    });
+    
   } catch (error) {
     console.error('出勤記録検索エラー:', error);
-    res.status(500).json({ success: false, error: '出勤記録の検索に失敗しました' });
+    res.status(500).json({ 
+      success: false, 
+      error: '出勤記録の検索に失敗しました: ' + error.message 
+    });
   }
 });
+
+  router.get('/users', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+  try {
+    const { role } = req.query;
+    
+    console.log('[STAFF API] ユーザー取得パラメータ:', { role });
+    
+    let query = `
+      SELECT 
+        u.id, 
+        u.name, 
+        u.role, 
+        u.service_type,
+        u.created_at
+      FROM users u
+      WHERE u.is_active = 1
+    `;
+    const params = [];
+    
+    // roleフィルター
+    if (role) {
+      query += ' AND u.role = ?';
+      params.push(role);
+    }
+    
+    query += ' ORDER BY u.role, u.name';
+    
+    const users = await dbAll(query, params);
+    
+    console.log('[STAFF API] ユーザー取得結果:', users.length, '件');
+    
+    res.json({ 
+      success: true, 
+      users 
+    });
+  } catch (error) {
+    console.error('[STAFF API] ユーザー一覧取得エラー:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'ユーザー一覧の取得に失敗しました: ' + error.message 
+    });
+  }
+});
+
+// 既存の利用者一覧取得（シンプル版）は /users/list として維持
+router.get('/users/list', async (req, res) => {
+  try {
+    const users = await dbAll(`
+      SELECT 
+        u.id, 
+        u.name, 
+        u.role, 
+        u.service_type
+      FROM users u
+      WHERE u.role = 'user' 
+        AND u.is_active = 1
+      ORDER BY u.name
+    `);
+    
+    res.json({ 
+      success: true, 
+      users 
+    });
+  } catch (error) {
+    console.error('利用者一覧取得エラー:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '利用者一覧の取得に失敗しました' 
+    });
+  }
+});
+
 
   // 日報詳細取得
   router.get('/reports/:userId/:date', async (req, res) => {
@@ -484,6 +481,27 @@ router.get('/attendance/search', async (req, res) => {
         success: false, 
         error: '月別出勤簿の取得に失敗しました' 
       });
+    }
+  });
+
+  // スタッフ自身の出勤記録取得
+  router.get('/attendance/:date', async (req, res) => {
+    try {
+      const staffId = req.session.user.id;
+      const { date } = req.params;
+      
+      const attendance = await dbGet(
+        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+        [staffId, date]
+      );
+      
+      res.json({ 
+        success: true, 
+        attendance: attendance || null 
+      });
+    } catch (error) {
+      console.error('出勤記録取得エラー:', error);
+      res.status(500).json({ success: false, error: '出勤記録の取得に失敗しました' });
     }
   });
 

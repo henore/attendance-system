@@ -45,7 +45,7 @@ export const API_ENDPOINTS = {
   STAFF: {
     CLOCK_OUT: '/api/staff/clock-out',
     ATTENDANCE: (date) => `/api/staff/attendance/${date}`,
-    ATTENDANCE_SEARCH: '/api/staff/attendance/search',
+    ATTENDANCE_SEARCH: '/api/staff/attendance/search', // 元に戻す
     BREAK_START: '/api/staff/break/start',
     BREAK_END: '/api/staff/break/end',
     USERS: '/api/staff/users',
