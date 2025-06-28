@@ -10,16 +10,6 @@ const helmet = require('helmet');
 const cors = require('cors');
 const { getCurrentDate, getCurrentTime } = require('./utils/date-time');
 
-const lineRoutes = require('./routes/line');
-
-// LINEルートをマウント
-app.use('/api/line', lineRoutes);
-
-// 静的ファイル配信の設定（画像アクセス用）
-app.use('/temp', express.static(path.join(__dirname, 'public/temp')));
-
-console.log('✅ LINE Messaging API ルートを追加しました');
-
 // Express アプリケーション作成
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -206,3 +196,13 @@ process.on('SIGINT', () => {
         process.exit(0);
     });
 });
+
+// ✅ app初期化後にLINEルート追加
+try {
+  const lineRoutes = require('./routes/line');
+  app.use('/api/line', lineRoutes);
+  app.use('/temp', express.static(path.join(__dirname, 'public/temp')));
+  console.log('✅ LINE Messaging API ルートを追加しました');
+} catch (error) {
+  console.warn('⚠️ LINE機能の初期化をスキップしました:', error.message);
+}
