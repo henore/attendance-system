@@ -1,5 +1,5 @@
 // backend/routes/line.js
-// 本番用LINE Messaging API統合（修正版）
+// 最新LINE SDK対応版（2024年仕様）
 
 const express = require('express');
 const puppeteer = require('puppeteer');
@@ -7,28 +7,51 @@ const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
 
-// LINE SDK の正しいインポート方法
-const { Client } = require('@line/bot-sdk');
-
 const router = express.Router();
 
-// LINE Bot設定
-const lineConfig = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET
-};
-
-// LINE Client初期化（環境変数チェック付き）
+// LINE SDK の最新インポート方法
 let lineClient = null;
-if (lineConfig.channelAccessToken && lineConfig.channelSecret) {
-  try {
-    lineClient = new Client(lineConfig);
-    console.log('✅ LINE Messaging API Client初期化完了');
-  } catch (error) {
-    console.error('❌ LINE Client初期化エラー:', error);
+let lineSDKInfo = 'SDK未読み込み';
+
+try {
+  // 最新のLINE SDK構造を確認
+  const lineSDK = require('@line/bot-sdk');
+  console.log('📦 LINE SDK利用可能なクラス:', Object.keys(lineSDK));
+  
+  const lineConfig = {
+    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+    channelSecret: process.env.LINE_CHANNEL_SECRET
+  };
+
+  // 複数のクライアント初期化方法を試行
+  if (lineSDK.MessagingApiClient) {
+    // 新しいSDK v8.x以降
+    lineClient = new lineSDK.MessagingApiClient({
+      channelAccessToken: lineConfig.channelAccessToken
+    });
+    console.log('✅ LINE MessagingApiClient初期化完了');
+    lineSDKInfo = 'MessagingApiClient';
+  } else if (lineSDK.Client) {
+    // 従来のSDK v7.x以前
+    lineClient = new lineSDK.Client(lineConfig);
+    console.log('✅ LINE Client初期化完了');
+    lineSDKInfo = 'Client';
+  } else if (lineSDK.default && lineSDK.default.MessagingApiClient) {
+    // ESモジュール形式
+    lineClient = new lineSDK.default.MessagingApiClient({
+      channelAccessToken: lineConfig.channelAccessToken
+    });
+    console.log('✅ LINE MessagingApiClient (default)初期化完了');
+    lineSDKInfo = 'default.MessagingApiClient';
+  } else {
+    console.error('❌ 利用可能なLINE Clientクラスが見つかりません');
+    console.log('利用可能なプロパティ:', Object.keys(lineSDK));
+    lineSDKInfo = `エラー: 利用可能クラス ${Object.keys(lineSDK).join(', ')}`;
   }
-} else {
-  console.warn('⚠️ LINE環境変数が設定されていません');
+
+} catch (error) {
+  console.error('❌ LINE SDK読み込みエラー:', error.message);
+  lineSDKInfo = `エラー: ${error.message}`;
 }
 
 /**
@@ -38,8 +61,14 @@ router.get('/status', (req, res) => {
   const enabled = !!(lineClient && process.env.LINE_CHANNEL_ACCESS_TOKEN);
   res.json({ 
     enabled,
-    configured: !!lineConfig.channelAccessToken,
-    clientReady: !!lineClient
+    configured: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
+    clientReady: !!lineClient,
+    sdkInfo: lineSDKInfo,
+    envCheck: {
+      hasToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
+      hasSecret: !!process.env.LINE_CHANNEL_SECRET,
+      defaultUserId: process.env.DEFAULT_LINE_USER_ID
+    }
   });
 });
 
@@ -128,8 +157,8 @@ router.post('/send-report', async (req, res) => {
     
     const { imageId, userName, date, lineUserId } = req.body;
     
-    // デフォルトの送信先（henore_kobo）
-    const targetUserId = lineUserId || process.env.DEFAULT_LINE_USER_ID || 'henore_kobo';
+    // デフォルトの送信先（ユーザーID使用）
+    const targetUserId = lineUserId || process.env.DEFAULT_LINE_USER_ID;
     
     console.log('[LINE送信] 開始:', { imageId, userName, date, targetUserId });
     
@@ -140,9 +169,11 @@ router.post('/send-report', async (req, res) => {
     // 画像を一時的にWebアクセス可能な場所に配置
     const publicImagePath = await saveImageToPublic(imageBuffer, imageId);
     
+    console.log('[LINE送信] 画像URL:', publicImagePath);
+    
     try {
-      // メッセージを送信
-      await lineClient.pushMessage(targetUserId, [
+      // メッセージを送信（新旧SDK対応）
+      const messages = [
         {
           type: 'text',
           text: `📋 ${userName}さんの日報が完了しました\n📅 ${formatDateForLine(date)}\n\n✅ スタッフによるコメント記入完了`
@@ -152,7 +183,16 @@ router.post('/send-report', async (req, res) => {
           originalContentUrl: publicImagePath,
           previewImageUrl: publicImagePath
         }
-      ]);
+      ];
+
+      // 新旧SDK両対応
+      if (lineClient.pushMessage) {
+        await lineClient.pushMessage(targetUserId, messages);
+      } else if (lineClient.pushMessages) {
+        await lineClient.pushMessages(targetUserId, messages);
+      } else {
+        throw new Error('pushMessageメソッドが見つかりません');
+      }
       
       console.log('[LINE送信] 成功:', { targetUserId, userName, date });
       
@@ -180,9 +220,11 @@ router.post('/send-report', async (req, res) => {
       let errorMessage = 'LINE送信に失敗しました';
       if (lineError.message) {
         if (lineError.message.includes('Invalid user')) {
-          errorMessage = 'LINE ID（henore_kobo）が見つかりません。Bot友達登録が必要です。';
+          errorMessage = `LINE ユーザーID（${targetUserId}）が見つかりません。Bot友達登録が必要です。`;
         } else if (lineError.message.includes('Invalid reply token')) {
           errorMessage = 'LINEトークンが無効です。';
+        } else if (lineError.message.includes('Invalid image')) {
+          errorMessage = '画像URLにアクセスできません。HTTPSが必要です。';
         } else {
           errorMessage += ': ' + lineError.message;
         }
@@ -209,24 +251,37 @@ router.post('/test-send', async (req, res) => {
       throw new Error('LINE APIが設定されていません');
     }
     
-    const targetUserId = req.body.lineUserId || process.env.DEFAULT_LINE_USER_ID || 'henore_kobo';
+    const targetUserId = req.body.lineUserId || process.env.DEFAULT_LINE_USER_ID;
     
-    await lineClient.pushMessage(targetUserId, {
+    console.log('[テスト送信] 開始:', { targetUserId, sdkInfo: lineSDKInfo });
+    
+    const message = {
       type: 'text',
-      text: `🧪 LINE送信テスト\n⏰ ${new Date().toLocaleString('ja-JP')}\n\n✅ 接続確認完了`
-    });
+      text: `🧪 LINE送信テスト\n⏰ ${new Date().toLocaleString('ja-JP')}\n🔧 SDK: ${lineSDKInfo}\n\n✅ 接続確認完了`
+    };
+
+    // 新旧SDK両対応
+    if (lineClient.pushMessage) {
+      await lineClient.pushMessage(targetUserId, message);
+    } else if (lineClient.pushMessages) {
+      await lineClient.pushMessages(targetUserId, [message]);
+    } else {
+      throw new Error('pushMessageメソッドが見つかりません');
+    }
     
     res.json({ 
       success: true, 
       message: 'テスト送信完了',
-      targetUserId 
+      targetUserId,
+      sdkInfo: lineSDKInfo
     });
     
   } catch (error) {
     console.error('[テスト送信] エラー:', error);
     res.status(500).json({ 
       success: false, 
-      message: error.message || 'テスト送信に失敗しました' 
+      message: error.message || 'テスト送信に失敗しました',
+      sdkInfo: lineSDKInfo
     });
   }
 });
@@ -443,11 +498,11 @@ function generateReportHTML(reportData, userData, commentData, date) {
         <div class="attendance-section">
           <div class="time-item">
             <div class="time-label">🕘 出勤時間</div>
-            <div class="time-value">${reportData.attendance?.clock_in || '-'}</div>
+            <div class="time-value">${reportData.attendance?.clock_in || reportData.clock_in || '-'}</div>
           </div>
           <div class="time-item">
             <div class="time-label">🕕 退勤時間</div>
-            <div class="time-value">${reportData.attendance?.clock_out || '-'}</div>
+            <div class="time-value">${reportData.attendance?.clock_out || reportData.clock_out || '-'}</div>
           </div>
         </div>
         
