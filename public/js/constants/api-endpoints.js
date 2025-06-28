@@ -27,7 +27,8 @@ export const API_ENDPOINTS = {
   LINE: {
     STATUS: '/api/line/status',
     GENERATE_IMAGE: '/api/line/generate-report-image',
-    SEND_REPORT: '/api/line/send-report'
+    SEND_REPORT: '/api/line/send-report',
+    TEST_SEND: '/api/line/test-send'  // テスト用エンドポイント
   },
   
   // 利用者用
