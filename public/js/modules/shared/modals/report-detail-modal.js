@@ -563,7 +563,7 @@ export class ReportDetailModal {
         
         ${comment && !isEditable ? `
           <div class="alert alert-warning mb-3">
-            <i class="fas fa-lock"></i> 既にコメントが記入されています（編集は管理者のみ可能）
+            <i class="fas fa-lock"></i> 既にコメントが記入されています
           </div>
         ` : ''}
         

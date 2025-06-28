@@ -104,51 +104,55 @@ export default class StaffModule extends BaseModule {
   }
 
   renderAttendanceSection() {
-    return `
-      <div class="custom-card">
-        <div class="custom-card-header">
-          <h5><i class="fas fa-user-tie"></i> スタッフ出退勤</h5>
-          <div class="header-status">
-            <span id="currentTimeDisplay"></span>
+  return `
+    <div class="custom-card">
+      <div class="custom-card-header">
+        <h5><i class="fas fa-user-tie"></i> スタッフ出退勤</h5>
+        <div class="header-status">
+          </div>
+      </div>
+      <div class="card-body">
+        <!-- 出退勤ボタン -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <button class="btn btn-success btn-lg w-100" id="clockInBtn">
+              <i class="fas fa-play"></i> 出勤
+            </button>
+          </div>
+          <div class="col-md-6">
+            <button class="btn btn-info btn-lg w-100" id="clockOutBtn" disabled>
+              <i class="fas fa-stop"></i> 退勤
+            </button>
           </div>
         </div>
-        <div class="card-body">
-          <!-- 出退勤ボタン -->
-          <div class="row mb-4">
-            <div class="col-md-6">
-              <button class="btn btn-success btn-lg w-100" id="clockInBtn">
-                <i class="fas fa-play"></i> 出勤
-              </button>
-            </div>
-            <div class="col-md-6">
-              <button class="btn btn-info btn-lg w-100" id="clockOutBtn" disabled>
-                <i class="fas fa-stop"></i> 退勤
-              </button>
-            </div>
-          </div>
 
-          <!-- 休憩ボタン -->
-          <div class="row mb-4">
-            <div class="col-md-6">
-              <button class="btn btn-warning btn-lg w-100" id="breakStartBtn" disabled>
-                <i class="fas fa-coffee"></i> 休憩開始
-              </button>
-            </div>
-            <div class="col-md-6">
-              <button class="btn btn-outline-warning btn-lg w-100" id="breakEndBtn" disabled>
-                <i class="fas fa-coffee"></i> 休憩終了
-              </button>
-            </div>
+        <!-- 休憩ボタン -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <button class="btn btn-warning btn-lg w-100" id="breakStartBtn" disabled>
+              <i class="fas fa-coffee"></i> 休憩開始
+            </button>
           </div>
+          <div class="col-md-6">
+            <button class="btn btn-outline-warning btn-lg w-100" id="breakEndBtn" disabled>
+              <i class="fas fa-coffee"></i> 休憩終了
+            </button>
+          </div>
+        </div>
 
-          <!-- ステータス表示 -->
-          <div id="attendanceStatusDisplay" class="status-display">
-            <!-- 動的に更新される -->
-          </div>
+        <!-- 休憩ステータス専用表示 -->
+        <div id="breakStatusDisplay" class="break-status-display">
+          <!-- 動的に更新される -->
+        </div>
+
+        <!-- ステータス表示 -->
+        <div id="attendanceStatusDisplay" class="status-display">
+          <!-- 動的に更新される -->
         </div>
       </div>
-    `;
-  }
+    </div>
+  `;
+}
 
   setupEventListeners() {
     // メニューボタン

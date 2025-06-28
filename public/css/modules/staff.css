@@ -1,69 +1,337 @@
-/* /css/modules/staff.css
-   スタッフ画面専用スタイル */
+/* 休憩ステータス表示の改善（staff.cssに追加） */
 
-.staff-dashboard {
-  padding: var(--spacing-md);
-}
-
-.staff-menu {
-  margin-bottom: var(--spacing-lg);
-}
-
-.staff-menu-btn {
-  transition: all var(--transition-fast);
-}
-
-.staff-menu-btn.active {
-  background-color: var(--primary-color);
-  color: white;
-}
-
-/* 休憩ステータス表示のスタイル */
+/* 既存のスタイルを上書き */
 .break-status-display {
-  padding: 1rem;
-  background-color: #f8f9fa;
+  padding: 0;
+  background-color: transparent;
   border-radius: 0.5rem;
   margin-top: 1rem;
-  text-align: center;
-  min-height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: auto;
+  display: block;
+  overflow: hidden;
+  transition: opacity 0.3s ease;
 }
 
 .break-status-display:empty {
   display: none;
+  padding: 0;
+  margin: 0;
 }
 
-.break-status-display p {
+/* 休憩ステータスコンテンツ */
+.break-status-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.break-status-icon {
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+
+.break-status-text {
+  flex-grow: 1;
+  text-align: left;
+}
+
+.break-status-text p {
   margin-bottom: 0.5rem;
+  font-size: 1.1rem;
 }
 
-.break-status-display small {
+.break-status-text .fw-bold {
+  font-weight: 600;
+}
+
+.break-status-text .text-muted {
+  color: #6c757d;
+}
+
+/* プログレスバー */
+.break-status-display .progress {
+  background-color: rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.break-status-display .progress-bar {
+  transition: width 0.3s ease;
+  background: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+  animation: progress-bar-stripes 1s linear infinite;
+}
+
+.break-status-display .progress-bar.bg-warning {
+  background-color: #ffc107;
+}
+
+/* プログレスバーアニメーション */
+@keyframes progress-bar-stripes {
+  0% {
+    background-position: 1rem 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+/* アイコンのパルスアニメーション */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 60分超過時の強調 */
+.break-status-content.text-danger {
+  background-color: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.2);
+  animation: danger-pulse 1s infinite;
+}
+
+.break-status-content.text-danger .break-status-icon {
+  color: #dc3545;
+}
+
+/* 危険パルスアニメーション */
+@keyframes danger-pulse {
+  0%, 100% {
+    background-color: rgba(220, 53, 69, 0.1);
+  }
+  50% {
+    background-color: rgba(220, 53, 69, 0.2);
+  }
+}
+
+/* 時計アイコンのスタイル */
+.break-status-text .fa-clock {
   font-size: 0.875rem;
+  margin-right: 0.25rem;
+  color: #6c757d;
+}
+
+/* アイコンカラー */
+.break-status-icon.text-warning {
+  color: #ffc107;
+}
+
+/* Font Awesomeアイコンサイズ */
+.break-status-icon .fa-2x {
+  font-size: 2em;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 576px) {
+  .break-status-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+  }
+  
+  .break-status-text {
+    text-align: center;
+  }
+  
+  .break-status-display .progress {
+    width: 100%;
+    max-width: 200px;
+    margin: 0 auto 0.5rem;
+  }
+}
+
+/* 休憩ステータス表示の改善（staff.cssに追加） */
+
+/* スタッフダッシュボードの上部余白を確保 */
+.staff-dashboard {
+  padding-top: 1.5rem;
+}
+
+.staff-menu {
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* 既存のスタイルを上書き */
+.break-status-display {
+  padding: 0;
+  background-color: transparent;
+  border-radius: 0.5rem;
+  margin-top: 1rem;
+  min-height: auto;
   display: block;
-  margin-top: 0.25rem;
+  overflow: hidden;
+  transition: opacity 0.3s ease;
 }
 
-/* 休憩時間超過時の強調表示 */
-.break-status-display .text-danger {
-  font-weight: bold;
-  animation: blink 1s infinite;
+.break-status-display:empty {
+  display: none;
+  padding: 0;
+  margin: 0;
 }
 
-@keyframes blink {
-  0%, 50%, 100% { opacity: 1; }
-  25%, 75% { opacity: 0.5; }
+/* 休憩ステータスコンテンツ */
+.break-status-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-/* ボタンの視覚的フィードバック */
-#breakStartBtn:disabled, #breakEndBtn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.break-status-icon {
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
 }
 
-/* 出勤・退勤ボタンの改善 */
-#clockInBtn:disabled, #clockOutBtn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.break-status-text {
+  flex-grow: 1;
+  text-align: left;
+}
+
+.break-status-text p {
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.break-status-text .fw-bold {
+  font-weight: 600;
+}
+
+.break-status-text .text-muted {
+  color: #6c757d;
+}
+
+/* プログレスバー */
+.break-status-display .progress {
+  background-color: rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.break-status-display .progress-bar {
+  transition: width 0.3s ease;
+  background: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+  animation: progress-bar-stripes 1s linear infinite;
+}
+
+.break-status-display .progress-bar.bg-warning {
+  background-color: #ffc107;
+}
+
+/* プログレスバーアニメーション */
+@keyframes progress-bar-stripes {
+  0% {
+    background-position: 1rem 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+/* アイコンのパルスアニメーション */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 60分超過時の強調 */
+.break-status-content.text-danger {
+  background-color: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.2);
+  animation: danger-pulse 1s infinite;
+}
+
+.break-status-content.text-danger .break-status-icon {
+  color: #dc3545;
+}
+
+/* 危険パルスアニメーション */
+@keyframes danger-pulse {
+  0%, 100% {
+    background-color: rgba(220, 53, 69, 0.1);
+  }
+  50% {
+    background-color: rgba(220, 53, 69, 0.2);
+  }
+}
+
+/* 時計アイコンのスタイル */
+.break-status-text .fa-clock {
+  font-size: 0.875rem;
+  margin-right: 0.25rem;
+  color: #6c757d;
+}
+
+/* アイコンカラー */
+.break-status-icon.text-warning {
+  color: #ffc107;
+}
+
+/* Font Awesomeアイコンサイズ */
+.break-status-icon .fa-2x {
+  font-size: 2em;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 576px) {
+  .break-status-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+  }
+  
+  .break-status-text {
+    text-align: center;
+  }
+  
+  .break-status-display .progress {
+    width: 100%;
+    max-width: 200px;
+    margin: 0 auto 0.5rem;
+  }
 }

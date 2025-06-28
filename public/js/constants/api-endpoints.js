@@ -44,16 +44,16 @@ export const API_ENDPOINTS = {
   // スタッフ用
   STAFF: {
     CLOCK_OUT: '/api/staff/clock-out',
-    ATTENDANCE: (date) => `/api/staff/attendance/${date}`,
-    ATTENDANCE_SEARCH: '/api/staff/attendance/search', // 元に戻す
     BREAK_START: '/api/staff/break/start',
     BREAK_END: '/api/staff/break/end',
     USERS: '/api/staff/users',
     USERS_LIST: '/api/staff/users/list',
-    USER_STATUS: (userId) => `/api/staff/users/${userId}/status`,
-    REPORT: (userId, date) => `/api/staff/reports/${userId}/${date}`,
     COMMENT: '/api/staff/comment',
     ATTENDANCE_BOOK: '/api/staff/attendance-book',
+    ATTENDANCE_SEARCH: '/api/staff/attendance/search', // 元に戻す
+    ATTENDANCE: (date) => `/api/staff/attendance/${date}`,
+    USER_STATUS: (userId) => `/api/staff/users/${userId}/status`,
+    REPORT: (userId, date) => `/api/staff/reports/${userId}/${date}`,
     MONTHLY_ATTENDANCE: (year, month, userId) => 
         `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`
   },

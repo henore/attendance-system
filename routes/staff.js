@@ -339,74 +339,59 @@ router.get('/users/list', async (req, res) => {
     }
   });
 
-  // 休憩終了（スタッフ専用）
-  router.post('/break/end', async (req, res) => {
-    try {
-      const userId = req.session.user.id;
-      const today = getCurrentDate();
-      const { autoEnd } = req.body;
-      
-      // 既存の出勤記録を確認
-      const attendance = await dbGet(
-        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
-        [userId, today]
-      );
-      
-      if (!attendance || !attendance.break_start) {
-        return res.status(400).json({ 
-          success: false, 
-          error: '休憩を開始していません' 
-        });
-      }
-      
-      if (attendance.break_end) {
-        return res.status(400).json({ 
-          success: false, 
-          error: '既に休憩を終了しています' 
-        });
-      }
-      
-      // 終了時刻の決定
-      let finalEndTime;
-      if (autoEnd) {
-        // 自動終了の場合は開始時刻+60分
-        const maxEndMinutes = timeToMinutes(attendance.break_start) + 60;
-        finalEndTime = minutesToTime(maxEndMinutes);
-      } else {
-        const currentTime = getCurrentTime();
-        
-        // 60分経過チェック
-        const elapsedMinutes = timeToMinutes(currentTime) - timeToMinutes(attendance.break_start);
-        
-        if (elapsedMinutes > 60) {
-          // 60分を超えている場合は、開始時刻+60分で終了
-          const maxEndMinutes = timeToMinutes(attendance.break_start) + 60;
-          finalEndTime = minutesToTime(maxEndMinutes);
-        } else {
-          finalEndTime = currentTime;
-        }
-      }
-      
-      // 休憩終了時間を記録
-      await dbRun(
-        'UPDATE attendance SET break_end = ? WHERE id = ?',
-        [finalEndTime, attendance.id]
-      );
-      
-      res.json({
-        success: true,
-        message: autoEnd ? '休憩を自動終了しました（60分）' : '休憩を終了しました',
-        endTime: finalEndTime,
-        duration: 60 // 固定60分
-      });
-    } catch (error) {
-      console.error('休憩終了エラー:', error);
-      res.status(500).json({ 
+  // 休憩終了（スタッフ専用） - 常に60分後の時刻を記録
+router.post('/break/end', async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const today = getCurrentDate();
+    const { autoEnd } = req.body;
+    
+    // 既存の出勤記録を確認
+    const attendance = await dbGet(
+      'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+      [userId, today]
+    );
+    
+    if (!attendance || !attendance.break_start) {
+      return res.status(400).json({ 
         success: false, 
-        error: '休憩終了に失敗しました' 
+        error: '休憩を開始していません' 
       });
     }
-  });
+    
+    if (attendance.break_end) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '既に休憩を終了しています' 
+      });
+    }
+    
+    // 常に開始時刻+60分で終了時刻を設定
+    const startMinutes = timeToMinutes(attendance.break_start);
+    const endMinutes = startMinutes + 60;
+    const finalEndTime = minutesToTime(endMinutes);
+    
+    // 休憩終了時間を記録
+    await dbRun(
+      'UPDATE attendance SET break_end = ? WHERE id = ?',
+      [finalEndTime, attendance.id]
+    );
+    
+    res.json({
+      success: true,
+      message: autoEnd ? '休憩を自動終了しました（60分）' : '休憩を終了しました',
+      endTime: finalEndTime,
+      breakStart: attendance.break_start, // フロントエンドで表示用
+      duration: 60 // 固定60分
+    });
+  } catch (error) {
+    console.error('休憩終了エラー:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '休憩終了に失敗しました' 
+    });
+  }
+});
 
   // 月別出勤簿データ取得（スタッフ権限用）
   router.get('/monthly-attendance', async (req, res) => {
