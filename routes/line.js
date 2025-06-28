@@ -1,5 +1,5 @@
-// backend/routes/line.js
-// LINE Messaging API統合
+// routes/line.js
+// LINE Messaging API統合（修正版）
 
 const express = require('express');
 const puppeteer = require('puppeteer');
@@ -19,12 +19,32 @@ const lineConfig = {
 
 const client = new MessagingApiClient(lineConfig);
 
+// 必要なディレクトリを作成
+async function ensureDirectories() {
+  const dirs = ['temp', 'public/temp'];
+  for (const dir of dirs) {
+    try {
+      await fs.mkdir(dir, { recursive: true });
+    } catch (error) {
+      console.error(`ディレクトリ作成エラー ${dir}:`, error);
+    }
+  }
+}
+
+// 起動時にディレクトリを作成
+ensureDirectories();
+
 /**
  * LINE送信機能の状態確認
  */
 router.get('/status', (req, res) => {
   const enabled = !!(process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.LINE_CHANNEL_SECRET);
-  res.json({ enabled });
+  res.json({ 
+    enabled,
+    hasToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
+    hasSecret: !!process.env.LINE_CHANNEL_SECRET,
+    defaultUserId: process.env.DEFAULT_LINE_USER_ID || 'not set'
+  });
 });
 
 /**
@@ -34,23 +54,45 @@ router.post('/generate-report-image', async (req, res) => {
   try {
     const { reportData, userData, commentData, date } = req.body;
     
+    console.log('[画像生成] 開始:', {
+      userName: userData?.name,
+      date: date || reportData?.date,
+      hasAttendance: !!reportData?.attendance
+    });
+    
     // HTMLテンプレートを生成
-    const html = generateReportHTML(reportData, userData, commentData, date);
+    const html = generateReportHTML(reportData, userData, commentData, date || reportData.date);
     
     // Puppeteerで画像生成
     const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      headless: 'new',
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--font-render-hinting=none',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process'
+      ]
     });
     
     const page = await browser.newPage();
     await page.setViewport({ width: 800, height: 1200, deviceScaleFactor: 2 });
+    
+    // 日本語フォントの設定
+    await page.evaluateOnNewDocument(() => {
+      document.documentElement.style.fontFamily = '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif';
+    });
+    
     await page.setContent(html, { waitUntil: 'networkidle0' });
+    
+    // 少し待機してレンダリングを完了させる
+    await page.waitForTimeout(1000);
     
     const imageBuffer = await page.screenshot({
       type: 'png',
       fullPage: true,
-      clip: { x: 0, y: 0, width: 800, height: 1200 }
+      encoding: 'binary'
     });
     
     await browser.close();
@@ -59,6 +101,8 @@ router.post('/generate-report-image', async (req, res) => {
     const imageId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const imagePath = path.join('temp', `${imageId}.png`);
     await fs.writeFile(imagePath, imageBuffer);
+    
+    console.log('[画像生成] 完了:', imageId);
     
     res.json({ 
       success: true, 
@@ -70,7 +114,7 @@ router.post('/generate-report-image', async (req, res) => {
     console.error('画像生成エラー:', error);
     res.status(500).json({ 
       success: false, 
-      message: '画像生成に失敗しました' 
+      message: '画像生成に失敗しました: ' + error.message 
     });
   }
 });
@@ -82,6 +126,8 @@ router.post('/send-report', async (req, res) => {
   try {
     const { imageId, userName, date, lineUserId } = req.body;
     
+    console.log('[LINE送信] 開始:', { imageId, userName, date, lineUserId });
+    
     // デフォルトの送信先（環境変数で設定）
     const targetUserId = lineUserId || process.env.DEFAULT_LINE_USER_ID;
     
@@ -91,28 +137,56 @@ router.post('/send-report', async (req, res) => {
     
     // 画像ファイルを読み込み
     const imagePath = path.join('temp', `${imageId}.png`);
+    
+    // ファイルの存在確認
+    try {
+      await fs.access(imagePath);
+    } catch (error) {
+      throw new Error('画像ファイルが見つかりません: ' + imageId);
+    }
+    
     const imageBuffer = await fs.readFile(imagePath);
     
-    // 画像をLINEにアップロード
-    const imageUrl = await uploadImageToLine(imageBuffer);
+    // 画像を公開ディレクトリにコピー
+    const publicFileName = `report_${Date.now()}.png`;
+    const publicPath = path.join('public', 'temp', publicFileName);
+    await fs.writeFile(publicPath, imageBuffer);
+    
+    // 公開URLを生成
+    const imageUrl = `${process.env.BASE_URL}/temp/${publicFileName}`;
+    
+    console.log('[LINE送信] 画像URL:', imageUrl);
     
     // メッセージを送信
-    const message = {
-      type: 'image',
-      originalContentUrl: imageUrl,
-      previewImageUrl: imageUrl
-    };
+    try {
+      await client.pushMessage({
+        to: targetUserId,
+        messages: [
+          {
+            type: 'text',
+            text: `📋 ${userName}さんの日報が完了しました\n📅 ${formatDateSimple(date)}\n\n詳細は添付画像をご確認ください。`
+          },
+          {
+            type: 'image',
+            originalContentUrl: imageUrl,
+            previewImageUrl: imageUrl
+          }
+        ]
+      });
+      
+      console.log('[LINE送信] 送信成功');
+    } catch (lineError) {
+      console.error('[LINE送信] API エラー:', lineError.response?.data || lineError);
+      throw new Error('LINE APIエラー: ' + (lineError.response?.data?.message || lineError.message));
+    }
     
-    await client.pushMessage(targetUserId, [
-      {
-        type: 'text',
-        text: `📋 ${userName}さんの日報が完了しました\n📅 ${date}`
-      },
-      message
-    ]);
+    // 一時ファイルを削除（元の画像）
+    fs.unlink(imagePath).catch(err => console.error('一時ファイル削除エラー:', err));
     
-    // 一時ファイルを削除
-    await fs.unlink(imagePath);
+    // 公開画像は5分後に削除
+    setTimeout(() => {
+      fs.unlink(publicPath).catch(err => console.error('公開画像削除エラー:', err));
+    }, 5 * 60 * 1000);
     
     res.json({ 
       success: true, 
@@ -129,9 +203,46 @@ router.post('/send-report', async (req, res) => {
 });
 
 /**
+ * テスト送信
+ */
+router.post('/test-send', async (req, res) => {
+  try {
+    const targetUserId = process.env.DEFAULT_LINE_USER_ID;
+    
+    if (!targetUserId) {
+      throw new Error('デフォルトLINEユーザーIDが設定されていません');
+    }
+    
+    await client.pushMessage({
+      to: targetUserId,
+      messages: [{
+        type: 'text',
+        text: '✅ LINE連携テスト送信\n\nこのメッセージが届いていれば、LINE連携は正常に動作しています。\n\n設定情報:\n- Channel: 設定済み\n- User ID: ' + targetUserId.substring(0, 10) + '...'
+      }]
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'テストメッセージを送信しました' 
+    });
+    
+  } catch (error) {
+    console.error('テスト送信エラー:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.response?.data?.message || error.message || 'テスト送信に失敗しました' 
+    });
+  }
+});
+
+/**
  * 日報HTMLテンプレート生成
  */
 function generateReportHTML(reportData, userData, commentData, date) {
+  // 出勤情報の取得（reportData直下またはattendanceオブジェクト内）
+  const clockIn = reportData.clock_in || reportData.attendance?.clock_in || '-';
+  const clockOut = reportData.clock_out || reportData.attendance?.clock_out || '-';
+  
   return `
     <!DOCTYPE html>
     <html lang="ja">
@@ -141,7 +252,7 @@ function generateReportHTML(reportData, userData, commentData, date) {
       <title>日報</title>
       <style>
         body {
-          font-family: 'Helvetica Neue', Arial, sans-serif;
+          font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif;
           margin: 0;
           padding: 20px;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -216,6 +327,7 @@ function generateReportHTML(reportData, userData, commentData, date) {
           font-size: 16px;
           line-height: 1.6;
           color: #555;
+          white-space: pre-wrap;
         }
         .health-grid {
           display: grid;
@@ -261,6 +373,7 @@ function generateReportHTML(reportData, userData, commentData, date) {
           padding: 15px;
           border-radius: 8px;
           margin-bottom: 10px;
+          white-space: pre-wrap;
         }
         .comment-author {
           font-size: 14px;
@@ -282,11 +395,11 @@ function generateReportHTML(reportData, userData, commentData, date) {
         <div class="attendance-section">
           <div class="time-item">
             <div class="time-label">🕘 出勤時間</div>
-            <div class="time-value">${reportData.attendance?.clock_in || '-'}</div>
+            <div class="time-value">${clockIn}</div>
           </div>
           <div class="time-item">
             <div class="time-label">🕕 退勤時間</div>
-            <div class="time-value">${reportData.attendance?.clock_out || '-'}</div>
+            <div class="time-value">${clockOut}</div>
           </div>
         </div>
         
@@ -313,7 +426,7 @@ function generateReportHTML(reportData, userData, commentData, date) {
           <div class="health-grid">
             <div class="health-item">
               <div class="health-label">体温</div>
-              <div class="health-value">${reportData.temperature}℃</div>
+              <div class="health-value">${reportData.temperature || '-'}℃</div>
             </div>
             <div class="health-item">
               <div class="health-label">食欲</div>
@@ -348,41 +461,48 @@ function generateReportHTML(reportData, userData, commentData, date) {
   `;
 }
 
-/**
- * 画像をLINEにアップロード
- */
-async function uploadImageToLine(imageBuffer) {
-  // 実際のLINE API実装では、画像を一時的にアクセス可能なURLに配置する必要があります
-  // 例: AWS S3、Google Cloud Storage、または自サーバーの公開ディレクトリ
-  
-  // 簡易実装例（本番では適切なファイルストレージサービスを使用）
-  const fileName = `report_${Date.now()}.png`;
-  const publicPath = path.join('public', 'temp', fileName);
-  await fs.writeFile(publicPath, imageBuffer);
-  
-  // 公開URLを返す
-  return `${process.env.BASE_URL}/temp/${fileName}`;
-}
-
 // ヘルパー関数
 function formatDate(dateString) {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long'
-  });
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long'
+    });
+  } catch (error) {
+    return dateString;
+  }
+}
+
+function formatDateSimple(dateString) {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ja-JP');
+  } catch (error) {
+    return dateString;
+  }
 }
 
 function formatAppetite(appetite) {
-  const labels = { 'good': 'あり', 'none': 'なし' };
-  return labels[appetite] || appetite;
+  const labels = { 
+    'good': 'あり', 
+    'normal': '普通',
+    'poor': '不振',
+    'none': 'なし' 
+  };
+  return labels[appetite] || appetite || '-';
 }
 
 function formatSleepQuality(quality) {
-  const labels = { 'good': '良好', 'poor': '不良', 'bad': '悪い' };
-  return labels[quality] || quality;
+  const labels = { 
+    'good': '良好', 
+    'normal': '普通',
+    'poor': '不良', 
+    'bad': '悪い' 
+  };
+  return labels[quality] || quality || '-';
 }
 
 module.exports = router;

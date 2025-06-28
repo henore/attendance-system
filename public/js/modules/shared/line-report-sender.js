@@ -371,12 +371,52 @@ export class LineReportSender {
     console.log('==============================\n');
   }
 
-  /**
-   * 実際のLINE送信（将来実装用）
+   /**
+   * 実際のLINE送信
    */
   async sendToLine(imageBlob, userName, date) {
-    // TODO: 実際のLINE API実装
-    console.log('[LINE送信] 実装予定 - 現在はテストモードです');
+    try {
+      console.log('[LINE送信] 実際の送信処理開始');
+      
+      // 1. まず画像をサーバーに生成してもらう
+      const imageResponse = await this.app.apiCall(API_ENDPOINTS.LINE.GENERATE_IMAGE, {
+        method: 'POST',
+        body: JSON.stringify({
+          reportData: this.currentReportData,
+          userData: this.currentUserData,
+          commentData: this.currentCommentData,
+          date: date  // dateパラメータを追加
+        })
+      });
+      
+      if (!imageResponse.success) {
+        throw new Error('画像生成に失敗しました');
+      }
+      
+      console.log('[LINE送信] 画像生成完了:', imageResponse.imageId);
+      
+      // 2. LINEに送信
+      const sendResponse = await this.app.apiCall(API_ENDPOINTS.LINE.SEND_REPORT, {
+        method: 'POST',
+        body: JSON.stringify({
+          imageId: imageResponse.imageId,  // imageIdを使用
+          userName: userName,
+          date: date,
+          lineUserId: this.defaultLineId
+        })
+      });
+      
+      if (!sendResponse.success) {
+        throw new Error(sendResponse.message || 'LINE送信に失敗しました');
+      }
+      
+      console.log('[LINE送信] 送信完了');
+      this.app.showNotification('日報をLINEに送信しました', 'success');
+      
+    } catch (error) {
+      console.error('[LINE送信] エラー:', error);
+      throw error;
+    }
   }
 
   /**
