@@ -1,9 +1,10 @@
 // public/js/modules/shared/modals/report-detail-modal.js
-// 日報詳細表示とコメント編集機能の統合モーダル（簡易排他制御版）
+// 日報詳細表示とコメント編集機能の統合モーダル（LINE送信機能付き）
 
 import { API_ENDPOINTS } from '../../../constants/api-endpoints.js';
 import { modalManager } from '../modal-manager.js';
 import { formatDate, formatDateTime } from '../../../utils/date-time.js';
+import { LineReportSender } from '../line-report-sender.js'; // 新規追加
 
 export class ReportDetailModal {
   constructor(app, parentModule) {
@@ -21,6 +22,9 @@ export class ReportDetailModal {
     this.isEditing = false;
     this.lastCheckTime = null;
     this.checkInterval = null;
+    
+    // LINE送信機能を追加
+    this.lineSender = new LineReportSender(app);
   }
 
   /**
@@ -67,6 +71,9 @@ export class ReportDetailModal {
                 <button type="button" class="btn btn-primary" id="${this.modalId}SaveCommentBtn" style="display: none;">
                   <i class="fas fa-save"></i> コメントを保存
                 </button>
+                <button type="button" class="btn btn-success" id="${this.modalId}SaveAndSendBtn" style="display: none;">
+                  <i class="fas fa-share"></i> 保存してLINE送信
+                </button>
               ` : ''}
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                 <i class="fas fa-times"></i> 閉じる
@@ -87,7 +94,15 @@ export class ReportDetailModal {
       const saveBtn = document.getElementById(`${this.modalId}SaveCommentBtn`);
       if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-          this.saveComment();
+          this.saveComment(false); // LINE送信なし
+        });
+      }
+      
+      // LINE送信付き保存ボタン（新規追加）
+      const saveAndSendBtn = document.getElementById(`${this.modalId}SaveAndSendBtn`);
+      if (saveAndSendBtn) {
+        saveAndSendBtn.addEventListener('click', () => {
+          this.saveComment(true); // LINE送信あり
         });
       }
     }
@@ -605,9 +620,10 @@ export class ReportDetailModal {
     
     const textarea = document.getElementById('staffCommentTextarea');
     const saveBtn = document.getElementById(`${this.modalId}SaveCommentBtn`);
+    const saveAndSendBtn = document.getElementById(`${this.modalId}SaveAndSendBtn`);
     
-    if (!textarea || !saveBtn) {
-      console.log('[setupCommentArea] textarea または saveBtn が見つかりません');
+    if (!textarea || !saveBtn || !saveAndSendBtn) {
+      console.log('[setupCommentArea] 必要な要素が見つかりません');
       return;
     }
     
@@ -623,20 +639,28 @@ export class ReportDetailModal {
     
     console.log('[setupCommentArea] 編集可否:', isEditable);
     
-    // 保存ボタンの表示制御
+    // ボタンの表示制御
     saveBtn.style.display = isEditable ? 'inline-block' : 'none';
+    saveAndSendBtn.style.display = isEditable ? 'inline-block' : 'none';
     
     // 初期文字数カウント
     this.updateCharCount(textarea.value.length);
     
-    // 保存ボタンのイベントリスナーを再設定（重複回避）
+    // 既存のイベントリスナーを削除して新しく設定
     const newSaveBtn = saveBtn.cloneNode(true);
+    const newSaveAndSendBtn = saveAndSendBtn.cloneNode(true);
+    
     saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+    saveAndSendBtn.parentNode.replaceChild(newSaveAndSendBtn, saveAndSendBtn);
     
     newSaveBtn.addEventListener('click', () => {
-      console.log('[新しいイベントリスナー] コメント保存ボタンクリック');
-      console.log('[新しいイベントリスナー] this.currentData確認:', this.currentData);
-      this.saveComment();
+      console.log('[イベントリスナー] コメント保存ボタンクリック');
+      this.saveComment(false);
+    });
+    
+    newSaveAndSendBtn.addEventListener('click', () => {
+      console.log('[イベントリスナー] 保存＆LINE送信ボタンクリック');
+      this.saveComment(true);
     });
   }
 
@@ -658,10 +682,11 @@ export class ReportDetailModal {
   }
 
   /**
-   * コメント保存（競合チェック付き）
+   * コメント保存（LINE送信機能付き）
+   * @param {boolean} sendToLine - LINE送信するかどうか
    */
-  async saveComment() {
-    console.log('[コメント保存] メソッド開始');
+  async saveComment(sendToLine = false) {
+    console.log('[コメント保存] メソッド開始 - LINE送信:', sendToLine);
     
     try {
       const textarea = document.getElementById('staffCommentTextarea');
@@ -741,6 +766,26 @@ export class ReportDetailModal {
       // 保存成功後の処理
       if (saveResponse.success !== false) {
         this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
+        
+        // LINE送信処理
+        if (sendToLine) {
+          try {
+            console.log('[LINE送信] 開始');
+            await this.lineSender.sendReportCompletion(
+              this.currentData.report,
+              this.currentData.user,
+              {
+                comment: comment,
+                staff_name: this.app.currentUser.name,
+                created_at: new Date().toISOString()
+              }
+            );
+            console.log('[LINE送信] 完了');
+          } catch (lineError) {
+            console.error('[LINE送信] エラー:', lineError);
+            this.app.showNotification('コメントは保存されましたが、LINE送信に失敗しました', 'warning');
+          }
+        }
         
         // モーダルを閉じる
         modalManager.hide(this.modalId);

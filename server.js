@@ -10,6 +10,16 @@ const helmet = require('helmet');
 const cors = require('cors');
 const { getCurrentDate, getCurrentTime } = require('./utils/date-time');
 
+const lineRoutes = require('./routes/line');
+
+// LINEルートをマウント
+app.use('/api/line', lineRoutes);
+
+// 静的ファイル配信の設定（画像アクセス用）
+app.use('/temp', express.static(path.join(__dirname, 'public/temp')));
+
+console.log('✅ LINE Messaging API ルートを追加しました');
+
 // Express アプリケーション作成
 const app = express();
 const PORT = process.env.PORT || 3000;
