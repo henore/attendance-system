@@ -1,32 +1,61 @@
 // routes/line.js
-// LINE Messaging API統合（修正版）
+// LINE Messaging API統合（エラー修正版）
 
 const express = require('express');
 const puppeteer = require('puppeteer');
-const { MessagingApiClient } = require('@line/bot-sdk');
-const multer = require('multer');
 const fs = require('fs').promises;
 const path = require('path');
+const crypto = require('crypto');
 
 const router = express.Router();
-const upload = multer({ dest: 'temp/' });
 
-// LINE Bot設定
+// LINE SDK の初期化（シンプル版）
+let lineClient = null;
+let lineSDKInfo = 'SDK未初期化';
+
+// LINE設定
 const lineConfig = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET
 };
 
-const client = new MessagingApiClient(lineConfig);
+// SDK初期化関数
+function initializeLineSDK() {
+  try {
+    // @line/bot-sdk v7.x系の場合
+    const line = require('@line/bot-sdk');
+    lineClient = new line.Client(lineConfig);
+    lineSDKInfo = 'Client (v7.x)';
+    console.log('✅ LINE Client (v7.x) 初期化完了');
+  } catch (error) {
+    try {
+      // @line/bot-sdk v8.x系の場合
+      const { MessagingApiClient } = require('@line/bot-sdk');
+      lineClient = new MessagingApiClient({
+        channelAccessToken: lineConfig.channelAccessToken
+      });
+      lineSDKInfo = 'MessagingApiClient (v8.x)';
+      console.log('✅ LINE MessagingApiClient (v8.x) 初期化完了');
+    } catch (innerError) {
+      console.error('❌ LINE SDK初期化失敗:', innerError.message);
+      lineSDKInfo = `エラー: ${innerError.message}`;
+    }
+  }
+}
+
+// 初期化実行
+initializeLineSDK();
 
 // 必要なディレクトリを作成
 async function ensureDirectories() {
   const dirs = ['temp', 'public/temp'];
   for (const dir of dirs) {
+    const fullPath = path.join(__dirname, '..', dir);
     try {
-      await fs.mkdir(dir, { recursive: true });
+      await fs.mkdir(fullPath, { recursive: true });
+      console.log(`📁 ディレクトリ作成/確認: ${fullPath}`);
     } catch (error) {
-      console.error(`ディレクトリ作成エラー ${dir}:`, error);
+      console.error(`ディレクトリ作成エラー ${dir}:`, error.message);
     }
   }
 }
@@ -38,12 +67,18 @@ ensureDirectories();
  * LINE送信機能の状態確認
  */
 router.get('/status', (req, res) => {
-  const enabled = !!(process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.LINE_CHANNEL_SECRET);
+  const enabled = !!(lineClient && process.env.LINE_CHANNEL_ACCESS_TOKEN);
   res.json({ 
     enabled,
-    hasToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
-    hasSecret: !!process.env.LINE_CHANNEL_SECRET,
-    defaultUserId: process.env.DEFAULT_LINE_USER_ID || 'not set'
+    configured: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
+    clientReady: !!lineClient,
+    sdkInfo: lineSDKInfo,
+    envCheck: {
+      hasToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
+      tokenLength: process.env.LINE_CHANNEL_ACCESS_TOKEN?.length || 0,
+      hasSecret: !!process.env.LINE_CHANNEL_SECRET,
+      defaultUserId: process.env.DEFAULT_LINE_USER_ID || 'not set'
+    }
   });
 });
 
@@ -54,8 +89,8 @@ router.post('/generate-report-image', async (req, res) => {
   try {
     const { reportData, userData, commentData, date } = req.body;
     
-    console.log('[画像生成] 開始:', {
-      userName: userData?.name,
+    console.log('[画像生成] 開始:', { 
+      userName: userData?.name, 
       date: date || reportData?.date,
       hasAttendance: !!reportData?.attendance
     });
@@ -63,30 +98,32 @@ router.post('/generate-report-image', async (req, res) => {
     // HTMLテンプレートを生成
     const html = generateReportHTML(reportData, userData, commentData, date || reportData.date);
     
-    // Puppeteerで画像生成
+    // Puppeteerで画像生成（ヘッドレスモードの新しい設定）
     const browser = await puppeteer.launch({
-      headless: 'new',
+      headless: 'new', // 新しいヘッドレスモード
       args: [
         '--no-sandbox', 
         '--disable-setuid-sandbox',
-        '--font-render-hinting=none',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
         '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process'
+        '--single-process'
       ]
     });
     
     const page = await browser.newPage();
-    await page.setViewport({ width: 800, height: 1200, deviceScaleFactor: 2 });
     
     // 日本語フォントの設定
     await page.evaluateOnNewDocument(() => {
-      document.documentElement.style.fontFamily = '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif';
+      document.documentElement.style.fontFamily = '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif';
     });
     
+    await page.setViewport({ width: 800, height: 1400, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: 'networkidle0' });
     
-    // 少し待機してレンダリングを完了させる
+    // レンダリング完了を待つ
     await page.waitForTimeout(1000);
     
     const imageBuffer = await page.screenshot({
@@ -98,23 +135,26 @@ router.post('/generate-report-image', async (req, res) => {
     await browser.close();
     
     // 一時ファイルとして保存
-    const imageId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const imagePath = path.join('temp', `${imageId}.png`);
+    const imageId = `report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+    const tempDir = path.join(__dirname, '..', 'temp');
+    const imagePath = path.join(tempDir, `${imageId}.png`);
+    
     await fs.writeFile(imagePath, imageBuffer);
     
-    console.log('[画像生成] 完了:', imageId);
+    console.log('[画像生成] 完了:', { imageId, size: imageBuffer.length });
     
     res.json({ 
       success: true, 
       imageId,
+      size: imageBuffer.length,
       message: '画像生成完了'
     });
     
   } catch (error) {
-    console.error('画像生成エラー:', error);
+    console.error('[画像生成] エラー:', error);
     res.status(500).json({ 
       success: false, 
-      message: '画像生成に失敗しました: ' + error.message 
+      message: '画像生成に失敗しました: ' + error.message
     });
   }
 });
@@ -124,19 +164,21 @@ router.post('/generate-report-image', async (req, res) => {
  */
 router.post('/send-report', async (req, res) => {
   try {
+    if (!lineClient) {
+      throw new Error('LINE APIが初期化されていません。SDKの読み込みに失敗している可能性があります。');
+    }
+    
     const { imageId, userName, date, lineUserId } = req.body;
-    
-    console.log('[LINE送信] 開始:', { imageId, userName, date, lineUserId });
-    
-    // デフォルトの送信先（環境変数で設定）
     const targetUserId = lineUserId || process.env.DEFAULT_LINE_USER_ID;
     
     if (!targetUserId) {
       throw new Error('送信先LINEユーザーIDが設定されていません');
     }
     
+    console.log('[LINE送信] 開始:', { imageId, userName, date, targetUserId: targetUserId.substring(0, 10) + '...' });
+    
     // 画像ファイルを読み込み
-    const imagePath = path.join('temp', `${imageId}.png`);
+    const imagePath = path.join(__dirname, '..', 'temp', `${imageId}.png`);
     
     // ファイルの存在確認
     try {
@@ -149,55 +191,80 @@ router.post('/send-report', async (req, res) => {
     
     // 画像を公開ディレクトリにコピー
     const publicFileName = `report_${Date.now()}.png`;
-    const publicPath = path.join('public', 'temp', publicFileName);
+    const publicPath = path.join(__dirname, '..', 'public', 'temp', publicFileName);
     await fs.writeFile(publicPath, imageBuffer);
     
     // 公開URLを生成
-    const imageUrl = `${process.env.BASE_URL}/temp/${publicFileName}`;
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const imageUrl = `${baseUrl}/temp/${publicFileName}`;
     
     console.log('[LINE送信] 画像URL:', imageUrl);
     
     // メッセージを送信
+    const messages = [
+      {
+        type: 'text',
+        text: `📋 ${userName}さんの日報が完了しました\n📅 ${formatDateSimple(date)}\n\n詳細は添付画像をご確認ください。`
+      },
+      {
+        type: 'image',
+        originalContentUrl: imageUrl,
+        previewImageUrl: imageUrl
+      }
+    ];
+    
     try {
-      await client.pushMessage({
-        to: targetUserId,
-        messages: [
-          {
-            type: 'text',
-            text: `📋 ${userName}さんの日報が完了しました\n📅 ${formatDateSimple(date)}\n\n詳細は添付画像をご確認ください。`
-          },
-          {
-            type: 'image',
-            originalContentUrl: imageUrl,
-            previewImageUrl: imageUrl
-          }
-        ]
-      });
+      if (lineSDKInfo.includes('v8')) {
+        // v8.x系の場合
+        await lineClient.pushMessage({
+          to: targetUserId,
+          messages: messages
+        });
+      } else {
+        // v7.x系の場合
+        await lineClient.pushMessage(targetUserId, messages);
+      }
       
       console.log('[LINE送信] 送信成功');
     } catch (lineError) {
-      console.error('[LINE送信] API エラー:', lineError.response?.data || lineError);
-      throw new Error('LINE APIエラー: ' + (lineError.response?.data?.message || lineError.message));
+      console.error('[LINE API] エラー:', lineError.response?.data || lineError);
+      
+      // エラーメッセージの解析
+      let errorMessage = 'LINE送信に失敗しました';
+      if (lineError.statusCode === 400) {
+        if (lineError.response?.data?.message?.includes('Invalid user')) {
+          errorMessage = 'LINE ユーザーIDが無効です。Botと友達になっているか確認してください。';
+        } else {
+          errorMessage = lineError.response?.data?.message || errorMessage;
+        }
+      } else if (lineError.statusCode === 401) {
+        errorMessage = 'LINE認証エラー: アクセストークンを確認してください';
+      }
+      
+      throw new Error(errorMessage);
     }
     
-    // 一時ファイルを削除（元の画像）
-    fs.unlink(imagePath).catch(err => console.error('一時ファイル削除エラー:', err));
-    
-    // 公開画像は5分後に削除
-    setTimeout(() => {
-      fs.unlink(publicPath).catch(err => console.error('公開画像削除エラー:', err));
+    // 一時ファイルを削除（5分後）
+    setTimeout(async () => {
+      try {
+        await fs.unlink(imagePath);
+        await fs.unlink(publicPath);
+        console.log('[クリーンアップ] 一時ファイル削除完了');
+      } catch (err) {
+        console.error('[クリーンアップ] エラー:', err.message);
+      }
     }, 5 * 60 * 1000);
     
     res.json({ 
       success: true, 
-      message: 'LINE送信完了' 
+      message: 'LINE送信完了'
     });
     
   } catch (error) {
-    console.error('LINE送信エラー:', error);
+    console.error('[LINE送信] エラー:', error);
     res.status(500).json({ 
       success: false, 
-      message: error.message || 'LINE送信に失敗しました' 
+      message: error.message || 'LINE送信に失敗しました'
     });
   }
 });
@@ -207,30 +274,62 @@ router.post('/send-report', async (req, res) => {
  */
 router.post('/test-send', async (req, res) => {
   try {
-    const targetUserId = process.env.DEFAULT_LINE_USER_ID;
-    
-    if (!targetUserId) {
-      throw new Error('デフォルトLINEユーザーIDが設定されていません');
+    if (!lineClient) {
+      throw new Error('LINE APIが初期化されていません');
     }
     
-    await client.pushMessage({
-      to: targetUserId,
-      messages: [{
-        type: 'text',
-        text: '✅ LINE連携テスト送信\n\nこのメッセージが届いていれば、LINE連携は正常に動作しています。\n\n設定情報:\n- Channel: 設定済み\n- User ID: ' + targetUserId.substring(0, 10) + '...'
-      }]
-    });
+    const targetUserId = req.body.lineUserId || process.env.DEFAULT_LINE_USER_ID;
     
-    res.json({ 
-      success: true, 
-      message: 'テストメッセージを送信しました' 
-    });
+    if (!targetUserId) {
+      throw new Error('送信先LINEユーザーIDが設定されていません');
+    }
+    
+    console.log('[テスト送信] 開始:', { targetUserId: targetUserId.substring(0, 10) + '...', sdkInfo: lineSDKInfo });
+    
+    const message = {
+      type: 'text',
+      text: [
+        '✅ LINE連携テスト送信',
+        '',
+        'このメッセージが届いていれば、LINE連携は正常に動作しています。',
+        '',
+        `📅 送信日時: ${new Date().toLocaleString('ja-JP')}`,
+        `🔧 SDK情報: ${lineSDKInfo}`,
+        `📱 送信先ID: ${targetUserId.substring(0, 10)}...`
+      ].join('\n')
+    };
+    
+    try {
+      if (lineSDKInfo.includes('v8')) {
+        // v8.x系の場合
+        await lineClient.pushMessage({
+          to: targetUserId,
+          messages: [message]
+        });
+      } else {
+        // v7.x系の場合
+        await lineClient.pushMessage(targetUserId, message);
+      }
+      
+      console.log('[テスト送信] 送信成功');
+      
+      res.json({ 
+        success: true, 
+        message: 'テストメッセージを送信しました',
+        sdkInfo: lineSDKInfo
+      });
+      
+    } catch (lineError) {
+      console.error('[テスト送信] LINE APIエラー:', lineError.response?.data || lineError);
+      throw lineError;
+    }
     
   } catch (error) {
-    console.error('テスト送信エラー:', error);
+    console.error('[テスト送信] エラー:', error);
     res.status(500).json({ 
       success: false, 
-      message: error.response?.data?.message || error.message || 'テスト送信に失敗しました' 
+      message: error.message || 'テスト送信に失敗しました',
+      sdkInfo: lineSDKInfo
     });
   }
 });
@@ -239,7 +338,7 @@ router.post('/test-send', async (req, res) => {
  * 日報HTMLテンプレート生成
  */
 function generateReportHTML(reportData, userData, commentData, date) {
-  // 出勤情報の取得（reportData直下またはattendanceオブジェクト内）
+  // 出勤情報の取得
   const clockIn = reportData.clock_in || reportData.attendance?.clock_in || '-';
   const clockOut = reportData.clock_out || reportData.attendance?.clock_out || '-';
   
@@ -252,7 +351,7 @@ function generateReportHTML(reportData, userData, commentData, date) {
       <title>日報</title>
       <style>
         body {
-          font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif;
+          font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
           margin: 0;
           padding: 20px;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
