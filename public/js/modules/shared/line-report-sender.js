@@ -29,11 +29,16 @@ export class LineReportSender {
     }
 
     try {
-      console.log('[LINE送信] 開始:', {
-        userName: userData.name,
-        date: reportData.date,
-        testMode: this.testMode
-      });
+        // 🔽 ここを追加（または修正）
+    this.currentReportData = reportData;
+    this.currentUserData = userData;
+    this.currentCommentData = commentData;
+
+    console.log('[LINE送信] 開始:', {
+      userName: userData.name,
+      date: reportData.date,
+      testMode: this.testMode
+    });
       
       // 1. 画像生成（Canvas API使用）
       const imageBlob = await this.generateReportImageCanvas(reportData, userData, commentData);
