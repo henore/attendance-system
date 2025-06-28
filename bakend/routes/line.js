@@ -1,12 +1,14 @@
 // backend/routes/line.js
-// 本番用LINE Messaging API統合
+// 本番用LINE Messaging API統合（修正版）
 
 const express = require('express');
 const puppeteer = require('puppeteer');
-const { MessagingApiClient } = require('@line/bot-sdk');
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
+
+// LINE SDK の正しいインポート方法
+const { Client } = require('@line/bot-sdk');
 
 const router = express.Router();
 
@@ -20,7 +22,7 @@ const lineConfig = {
 let lineClient = null;
 if (lineConfig.channelAccessToken && lineConfig.channelSecret) {
   try {
-    lineClient = new MessagingApiClient(lineConfig);
+    lineClient = new Client(lineConfig);
     console.log('✅ LINE Messaging API Client初期化完了');
   } catch (error) {
     console.error('❌ LINE Client初期化エラー:', error);
@@ -135,9 +137,6 @@ router.post('/send-report', async (req, res) => {
     const imagePath = path.join(__dirname, '../temp', `${imageId}.png`);
     const imageBuffer = await fs.readFile(imagePath);
     
-    // 画像をBase64エンコード
-    const base64Image = imageBuffer.toString('base64');
-    
     // 画像を一時的にWebアクセス可能な場所に配置
     const publicImagePath = await saveImageToPublic(imageBuffer, imageId);
     
@@ -236,7 +235,7 @@ router.post('/test-send', async (req, res) => {
  * 画像を公開ディレクトリに保存
  */
 async function saveImageToPublic(imageBuffer, imageId) {
-  const publicDir = path.join(__dirname, '../../public/temp');
+  const publicDir = path.join(__dirname, '../public/temp');
   
   // ディレクトリが存在しない場合は作成
   try {
@@ -258,7 +257,7 @@ async function saveImageToPublic(imageBuffer, imageId) {
  * 公開画像を削除
  */
 async function deletePublicImage(imageId) {
-  const publicPath = path.join(__dirname, '../../public/temp', `${imageId}.png`);
+  const publicPath = path.join(__dirname, '../public/temp', `${imageId}.png`);
   try {
     await fs.unlink(publicPath);
   } catch (error) {
