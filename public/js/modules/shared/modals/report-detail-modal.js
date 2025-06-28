@@ -1,5 +1,5 @@
 // public/js/modules/shared/modals/report-detail-modal.js
-// 日報詳細表示とコメント編集機能の統合モーダル（完全修正版）
+// 日報詳細表示とコメント編集機能の統合モーダル（簡易排他制御版）
 
 import { API_ENDPOINTS } from '../../../constants/api-endpoints.js';
 import { modalManager } from '../modal-manager.js';
@@ -15,6 +15,12 @@ export class ReportDetailModal {
     // ユーザー権限
     this.userRole = app.currentUser.role;
     this.canComment = this.userRole === 'staff' || this.userRole === 'admin';
+    
+    // 排他制御用
+    this.originalComment = null;
+    this.isEditing = false;
+    this.lastCheckTime = null;
+    this.checkInterval = null;
   }
 
   /**
@@ -76,19 +82,17 @@ export class ReportDetailModal {
    * イベントリスナー設定
    */
   setupEventListeners() {
-    // コメント保存ボタン（Arrow Functionでthisを保持）
+    // コメント保存ボタン
     if (this.canComment) {
       const saveBtn = document.getElementById(`${this.modalId}SaveCommentBtn`);
       if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-          console.log('[イベントリスナー] コメント保存ボタンクリック');
-          console.log('[イベントリスナー] this.currentData確認:', this.currentData);
           this.saveComment();
         });
       }
     }
     
-    // モーダル内のイベント委譲（Arrow Functionでthisを保持）
+    // モーダル内のイベント委譲
     const modalContent = document.getElementById(`${this.modalId}Content`);
     if (modalContent) {
       modalContent.addEventListener('input', (e) => {
@@ -96,11 +100,34 @@ export class ReportDetailModal {
           this.handleCommentInput(e.target);
         }
       });
+      
+      // 編集開始の検知
+      modalContent.addEventListener('focus', (e) => {
+        if (e.target.id === 'staffCommentTextarea') {
+          this.startEditing();
+        }
+      }, true);
+      
+      // 編集終了の検知
+      modalContent.addEventListener('blur', (e) => {
+        if (e.target.id === 'staffCommentTextarea') {
+          this.endEditing();
+        }
+      }, true);
+    }
+    
+    // モーダルが閉じられた時の処理
+    const modal = document.getElementById(this.modalId);
+    if (modal) {
+      modal.addEventListener('hidden.bs.modal', () => {
+        this.stopCommentCheck();
+        this.isEditing = false;
+      });
     }
   }
 
   /**
-   * 日報詳細を表示（バグ修正版）
+   * 日報詳細を表示
    */
   async show(userId, userName, date) {
     try {
@@ -125,7 +152,7 @@ export class ReportDetailModal {
         return;
       }
       
-      // 現在のデータを保存（完全性チェック付き）
+      // 現在のデータを保存
       this.currentData = {
         userId: userId,
         userName: userName || 'ユーザー',
@@ -137,6 +164,12 @@ export class ReportDetailModal {
         breakRecord: response.breakRecord || null
       };
       
+      // コメントのタイムスタンプを保存（競合検知用）
+      this.originalComment = response.comment ? {
+        comment: response.comment.comment,
+        updated_at: response.comment.updated_at || response.comment.created_at
+      } : null;
+      
       console.log('[日報詳細] currentData設定完了:', this.currentData);
       
       // モーダルコンテンツを更新
@@ -145,12 +178,191 @@ export class ReportDetailModal {
       // モーダル表示
       modalManager.show(this.modalId);
       
+      // コメントの定期チェック開始
+      if (this.canComment && this.userRole === 'staff') {
+        this.startCommentCheck();
+      }
+      
     } catch (error) {
       console.error('日報詳細取得エラー:', error);
       this.app.showNotification('日報の取得に失敗しました', 'danger');
       
       // エラー時はcurrentDataをリセット
       this.currentData = null;
+    }
+  }
+
+  /**
+   * 編集開始
+   */
+  startEditing() {
+    this.isEditing = true;
+    console.log('[排他制御] 編集開始');
+    
+    // 編集中の表示を追加
+    const editingIndicator = document.getElementById('editingIndicator');
+    if (!editingIndicator) {
+      const textarea = document.getElementById('staffCommentTextarea');
+      if (textarea) {
+        const indicator = document.createElement('div');
+        indicator.id = 'editingIndicator';
+        indicator.className = 'text-info small mt-1';
+        indicator.innerHTML = '<i class="fas fa-edit"></i> 編集中...';
+        textarea.parentElement.appendChild(indicator);
+      }
+    }
+  }
+
+  /**
+   * 編集終了
+   */
+  endEditing() {
+    this.isEditing = false;
+    console.log('[排他制御] 編集終了');
+    
+    // 編集中の表示を削除
+    const editingIndicator = document.getElementById('editingIndicator');
+    if (editingIndicator) {
+      editingIndicator.remove();
+    }
+  }
+
+  /**
+   * コメントの定期チェック開始
+   */
+  startCommentCheck() {
+    this.stopCommentCheck();
+    
+    // 10秒ごとに最新のコメント状態をチェック
+    this.checkInterval = setInterval(async () => {
+      if (!this.currentData || this.isEditing) return;
+      
+      try {
+        // 最新の日報データを取得
+        const response = await this.app.apiCall(
+          API_ENDPOINTS.STAFF.REPORT(this.currentData.userId, this.currentData.date)
+        );
+        
+        if (response && response.comment) {
+          const newComment = response.comment;
+          
+          // コメントが更新されているかチェック
+          if (this.hasCommentChanged(newComment)) {
+            console.log('[排他制御] 他のユーザーによるコメント更新を検知');
+            
+            // 警告を表示
+            this.showCommentUpdateWarning(newComment);
+            
+            // データを更新
+            this.currentData.comment = newComment;
+            this.originalComment = {
+              comment: newComment.comment,
+              updated_at: newComment.updated_at || newComment.created_at
+            };
+            
+            // UIを更新
+            this.updateCommentDisplay(newComment);
+          }
+        }
+        
+      } catch (error) {
+        console.error('コメントチェックエラー:', error);
+      }
+    }, 10000); // 10秒ごと
+  }
+
+  /**
+   * コメントチェックを停止
+   */
+  stopCommentCheck() {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
+  }
+
+  /**
+   * コメントが変更されたかチェック
+   */
+  hasCommentChanged(newComment) {
+    if (!this.originalComment && newComment) {
+      return true;
+    }
+    
+    if (this.originalComment && newComment) {
+      return this.originalComment.updated_at !== (newComment.updated_at || newComment.created_at);
+    }
+    
+    return false;
+  }
+
+  /**
+   * コメント更新の警告表示
+   */
+  showCommentUpdateWarning(newComment) {
+    const warningId = 'commentUpdateWarning';
+    let warningDiv = document.getElementById(warningId);
+    
+    if (!warningDiv) {
+      warningDiv = document.createElement('div');
+      warningDiv.id = warningId;
+      warningDiv.className = 'alert alert-warning alert-dismissible fade show mt-3';
+      
+      const commentSection = document.querySelector('.staff-comment-section');
+      if (commentSection) {
+        commentSection.insertBefore(warningDiv, commentSection.firstChild);
+      }
+    }
+    
+    warningDiv.innerHTML = `
+      <i class="fas fa-exclamation-triangle"></i> 
+      <strong>${newComment.staff_name || '他のスタッフ'}さんがコメントを更新しました</strong>
+      <br>
+      <small>更新時刻: ${formatDateTime(newComment.updated_at || newComment.created_at)}</small>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+  }
+
+  /**
+   * コメント表示を更新
+   */
+  updateCommentDisplay(comment) {
+    // 既存のコメント情報を更新
+    const existingCommentInfo = document.querySelector('.existing-comment-info');
+    if (existingCommentInfo) {
+      existingCommentInfo.innerHTML = `
+        <small class="text-muted">
+          <i class="fas fa-info-circle"></i> 
+          記入者: ${comment.staff_name || 'スタッフ'} | 
+          記入日時: ${formatDateTime(comment.created_at)}
+          ${comment.updated_at ? ` | 更新: ${formatDateTime(comment.updated_at)}` : ''}
+          <span class="text-danger ms-2">
+            <i class="fas fa-sync"></i> 更新されました
+          </span>
+        </small>
+      `;
+    }
+    
+    // テキストエリアが編集中でなければ内容も更新
+    const textarea = document.getElementById('staffCommentTextarea');
+    if (textarea && !this.isEditing) {
+      // 未保存の変更がある場合は確認
+      if (textarea.value.trim() && textarea.value.trim() !== (this.originalComment?.comment || '')) {
+        const confirmUpdate = confirm(
+          '他のスタッフがコメントを更新しました。\n' +
+          'あなたの未保存の変更は失われます。\n' +
+          '最新のコメントを読み込みますか？'
+        );
+        
+        if (confirmUpdate) {
+          textarea.value = comment.comment || '';
+          this.updateCharCount(textarea.value.length);
+        }
+      } else {
+        // 変更がなければそのまま更新
+        textarea.value = comment.comment || '';
+        this.updateCharCount(textarea.value.length);
+      }
     }
   }
 
@@ -377,6 +589,7 @@ export class ReportDetailModal {
               <i class="fas fa-info-circle"></i> 
               記入者: ${comment.staff_name || 'スタッフ'} | 
               記入日時: ${formatDateTime(comment.created_at)}
+              ${comment.updated_at ? ` | 更新: ${formatDateTime(comment.updated_at)}` : ''}
             </small>
           </div>
         ` : ''}
@@ -445,13 +658,10 @@ export class ReportDetailModal {
   }
 
   /**
-   * コメント保存（強化デバッグ版）
+   * コメント保存（競合チェック付き）
    */
   async saveComment() {
     console.log('[コメント保存] メソッド開始');
-    console.log('[コメント保存] this:', this);
-    console.log('[コメント保存] this.currentData:', this.currentData);
-    console.log('[コメント保存] modalId:', this.modalId);
     
     try {
       const textarea = document.getElementById('staffCommentTextarea');
@@ -468,14 +678,6 @@ export class ReportDetailModal {
       // currentDataの存在チェック
       if (!this.currentData) {
         console.error('[コメント保存] currentDataが存在しません');
-        console.error('[コメント保存] this全体:', this);
-        
-        // 緊急回避：モーダルのタイトルからデータを復元
-        const titleElement = document.getElementById(`${this.modalId}Title`);
-        if (titleElement) {
-          console.log('[コメント保存] タイトル要素:', titleElement.innerHTML);
-        }
-        
         this.app.showNotification('データが正しく読み込まれていません。モーダルを閉じて再度開いてください。', 'danger');
         return;
       }
@@ -489,10 +691,45 @@ export class ReportDetailModal {
         return;
       }
       
+      // 保存前に最新のコメント状態をチェック（競合検知）
+      try {
+        const latestResponse = await this.app.apiCall(
+          API_ENDPOINTS.STAFF.REPORT(userId, date)
+        );
+        
+        if (latestResponse && latestResponse.comment) {
+          const latestComment = latestResponse.comment;
+          
+          // コメントが他のユーザーによって更新されているかチェック
+          if (this.hasCommentChanged(latestComment)) {
+            const confirmSave = confirm(
+              `警告: ${latestComment.staff_name || '他のスタッフ'}さんが既にコメントを記入しています。\n\n` +
+              `記入時刻: ${formatDateTime(latestComment.created_at)}\n` +
+              `内容: ${latestComment.comment.substring(0, 50)}${latestComment.comment.length > 50 ? '...' : ''}\n\n` +
+              `あなたのコメントで上書きしますか？`
+            );
+            
+            if (!confirmSave) {
+              // 最新のコメントを表示
+              this.currentData.comment = latestComment;
+              this.originalComment = {
+                comment: latestComment.comment,
+                updated_at: latestComment.updated_at || latestComment.created_at
+              };
+              this.updateModalContent();
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('最新状態チェックエラー:', error);
+        // エラーがあっても保存は続行
+      }
+      
       console.log('[コメント保存] データ確認:', { userId, userName, date, comment });
       
       // API呼び出し
-      await this.app.apiCall(API_ENDPOINTS.STAFF.COMMENT, {
+      const saveResponse = await this.app.apiCall(API_ENDPOINTS.STAFF.COMMENT, {
         method: 'POST',
         body: JSON.stringify({
           userId: userId,
@@ -501,19 +738,42 @@ export class ReportDetailModal {
         })
       });
       
-      this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
-      
-      // モーダルを閉じる
-      modalManager.hide(this.modalId);
-      
-      // 親モジュールに通知（画面更新など）
-      if (this.parent && this.parent.onCommentSaved) {
-        this.parent.onCommentSaved();
+      // 保存成功後の処理
+      if (saveResponse.success !== false) {
+        this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
+        
+        // モーダルを閉じる
+        modalManager.hide(this.modalId);
+        
+        // 親モジュールに通知（画面更新など）
+        if (this.parent && this.parent.onCommentSaved) {
+          this.parent.onCommentSaved();
+        }
+      } else {
+        // エラー処理
+        if (saveResponse.message) {
+          this.app.showNotification(saveResponse.message, 'danger');
+        }
+        
+        // 競合が発生した場合は最新データを再取得
+        if (saveResponse.conflict) {
+          await this.show(userId, userName, date);
+        }
       }
       
     } catch (error) {
       console.error('コメント保存エラー:', error);
-      this.app.showNotification(error.message || 'コメントの保存に失敗しました', 'danger');
+      
+      // エラーメッセージの詳細化
+      let errorMessage = 'コメントの保存に失敗しました';
+      
+      if (error.message && error.message.includes('already exists')) {
+        errorMessage = '他のスタッフが既にコメントを記入しています。画面を更新して最新の状態を確認してください。';
+      } else if (error.message) {
+        errorMessage += ': ' + error.message;
+      }
+      
+      this.app.showNotification(errorMessage, 'danger');
     }
   }
 
@@ -602,6 +862,8 @@ export class ReportDetailModal {
    * クリーンアップ
    */
   destroy() {
+    this.stopCommentCheck();
+    
     const modal = document.getElementById(this.modalId);
     if (modal) {
       modal.remove();
