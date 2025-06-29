@@ -805,4 +805,129 @@ function calculateSleepHours(bedtime, wakeupTime) {
   }
 }
 
+// routes/line.js に追加 - ボット設定確認用
+
+/**
+ * ボット設定状況の確認エンドポイント
+ */
+router.get('/bot-status', async (req, res) => {
+  try {
+    let clientStatus = 'not_initialized';
+    let clientType = 'unknown';
+    
+    if (lineClient) {
+      clientStatus = 'initialized';
+      clientType = lineSDKInfo;
+    }
+    
+    const status = {
+      environment: {
+        hasAccessToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
+        tokenLength: process.env.LINE_CHANNEL_ACCESS_TOKEN?.length || 0,
+        hasChannelSecret: !!process.env.LINE_CHANNEL_SECRET,
+        defaultUserId: process.env.DEFAULT_LINE_USER_ID || 'not_set',
+        baseUrl: process.env.BASE_URL || 'not_set'
+      },
+      client: {
+        status: clientStatus,
+        type: clientType,
+        ready: !!lineClient
+      },
+      webhookUrl: `${process.env.BASE_URL || 'http://localhost:3000'}/api/line/webhook`,
+      instructions: {
+        step1: 'LINE Developersでグループトーク参加を許可',
+        step2: 'Webhook URLを設定',
+        step3: 'Webhookを有効化',
+        step4: 'ボットを個人で友達追加してからグループ招待',
+        step5: 'グループで「テスト」と送信してWebhook動作確認'
+      },
+      troubleshooting: {
+        immediateLeave: [
+          'グループトーク機能が無効',
+          'Webhook URLが間違っている',
+          'Webhook応答エラー',
+          'ボットが友達追加されていない'
+        ],
+        solutions: [
+          'LINE Developersでグループトーク許可をON',
+          'Webhook URLを正確に設定',
+          'サーバーが正常に動作しているか確認',
+          '先に個人でボットを友達追加'
+        ]
+      }
+    };
+    
+    res.json(status);
+    
+  } catch (error) {
+    console.error('ボット状況確認エラー:', error);
+    res.status(500).json({ 
+      error: error.message,
+      status: 'error'
+    });
+  }
+});
+
+/**
+ * Webhook受信テスト（改良版）
+ */
+router.post('/webhook', (req, res) => {
+  try {
+    console.log('\n🔔 === Webhook受信 ===');
+    console.log('受信時刻:', new Date().toLocaleString('ja-JP'));
+    console.log('Headers:', req.headers);
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    
+    const events = req.body.events;
+    
+    if (!events || events.length === 0) {
+      console.log('イベントなし - 設定確認用リクエスト');
+      return res.status(200).send('OK');
+    }
+    
+    events.forEach((event, index) => {
+      console.log(`\n--- イベント ${index + 1} ---`);
+      console.log('タイプ:', event.type);
+      console.log('送信元:', event.source);
+      
+      if (event.source.type === 'group') {
+        console.log('✅ グループメッセージ受信!');
+        console.log('🎯 グループID:', event.source.groupId);
+        console.log('👤 ユーザーID:', event.source.userId);
+        
+        if (event.type === 'message') {
+          console.log('💬 メッセージ内容:', event.message.text);
+          
+          // .envファイル用の設定を出力
+          console.log('\n📋 === .env設定用 ===');
+          console.log(`DEFAULT_LINE_USER_ID=${event.source.groupId}`);
+          console.log('==================\n');
+        }
+        
+        if (event.type === 'join') {
+          console.log('🎉 グループ参加イベント!');
+        }
+      } else if (event.source.type === 'user') {
+        console.log('👤 個人メッセージ');
+        console.log('ユーザーID:', event.source.userId);
+      }
+      
+      if (event.type === 'message' && event.message.type === 'text') {
+        console.log('メッセージ:', event.message.text);
+      }
+    });
+    
+    console.log('==================\n');
+    
+    // 正常応答（重要！）
+    res.status(200).send('OK');
+    
+  } catch (error) {
+    console.error('❌ Webhook処理エラー:', error);
+    
+    // エラーでも200で応答（LINEのリトライを防ぐ）
+    res.status(200).send('Error logged');
+  }
+});
+
 module.exports = router;
