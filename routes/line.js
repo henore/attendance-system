@@ -1,5 +1,5 @@
 // routes/line.js
-// LINE Messaging API統合（エラー修正版）
+// LINE Messaging API統合（システムスタイル統一版）
 
 const express = require('express');
 const puppeteer = require('puppeteer');
@@ -9,7 +9,7 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
-// LINE SDK の初期化（シンプル版）
+// LINE SDK の初期化
 let lineClient = null;
 let lineSDKInfo = 'SDK未初期化';
 
@@ -83,7 +83,7 @@ router.get('/status', (req, res) => {
 });
 
 /**
- * 日報画像生成
+ * 日報画像生成（システムスタイル統一版）
  */
 router.post('/generate-report-image', async (req, res) => {
   try {
@@ -92,15 +92,19 @@ router.post('/generate-report-image', async (req, res) => {
     console.log('[画像生成] 開始:', { 
       userName: userData?.name, 
       date: date || reportData?.date,
-      hasAttendance: !!reportData?.attendance
+      hasAttendance: !!reportData?.attendance,
+      dataKeys: Object.keys(reportData || {})
     });
     
-    // HTMLテンプレートを生成
-    const html = generateReportHTML(reportData, userData, commentData, date || reportData.date);
+    // データの正規化と検証
+    const normalizedData = normalizeReportData(reportData, userData, commentData, date);
     
-    // Puppeteerで画像生成（ヘッドレスモードの新しい設定）
+    // HTMLテンプレートを生成（システムスタイル統一）
+    const html = generateSystemStyleHTML(normalizedData);
+    
+    // Puppeteerで画像生成
     const browser = await puppeteer.launch({
-      headless: 'new', // 新しいヘッドレスモード
+      headless: 'new',
       args: [
         '--no-sandbox', 
         '--disable-setuid-sandbox',
@@ -120,14 +124,13 @@ router.post('/generate-report-image', async (req, res) => {
       document.documentElement.style.fontFamily = '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif';
     });
     
-    await page.setViewport({ width: 800, height: 1400, deviceScaleFactor: 2 });
+    await page.setViewport({ width: 800, height: 1600, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: 'networkidle0' });
     
     // レンダリング完了を待つ
     const { setTimeout } = require('node:timers/promises');
-    await setTimeout(3000); // 3秒待つ
+    await setTimeout(2000);
 
-    
     const imageBuffer = await page.screenshot({
       type: 'png',
       fullPage: true,
@@ -182,7 +185,6 @@ router.post('/send-report', async (req, res) => {
     // 画像ファイルを読み込み
     const imagePath = path.join(__dirname, '..', 'temp', `${imageId}.png`);
     
-    // ファイルの存在確認
     try {
       await fs.access(imagePath);
     } catch (error) {
@@ -206,7 +208,7 @@ router.post('/send-report', async (req, res) => {
     const messages = [
       {
         type: 'text',
-        text: `📋 ${userName}さんの日報が完了しました\n📅 ${formatDateSimple(date)}\n\n詳細は添付画像をご確認ください。`
+        text: `📋 ${userName}さんの日報が完了しました\n📅 ${formatDateJapanese(date)}\n\n詳細は添付画像をご確認ください。`
       },
       {
         type: 'image',
@@ -217,13 +219,11 @@ router.post('/send-report', async (req, res) => {
     
     try {
       if (lineSDKInfo.includes('v8')) {
-        // v8.x系の場合
         await lineClient.pushMessage({
           to: targetUserId,
           messages: messages
         });
       } else {
-        // v7.x系の場合
         await lineClient.pushMessage(targetUserId, messages);
       }
       
@@ -231,7 +231,6 @@ router.post('/send-report', async (req, res) => {
     } catch (lineError) {
       console.error('[LINE API] エラー:', lineError.response?.data || lineError);
       
-      // エラーメッセージの解析
       let errorMessage = 'LINE送信に失敗しました';
       if (lineError.statusCode === 400) {
         if (lineError.response?.data?.message?.includes('Invalid user')) {
@@ -303,13 +302,11 @@ router.post('/test-send', async (req, res) => {
     
     try {
       if (lineSDKInfo.includes('v8')) {
-        // v8.x系の場合
         await lineClient.pushMessage({
           to: targetUserId,
           messages: [message]
         });
       } else {
-        // v7.x系の場合
         await lineClient.pushMessage(targetUserId, message);
       }
       
@@ -337,20 +334,82 @@ router.post('/test-send', async (req, res) => {
 });
 
 /**
- * 日報HTMLテンプレート生成
+ * データの正規化関数
  */
-function generateReportHTML(reportData, userData, commentData, date) {
-  // 出勤情報の取得
-  const clockIn = reportData.clock_in || reportData.attendance?.clock_in || '-';
-  const clockOut = reportData.clock_out || reportData.attendance?.clock_out || '-';
-  
+function normalizeReportData(reportData, userData, commentData, date) {
+  console.log('[データ正規化] 開始:', { 
+    reportDataKeys: Object.keys(reportData || {}),
+    userDataKeys: Object.keys(userData || {}),
+    hasComment: !!commentData?.comment 
+  });
+
+  // 出勤データの取得（複数のソースから統合）
+  const attendance = {
+    clock_in: reportData.clock_in || reportData.attendance?.clock_in || '-',
+    clock_out: reportData.clock_out || reportData.attendance?.clock_out || '-',
+    break_start: reportData.break_start || reportData.attendance?.break_start || null,
+    break_end: reportData.break_end || reportData.attendance?.break_end || null
+  };
+
+  // 休憩時間の表示計算
+  let breakTimeDisplay = '-';
+  if (userData.role === 'user' && userData.service_type !== 'home') {
+    if (reportData.breakRecord && reportData.breakRecord.start_time) {
+      breakTimeDisplay = reportData.breakRecord.end_time ? 
+        `${reportData.breakRecord.start_time}〜${reportData.breakRecord.end_time} (${reportData.breakRecord.duration || 60}分)` : 
+        `${reportData.breakRecord.start_time}〜 (進行中)`;
+    }
+  } else if (userData.role !== 'user' && attendance.break_start) {
+    breakTimeDisplay = attendance.break_end ? 
+      `${attendance.break_start}〜${attendance.break_end} (60分)` : 
+      `${attendance.break_start}〜 (進行中)`;
+  }
+
+  const normalized = {
+    user: userData,
+    date: date || reportData.date,
+    attendance: attendance,
+    breakTimeDisplay: breakTimeDisplay,
+    report: {
+      work_content: reportData.work_content || '',
+      external_work_location: reportData.external_work_location || null,
+      temperature: reportData.temperature || '-',
+      appetite: reportData.appetite || null,
+      sleep_quality: reportData.sleep_quality || null,
+      bedtime: reportData.bedtime || null,
+      wakeup_time: reportData.wakeup_time || null,
+      medication_time: reportData.medication_time || null,
+      reflection: reportData.reflection || '',
+      interview_request: reportData.interview_request || null
+    },
+    comment: commentData && commentData.comment ? {
+      comment: commentData.comment,
+      staff_name: commentData.staff_name,
+      created_at: commentData.created_at
+    } : null
+  };
+
+  console.log('[データ正規化] 完了:', {
+    userName: normalized.user.name,
+    clockIn: normalized.attendance.clock_in,
+    clockOut: normalized.attendance.clock_out,
+    hasComment: !!normalized.comment
+  });
+
+  return normalized;
+}
+
+/**
+ * システムスタイル統一HTMLテンプレート生成
+ */
+function generateSystemStyleHTML(data) {
   return `
     <!DOCTYPE html>
     <html lang="ja">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>日報</title>
+      <title>日報詳細</title>
       <style>
         body {
           font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
@@ -358,7 +417,9 @@ function generateReportHTML(reportData, userData, commentData, date) {
           padding: 20px;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           min-height: 100vh;
+          color: #333;
         }
+        
         .report-container {
           background: white;
           border-radius: 15px;
@@ -367,92 +428,138 @@ function generateReportHTML(reportData, userData, commentData, date) {
           max-width: 750px;
           margin: 0 auto;
         }
+        
         .header {
           text-align: center;
           margin-bottom: 30px;
           border-bottom: 3px solid #667eea;
           padding-bottom: 20px;
         }
+        
         .title {
-          font-size: 28px;
+          font-size: 24px;
           font-weight: bold;
           color: #333;
           margin-bottom: 10px;
         }
+        
         .date {
-          font-size: 18px;
+          font-size: 16px;
           color: #666;
         }
-        .attendance-section {
+        
+        /* 出勤情報セクション - システムと同じスタイル */
+        .attendance-row {
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 15px;
           margin-bottom: 30px;
-          padding: 20px;
-          background: #f8f9ff;
-          border-radius: 10px;
         }
-        .time-item {
+        
+        .detail-section {
           text-align: center;
           padding: 15px;
-          background: white;
+          background: #f8f9ff;
           border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+          border-left: 4px solid #667eea;
         }
-        .time-label {
+        
+        .detail-section h6 {
           font-size: 14px;
           color: #666;
-          margin-bottom: 5px;
+          margin: 0 0 8px 0;
+          font-weight: normal;
         }
-        .time-value {
-          font-size: 24px;
+        
+        .detail-value {
+          font-size: 20px;
           font-weight: bold;
-          color: #333;
+          margin: 0;
         }
-        .section {
-          margin-bottom: 25px;
-          padding: 20px;
-          border-left: 4px solid #667eea;
-          background: #fafbff;
-          border-radius: 0 8px 8px 0;
+        
+        .text-success { color: #28a745; }
+        .text-info { color: #17a2b8; }
+        .text-warning { color: #ffc107; }
+        .text-muted { color: #6c757d; }
+        
+        hr {
+          border: none;
+          border-top: 1px solid #e9ecef;
+          margin: 25px 0;
         }
-        .section-title {
+        
+        /* 日報内容セクション */
+        .report-summary {
+          margin-bottom: 20px;
+        }
+        
+        .report-summary h6 {
           font-size: 18px;
           font-weight: bold;
           color: #333;
-          margin-bottom: 15px;
+          margin-bottom: 20px;
           display: flex;
           align-items: center;
         }
-        .section-content {
-          font-size: 16px;
-          line-height: 1.6;
-          color: #555;
-          white-space: pre-wrap;
+        
+        .report-summary h6 i {
+          margin-right: 8px;
         }
-        .health-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-          gap: 15px;
-          margin-top: 15px;
+        
+        .form-section {
+          margin-bottom: 20px;
         }
-        .health-item {
-          background: white;
-          padding: 15px;
-          border-radius: 8px;
-          text-align: center;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        .health-label {
-          font-size: 12px;
-          color: #666;
+        
+        .past-form-label {
+          display: block;
+          font-size: 14px;
+          font-weight: 600;
+          color: #495057;
           margin-bottom: 5px;
         }
-        .health-value {
-          font-size: 16px;
-          font-weight: bold;
-          color: #333;
+        
+        .past-form-label i {
+          margin-right: 6px;
+          width: 16px;
+          text-align: center;
         }
+        
+        .past-form-value {
+          font-size: 16px;
+          color: #333;
+          padding: 8px 12px;
+          background: #f8f9fa;
+          border-radius: 4px;
+          min-height: 20px;
+        }
+        
+        .text-content {
+          font-size: 16px;
+          line-height: 1.6;
+          color: #333;
+          background: #f8f9fa;
+          padding: 12px;
+          border-radius: 4px;
+          white-space: pre-wrap;
+          min-height: 20px;
+        }
+        
+        /* 健康状態グリッド */
+        .health-row {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 15px;
+          margin-bottom: 20px;
+        }
+        
+        .health-detail-row {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 15px;
+          margin-bottom: 20px;
+        }
+        
+        /* スタッフコメントセクション */
         .comment-section {
           background: linear-gradient(135deg, #667eea, #764ba2);
           color: white;
@@ -460,6 +567,7 @@ function generateReportHTML(reportData, userData, commentData, date) {
           border-radius: 10px;
           margin-top: 30px;
         }
+        
         .comment-title {
           font-size: 18px;
           font-weight: bold;
@@ -467,6 +575,11 @@ function generateReportHTML(reportData, userData, commentData, date) {
           display: flex;
           align-items: center;
         }
+        
+        .comment-title i {
+          margin-right: 8px;
+        }
+        
         .comment-content {
           font-size: 16px;
           line-height: 1.6;
@@ -476,84 +589,130 @@ function generateReportHTML(reportData, userData, commentData, date) {
           margin-bottom: 10px;
           white-space: pre-wrap;
         }
+        
         .comment-author {
           font-size: 14px;
           opacity: 0.9;
           text-align: right;
         }
-        .icon {
-          margin-right: 8px;
+        
+        /* アイコンのスタイル */
+        .fas {
+          display: inline-block;
+          width: 16px;
+          text-align: center;
         }
       </style>
     </head>
     <body>
       <div class="report-container">
+        <!-- ヘッダー -->
         <div class="header">
-          <div class="title">📋 ${userData.name}さんの日報</div>
-          <div class="date">${formatDate(date)}</div>
+          <div class="title">📋 ${data.user.name}さんの日報詳細</div>
+          <div class="date">${formatDateJapanese(data.date)}</div>
         </div>
         
-        <div class="attendance-section">
-          <div class="time-item">
-            <div class="time-label">🕘 出勤時間</div>
-            <div class="time-value">${clockIn}</div>
+        <!-- 出勤情報 -->
+        <div class="attendance-row">
+          <div class="detail-section">
+            <h6><i class="fas">🕘</i> 出勤時間</h6>
+            <div class="detail-value text-success">${data.attendance.clock_in}</div>
           </div>
-          <div class="time-item">
-            <div class="time-label">🕕 退勤時間</div>
-            <div class="time-value">${clockOut}</div>
+          <div class="detail-section">
+            <h6><i class="fas">☕</i> 休憩時間</h6>
+            <div class="detail-value text-warning">${data.breakTimeDisplay}</div>
           </div>
-        </div>
-        
-        <div class="section">
-          <div class="section-title">
-            <span class="icon">📝</span>作業内容
-          </div>
-          <div class="section-content">${reportData.work_content || '-'}</div>
-        </div>
-        
-        ${reportData.external_work_location ? `
-          <div class="section">
-            <div class="section-title">
-              <span class="icon">🏢</span>施設外就労先
-            </div>
-            <div class="section-content">${reportData.external_work_location}</div>
-          </div>
-        ` : ''}
-        
-        <div class="section">
-          <div class="section-title">
-            <span class="icon">💪</span>健康状態
-          </div>
-          <div class="health-grid">
-            <div class="health-item">
-              <div class="health-label">体温</div>
-              <div class="health-value">${reportData.temperature || '-'}℃</div>
-            </div>
-            <div class="health-item">
-              <div class="health-label">食欲</div>
-              <div class="health-value">${formatAppetite(reportData.appetite)}</div>
-            </div>
-            <div class="health-item">
-              <div class="health-label">睡眠</div>
-              <div class="health-value">${formatSleepQuality(reportData.sleep_quality)}</div>
+          <div class="detail-section">
+            <h6><i class="fas">🕕</i> 退勤時間</h6>
+            <div class="detail-value ${data.attendance.clock_out !== '-' ? 'text-info' : 'text-muted'}">
+              ${data.attendance.clock_out === '-' ? '未退勤' : data.attendance.clock_out}
             </div>
           </div>
         </div>
-        
-        <div class="section">
-          <div class="section-title">
-            <span class="icon">💭</span>振り返り・感想
+
+        <hr>
+
+        <!-- 日報内容 -->
+        <div class="report-summary">
+          <h6><i class="fas">📝</i> 日報内容</h6>
+          
+          <!-- 作業内容 -->
+          <div class="form-section">
+            <label class="past-form-label"><i class="fas">📋</i> 作業内容</label>
+            <div class="text-content">${data.report.work_content || ''}</div>
           </div>
-          <div class="section-content">${reportData.reflection || '-'}</div>
+
+          ${data.report.external_work_location ? `
+            <!-- 施設外就労先 -->
+            <div class="form-section">
+              <label class="past-form-label">
+                <i class="fas">🏢</i> 施設外就労先
+              </label>
+              <div class="past-form-value text-info">${data.report.external_work_location}</div>
+            </div>
+          ` : ''}
+
+          <!-- 健康状態 -->
+          <div class="health-row">
+            <div class="form-section">
+              <label class="past-form-label"><i class="fas">🌡️</i> 体温</label>
+              <div class="past-form-value">${data.report.temperature}℃</div>
+            </div>
+            <div class="form-section">
+              <label class="past-form-label"><i class="fas">🍽️</i> 食欲</label>
+              <div class="past-form-value">${formatAppetite(data.report.appetite)}</div>
+            </div>
+            <div class="form-section">
+              <label class="past-form-label"><i class="fas">💊</i> 頓服服用</label>
+              <div class="past-form-value">${data.report.medication_time ? data.report.medication_time + '時頃' : 'なし'}</div>
+            </div>
+            <div class="form-section">
+              <label class="past-form-label"><i class="fas">😴</i> 睡眠時間</label>
+              <div class="past-form-value">${calculateSleepHours(data.report.bedtime, data.report.wakeup_time)}</div>
+            </div>
+          </div>
+
+          ${data.report.bedtime || data.report.wakeup_time ? `
+            <!-- 睡眠情報詳細 -->
+            <div class="health-detail-row">
+              <div class="form-section">
+                <label class="past-form-label"><i class="fas">🌙</i> 就寝時間</label>
+                <div class="past-form-value">${data.report.bedtime || '-'}</div>
+              </div>
+              <div class="form-section">
+                <label class="past-form-label"><i class="fas">☀️</i> 起床時間</label>
+                <div class="past-form-value">${data.report.wakeup_time || '-'}</div>
+              </div>
+              <div class="form-section">
+                <label class="past-form-label"><i class="fas">😴</i> 睡眠状態</label>
+                <div class="past-form-value">${formatSleepQuality(data.report.sleep_quality)}</div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- 振り返り -->
+          <div class="form-section">
+            <label class="past-form-label"><i class="fas">💭</i> 振り返り・感想</label>
+            <div class="text-content">${data.report.reflection || ''}</div>
+          </div>
+
+          ${data.report.interview_request ? `
+            <!-- 面談希望 -->
+            <div class="form-section">
+              <label class="past-form-label"><i class="fas">💬</i> 面談希望</label>
+              <div class="past-form-value text-info">${formatInterviewRequest(data.report.interview_request)}</div>
+            </div>
+          ` : ''}
         </div>
-        
-        ${commentData && commentData.comment ? `
+
+        ${data.comment ? `
+          <!-- スタッフコメント -->
           <div class="comment-section">
             <div class="comment-title">
-              <span class="icon">💬</span>スタッフからのコメント
+              <i class="fas">💬</i>スタッフからのコメント
             </div>
-            <div class="comment-content">${commentData.comment}</div>
-            <div class="comment-author">記入者: ${commentData.staff_name}</div>
+            <div class="comment-content">${data.comment.comment}</div>
+            <div class="comment-author">記入者: ${data.comment.staff_name}</div>
           </div>
         ` : ''}
       </div>
@@ -563,7 +722,7 @@ function generateReportHTML(reportData, userData, commentData, date) {
 }
 
 // ヘルパー関数
-function formatDate(dateString) {
+function formatDateJapanese(dateString) {
   try {
     const date = new Date(dateString);
     return date.toLocaleDateString('ja-JP', {
@@ -577,18 +736,9 @@ function formatDate(dateString) {
   }
 }
 
-function formatDateSimple(dateString) {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ja-JP');
-  } catch (error) {
-    return dateString;
-  }
-}
-
 function formatAppetite(appetite) {
   const labels = { 
-    'good': 'あり', 
+    'good': '良好', 
     'normal': '普通',
     'poor': '不振',
     'none': 'なし' 
@@ -600,10 +750,59 @@ function formatSleepQuality(quality) {
   const labels = { 
     'good': '良好', 
     'normal': '普通',
-    'poor': '不良', 
+    'poor': '不良',
     'bad': '悪い' 
   };
   return labels[quality] || quality || '-';
+}
+
+function formatInterviewRequest(value) {
+  const labels = {
+    'required': '必要',
+    'not_required': '不要',
+    'consultation': '相談がある',
+    'interview': '面談希望'
+  };
+  return labels[value] || value;
+}
+
+function calculateSleepHours(bedtime, wakeupTime) {
+  if (!bedtime || !wakeupTime) return '-';
+  
+  try {
+    const [bedHours, bedMinutes] = bedtime.split(':').map(Number);
+    const [wakeHours, wakeMinutes] = wakeupTime.split(':').map(Number);
+    
+    const bedTotalMinutes = bedHours * 60 + bedMinutes;
+    const wakeTotalMinutes = wakeHours * 60 + wakeMinutes;
+    
+    let sleepMinutes;
+    
+    if (wakeTotalMinutes >= bedTotalMinutes) {
+      if (bedTotalMinutes > 12 * 60 && wakeTotalMinutes < 12 * 60) {
+        sleepMinutes = (24 * 60 - bedTotalMinutes) + wakeTotalMinutes;
+      } else {
+        sleepMinutes = wakeTotalMinutes - bedTotalMinutes;
+      }
+    } else {
+      sleepMinutes = (24 * 60 - bedTotalMinutes) + wakeTotalMinutes;
+    }
+    
+    const hours = Math.floor(sleepMinutes / 60);
+    const minutes = sleepMinutes % 60;
+    
+    if (hours === 0) {
+      return `${minutes}分`;
+    } else if (minutes === 0) {
+      return `${hours}時間`;
+    } else {
+      return `${hours}時間${minutes}分`;
+    }
+    
+  } catch (error) {
+    console.error('睡眠時間計算エラー:', error);
+    return '-';
+  }
 }
 
 module.exports = router;
