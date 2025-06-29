@@ -79,14 +79,14 @@ export class LineReportSender {
       
       console.log('[LINE送信] 画像生成完了:', imageResponse.imageId);
       
-      // 2. LINEに送信
+      // 2. LINEに送信（lineUserIdはサーバー側で環境変数から取得）
       const sendResponse = await this.app.apiCall(API_ENDPOINTS.LINE.SEND_REPORT, {
         method: 'POST',
         body: JSON.stringify({
           imageId: imageResponse.imageId,
           userName: userData.name,
-          date: reportData.date,
-          lineUserId: process.env.DEFAULT_LINE_USER_ID || null
+          date: reportData.date
+          // lineUserIdはサーバー側で自動設定
         })
       });
       
