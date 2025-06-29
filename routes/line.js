@@ -124,7 +124,7 @@ router.post('/generate-report-image', async (req, res) => {
       document.documentElement.style.fontFamily = '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif';
     });
     
-    await page.setViewport({ width: 800, height: 1500, deviceScaleFactor: 2 });
+    await page.setViewport({ width: 800, height: 1400, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: 'networkidle0' });
     
     // レンダリング完了を待つ
@@ -414,7 +414,7 @@ function generateSystemStyleHTML(data) {
         body {
           font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
           margin: 0;
-          padding: 15px 15px 10px 15px;
+          padding: 10px 15px 5px 15px;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           min-height: 100vh;
           color: #333;
@@ -426,7 +426,7 @@ function generateSystemStyleHTML(data) {
           padding: 30px;
           box-shadow: 0 10px 30px rgba(0,0,0,0.1);
           max-width: 750px;
-          margin: 40px auto 20px auto;
+          margin: 60px auto 10px auto;
         }
         
         .header {
@@ -437,14 +437,14 @@ function generateSystemStyleHTML(data) {
         }
         
         .title {
-          font-size: 28px;
+          font-size: 32px;
           font-weight: bold;
           color: #333;
           margin-bottom: 10px;
         }
         
         .date {
-          font-size: 18px;
+          font-size: 20px;
           color: #666;
         }
         
@@ -465,14 +465,14 @@ function generateSystemStyleHTML(data) {
         }
         
         .detail-section h6 {
-          font-size: 16px;
+          font-size: 18px;
           color: #666;
           margin: 0 0 8px 0;
           font-weight: normal;
         }
         
         .detail-value {
-          font-size: 22px;
+          font-size: 26px;
           font-weight: bold;
           margin: 0;
         }
@@ -494,7 +494,7 @@ function generateSystemStyleHTML(data) {
         }
         
         .report-summary h6 {
-          font-size: 20px;
+          font-size: 24px;
           font-weight: bold;
           color: #333;
           margin-bottom: 20px;
@@ -512,7 +512,7 @@ function generateSystemStyleHTML(data) {
         
         .past-form-label {
           display: block;
-          font-size: 16px;
+          font-size: 18px;
           font-weight: 600;
           color: #495057;
           margin-bottom: 5px;
@@ -525,7 +525,7 @@ function generateSystemStyleHTML(data) {
         }
         
         .past-form-value {
-          font-size: 18px;
+          font-size: 20px;
           color: #333;
           padding: 8px 12px;
           background: #f8f9fa;
@@ -534,7 +534,7 @@ function generateSystemStyleHTML(data) {
         }
         
         .text-content {
-          font-size: 18px;
+          font-size: 20px;
           line-height: 1.6;
           color: #333;
           background: #f8f9fa;
@@ -569,7 +569,7 @@ function generateSystemStyleHTML(data) {
         }
         
         .comment-title {
-          font-size: 20px;
+          font-size: 24px;
           font-weight: bold;
           margin-bottom: 15px;
           display: flex;
@@ -581,7 +581,7 @@ function generateSystemStyleHTML(data) {
         }
         
         .comment-content {
-          font-size: 18px;
+          font-size: 20px;
           line-height: 1.6;
           background: rgba(255,255,255,0.1);
           padding: 15px;
@@ -591,7 +591,7 @@ function generateSystemStyleHTML(data) {
         }
         
         .comment-author {
-          font-size: 16px;
+          font-size: 18px;
           opacity: 0.9;
           text-align: right;
         }
