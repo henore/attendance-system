@@ -7,7 +7,7 @@ export class LineReportSender {
   constructor(app) {
     this.app = app;
     this.isEnabled = true; // ローカルテストでは常に有効
-    this.defaultLineId = 'henore_kobo'; // あなたのLINE ID
+    this.defaultLineId = 'U816c8d0f1dcbc4adbe1f0e1c14884e9f'; // あなたのLINE ID
     this.testMode = false; // テストモード（実際のLINE送信はしない）
     this.init();
   }

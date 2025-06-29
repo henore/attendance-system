@@ -124,7 +124,9 @@ router.post('/generate-report-image', async (req, res) => {
     await page.setContent(html, { waitUntil: 'networkidle0' });
     
     // レンダリング完了を待つ
-    await page.waitForTimeout(1000);
+    const { setTimeout } = require('node:timers/promises');
+    await setTimeout(3000); // 3秒待つ
+
     
     const imageBuffer = await page.screenshot({
       type: 'png',
