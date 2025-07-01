@@ -10,7 +10,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // ユーザー登録
     router.post('/register', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { username, password, name, role, serviceType, ServiceNo} = req.body;
+            const { username, password, name, role, serviceType, ServiceNo } = req.body;
             
             // バリデーション
             if (!username || !password || !name || !role) {
@@ -46,9 +46,11 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     success: false,
                     error: '利用者の場合は受給者番号を入力して下さい' 
                 });
-            }else{
-                ServiceNo = NULL
             }
+
+            // 受給者番号の処理
+            const finalServiceNo = role === 'user' ? ServiceNo : null;
+            const finalServiceType = role === 'user' ? serviceType : null;
             
             // パスワードのハッシュ化
             const hashedPassword = await bcrypt.hash(password, 10);
@@ -68,8 +70,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             
             // ユーザー登録
             const result = await dbRun(
-                'INSERT INTO users (username, password, name, role, service_type, service_no) VALUES (?, ?, ?, ?, ? ,?)', 
-                [username, hashedPassword, name, role, serviceType ,ServiceNo || null]
+                'INSERT INTO users (username, password, name, role, service_type, service_no) VALUES (?, ?, ?, ?, ?, ?)', 
+                [username, hashedPassword, name, role, finalServiceType, finalServiceNo]
             );
             
             // 監査ログ記録
@@ -78,7 +80,13 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 [
                     req.session.user.id, 
                     'account_create', 
-                    JSON.stringify({ username, name, role, serviceType }), 
+                    JSON.stringify({ 
+                        username, 
+                        name, 
+                        role, 
+                        serviceType: finalServiceType,
+                        hasServiceNo: !!finalServiceNo 
+                    }), 
                     req.ip
                 ]
             );
@@ -596,6 +604,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     error: '必須項目が不足しています' 
                 });
             }
+
+            const finalServiceNo = role === 'user' ? service_no : null;
             
             // 重複チェック（自分以外）
             const existing = await dbGet(
@@ -612,7 +622,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             
             // 更新クエリ構築
             let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, service_no = ?, updated_at = CURRENT_TIMESTAMP';
-            const params = [username, name, role, serviceType, service_no];
+            const params = [username, name, role, finalServiceNo, service_no];
             
             // パスワード変更がある場合
             if (password) {
