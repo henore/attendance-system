@@ -1,8 +1,9 @@
 // routes/line.js
-// LINE Messaging API統合（システムスタイル統一版）
+// LINE Messaging API統合（画像要件対応版）
 
 const express = require('express');
 const puppeteer = require('puppeteer');
+const sharp = require('sharp'); // 画像処理ライブラリ（要インストール）
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
@@ -83,27 +84,26 @@ router.get('/status', (req, res) => {
 });
 
 /**
- * 日報画像生成（システムスタイル統一版）
+ * 日報画像生成（LINE API要件対応版）
  */
 router.post('/generate-report-image', async (req, res) => {
+  let browser = null;
   try {
     const { reportData, userData, commentData, date } = req.body;
     
     console.log('[画像生成] 開始:', { 
       userName: userData?.name, 
-      date: date || reportData?.date,
-      hasAttendance: !!reportData?.attendance,
-      dataKeys: Object.keys(reportData || {})
+      date: date || reportData?.date
     });
     
-    // データの正規化と検証
+    // データの正規化
     const normalizedData = normalizeReportData(reportData, userData, commentData, date);
     
-    // HTMLテンプレートを生成（システムスタイル統一）
-    const html = generateSystemStyleHTML(normalizedData);
+    // HTMLテンプレートを生成（正方形レイアウト対応）
+    const html = generateSquareLayoutHTML(normalizedData);
     
     // Puppeteerで画像生成
-    const browser = await puppeteer.launch({
+    browser = await puppeteer.launch({
       headless: 'new',
       args: [
         '--no-sandbox', 
@@ -124,39 +124,85 @@ router.post('/generate-report-image', async (req, res) => {
       document.documentElement.style.fontFamily = '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif';
     });
     
-    await page.setViewport({ width: 800, height: 1400, deviceScaleFactor: 2 });
+    // 正方形のビューポート設定
+    await page.setViewport({ width: 1024, height: 1024, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: 'networkidle0' });
     
     // レンダリング完了を待つ
     const { setTimeout } = require('node:timers/promises');
     await setTimeout(2000);
 
-    const imageBuffer = await page.screenshot({
+    // スクリーンショット取得（PNG形式で一旦取得）
+    const pngBuffer = await page.screenshot({
       type: 'png',
-      fullPage: true,
+      fullPage: false, // ビューポートサイズで固定
       encoding: 'binary'
     });
     
     await browser.close();
+    browser = null;
     
-    // 一時ファイルとして保存
+    // sharpを使用して画像を処理
     const imageId = `report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
     const tempDir = path.join(__dirname, '..', 'temp');
-    const imagePath = path.join(tempDir, `${imageId}.png`);
     
-    await fs.writeFile(imagePath, imageBuffer);
+    // 1024x1024のオリジナル画像（JPEG変換）
+    const originalPath = path.join(tempDir, `${imageId}_original.jpg`);
+    await sharp(pngBuffer)
+      .resize(1024, 1024, { 
+        fit: 'cover',
+        position: 'top'
+      })
+      .jpeg({ 
+        quality: 90,
+        progressive: true,
+        mozjpeg: true
+      })
+      .toFile(originalPath);
     
-    console.log('[画像生成] 完了:', { imageId, size: imageBuffer.length });
+    // 240x240のプレビュー画像
+    const previewPath = path.join(tempDir, `${imageId}_preview.jpg`);
+    await sharp(pngBuffer)
+      .resize(240, 240, { 
+        fit: 'cover',
+        position: 'top'
+      })
+      .jpeg({ 
+        quality: 80 
+      })
+      .toFile(previewPath);
+    
+    // ファイルサイズチェック
+    const originalStats = await fs.stat(originalPath);
+    const previewStats = await fs.stat(previewPath);
+    
+    console.log('[画像生成] 完了:', {
+      imageId,
+      originalSize: `${(originalStats.size / 1024).toFixed(2)}KB`,
+      previewSize: `${(previewStats.size / 1024).toFixed(2)}KB`
+    });
+    
+    // 1MB超えの場合は品質を下げて再生成
+    if (originalStats.size > 1024 * 1024) {
+      console.log('[画像生成] オリジナル画像が1MBを超えたため品質を調整');
+      await sharp(pngBuffer)
+        .resize(1024, 1024, { fit: 'cover', position: 'top' })
+        .jpeg({ quality: 70 })
+        .toFile(originalPath);
+    }
     
     res.json({ 
       success: true, 
       imageId,
-      size: imageBuffer.length,
+      originalSize: originalStats.size,
+      previewSize: previewStats.size,
       message: '画像生成完了'
     });
     
   } catch (error) {
     console.error('[画像生成] エラー:', error);
+    if (browser) await browser.close();
+    
     res.status(500).json({ 
       success: false, 
       message: '画像生成に失敗しました: ' + error.message
@@ -165,12 +211,12 @@ router.post('/generate-report-image', async (req, res) => {
 });
 
 /**
- * LINE送信
+ * LINE送信（オリジナル・プレビュー画像対応）
  */
 router.post('/send-report', async (req, res) => {
   try {
     if (!lineClient) {
-      throw new Error('LINE APIが初期化されていません。SDKの読み込みに失敗している可能性があります。');
+      throw new Error('LINE APIが初期化されていません');
     }
     
     const { imageId, userName, date, lineUserId } = req.body;
@@ -180,29 +226,38 @@ router.post('/send-report', async (req, res) => {
       throw new Error('送信先LINEユーザーIDが設定されていません');
     }
     
-    console.log('[LINE送信] 開始:', { imageId, userName, date, targetUserId: targetUserId.substring(0, 10) + '...' });
+    console.log('[LINE送信] 開始:', { imageId, userName, date });
     
-    // 画像ファイルを読み込み
-    const imagePath = path.join(__dirname, '..', 'temp', `${imageId}.png`);
+    // 画像ファイルの存在確認
+    const tempDir = path.join(__dirname, '..', 'temp');
+    const originalPath = path.join(tempDir, `${imageId}_original.jpg`);
+    const previewPath = path.join(tempDir, `${imageId}_preview.jpg`);
     
     try {
-      await fs.access(imagePath);
+      await fs.access(originalPath);
+      await fs.access(previewPath);
     } catch (error) {
       throw new Error('画像ファイルが見つかりません: ' + imageId);
     }
     
-    const imageBuffer = await fs.readFile(imagePath);
-    
     // 画像を公開ディレクトリにコピー
-    const publicFileName = `report_${Date.now()}.png`;
-    const publicPath = path.join(__dirname, '..', 'public', 'temp', publicFileName);
-    await fs.writeFile(publicPath, imageBuffer);
+    const timestamp = Date.now();
+    const publicOriginalName = `report_${timestamp}_original.jpg`;
+    const publicPreviewName = `report_${timestamp}_preview.jpg`;
+    
+    const publicDir = path.join(__dirname, '..', 'public', 'temp');
+    const publicOriginalPath = path.join(publicDir, publicOriginalName);
+    const publicPreviewPath = path.join(publicDir, publicPreviewName);
+    
+    await fs.copyFile(originalPath, publicOriginalPath);
+    await fs.copyFile(previewPath, publicPreviewPath);
     
     // 公開URLを生成
     const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
-    const imageUrl = `${baseUrl}/temp/${publicFileName}`;
+    const originalUrl = `${baseUrl}/temp/${publicOriginalName}`;
+    const previewUrl = `${baseUrl}/temp/${publicPreviewName}`;
     
-    console.log('[LINE送信] 画像URL:', imageUrl);
+    console.log('[LINE送信] 画像URL:', { originalUrl, previewUrl });
     
     // メッセージを送信
     const messages = [
@@ -212,8 +267,8 @@ router.post('/send-report', async (req, res) => {
       },
       {
         type: 'image',
-        originalContentUrl: imageUrl,
-        previewImageUrl: imageUrl
+        originalContentUrl: originalUrl,
+        previewImageUrl: previewUrl
       }
     ];
     
@@ -234,7 +289,7 @@ router.post('/send-report', async (req, res) => {
       let errorMessage = 'LINE送信に失敗しました';
       if (lineError.statusCode === 400) {
         if (lineError.response?.data?.message?.includes('Invalid user')) {
-          errorMessage = 'LINE ユーザーIDが無効です。Botと友達になっているか確認してください。';
+          errorMessage = 'LINE ユーザーIDが無効です。';
         } else {
           errorMessage = lineError.response?.data?.message || errorMessage;
         }
@@ -248,8 +303,10 @@ router.post('/send-report', async (req, res) => {
     // 一時ファイルを削除（5分後）
     setTimeout(async () => {
       try {
-        await fs.unlink(imagePath);
-        await fs.unlink(publicPath);
+        await fs.unlink(originalPath);
+        await fs.unlink(previewPath);
+        await fs.unlink(publicOriginalPath);
+        await fs.unlink(publicPreviewPath);
         console.log('[クリーンアップ] 一時ファイル削除完了');
       } catch (err) {
         console.error('[クリーンアップ] エラー:', err.message);
@@ -271,79 +328,282 @@ router.post('/send-report', async (req, res) => {
 });
 
 /**
- * テスト送信
+ * 正方形レイアウト用HTMLテンプレート生成
  */
-router.post('/test-send', async (req, res) => {
-  try {
-    if (!lineClient) {
-      throw new Error('LINE APIが初期化されていません');
-    }
-    
-    const targetUserId = req.body.lineUserId || process.env.DEFAULT_LINE_USER_ID;
-    
-    if (!targetUserId) {
-      throw new Error('送信先LINEユーザーIDが設定されていません');
-    }
-    
-    console.log('[テスト送信] 開始:', { targetUserId: targetUserId.substring(0, 10) + '...', sdkInfo: lineSDKInfo });
-    
-    const message = {
-      type: 'text',
-      text: [
-        '✅ LINE連携テスト送信',
-        '',
-        'このメッセージが届いていれば、LINE連携は正常に動作しています。',
-        '',
-        `📅 送信日時: ${new Date().toLocaleString('ja-JP')}`,
-        `🔧 SDK情報: ${lineSDKInfo}`,
-        `📱 送信先ID: ${targetUserId.substring(0, 10)}...`
-      ].join('\n')
-    };
-    
-    try {
-      if (lineSDKInfo.includes('v8')) {
-        await lineClient.pushMessage({
-          to: targetUserId,
-          messages: [message]
-        });
-      } else {
-        await lineClient.pushMessage(targetUserId, message);
-      }
-      
-      console.log('[テスト送信] 送信成功');
-      
-      res.json({ 
-        success: true, 
-        message: 'テストメッセージを送信しました',
-        sdkInfo: lineSDKInfo
-      });
-      
-    } catch (lineError) {
-      console.error('[テスト送信] LINE APIエラー:', lineError.response?.data || lineError);
-      throw lineError;
-    }
-    
-  } catch (error) {
-    console.error('[テスト送信] エラー:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || 'テスト送信に失敗しました',
-      sdkInfo: lineSDKInfo
-    });
-  }
-});
+function generateSquareLayoutHTML(data) {
+  return `
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>日報詳細</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        body {
+          font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+          width: 1024px;
+          height: 1024px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        
+        .report-container {
+          background: white;
+          border-radius: 20px;
+          padding: 40px;
+          width: 920px;
+          height: 920px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        /* スクロールバー非表示 */
+        .report-container::-webkit-scrollbar {
+          display: none;
+        }
+        
+        .header {
+          text-align: center;
+          margin-bottom: 25px;
+          border-bottom: 3px solid #667eea;
+          padding-bottom: 15px;
+        }
+        
+        .title {
+          font-size: 28px;
+          font-weight: bold;
+          color: #333;
+          margin-bottom: 5px;
+        }
+        
+        .date {
+          font-size: 18px;
+          color: #666;
+        }
+        
+        /* コンパクトな出勤情報 */
+        .attendance-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+        
+        .detail-section {
+          text-align: center;
+          padding: 10px;
+          background: #f8f9ff;
+          border-radius: 8px;
+          border-left: 4px solid #667eea;
+        }
+        
+        .detail-section h6 {
+          font-size: 14px;
+          color: #666;
+          margin: 0 0 5px 0;
+        }
+        
+        .detail-value {
+          font-size: 20px;
+          font-weight: bold;
+        }
+        
+        .text-success { color: #28a745; }
+        .text-info { color: #17a2b8; }
+        .text-warning { color: #ffc107; }
+        .text-muted { color: #6c757d; }
+        
+        hr {
+          border: none;
+          border-top: 1px solid #e9ecef;
+          margin: 15px 0;
+        }
+        
+        /* コンパクトな日報内容 */
+        .report-summary h6 {
+          font-size: 20px;
+          font-weight: bold;
+          color: #333;
+          margin-bottom: 15px;
+        }
+        
+        .form-section {
+          margin-bottom: 12px;
+        }
+        
+        .past-form-label {
+          font-size: 14px;
+          font-weight: 600;
+          color: #495057;
+          margin-bottom: 3px;
+        }
+        
+        .past-form-value {
+          font-size: 16px;
+          color: #333;
+          padding: 6px 10px;
+          background: #f8f9fa;
+          border-radius: 4px;
+        }
+        
+        .text-content {
+          font-size: 14px;
+          line-height: 1.4;
+          color: #333;
+          background: #f8f9fa;
+          padding: 8px 10px;
+          border-radius: 4px;
+          white-space: pre-wrap;
+          max-height: 80px;
+          overflow: hidden;
+        }
+        
+        /* コンパクトな健康状態 */
+        .health-row {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        
+        /* スタッフコメント */
+        .comment-section {
+          background: linear-gradient(135deg, #667eea, #764ba2);
+          color: white;
+          padding: 15px;
+          border-radius: 10px;
+          margin-top: auto;
+        }
+        
+        .comment-title {
+          font-size: 18px;
+          font-weight: bold;
+          margin-bottom: 8px;
+        }
+        
+        .comment-content {
+          font-size: 14px;
+          line-height: 1.4;
+          background: rgba(255,255,255,0.1);
+          padding: 10px;
+          border-radius: 6px;
+          margin-bottom: 5px;
+        }
+        
+        .comment-author {
+          font-size: 12px;
+          opacity: 0.9;
+          text-align: right;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="report-container">
+        <!-- ヘッダー -->
+        <div class="header">
+          <div class="title">📋 ${data.user.name}さんの日報</div>
+          <div class="date">${formatDateJapanese(data.date)}</div>
+        </div>
+        
+        <!-- 出勤情報 -->
+        <div class="attendance-row">
+          <div class="detail-section">
+            <h6>出勤</h6>
+            <div class="detail-value text-success">${data.attendance.clock_in}</div>
+          </div>
+          <div class="detail-section">
+            <h6>休憩</h6>
+            <div class="detail-value text-warning">${data.breakTimeDisplay.split(' ')[0]}</div>
+          </div>
+          <div class="detail-section">
+            <h6>退勤</h6>
+            <div class="detail-value ${data.attendance.clock_out !== '-' ? 'text-info' : 'text-muted'}">
+              ${data.attendance.clock_out === '-' ? '未退勤' : data.attendance.clock_out}
+            </div>
+          </div>
+        </div>
 
-/**
- * データの正規化関数
- */
+        <hr>
+
+        <!-- 日報内容（コンパクト版） -->
+        <div class="report-summary" style="flex: 1;">
+          <h6>📝 日報内容</h6>
+          
+          <!-- 作業内容 -->
+          <div class="form-section">
+            <label class="past-form-label">作業内容</label>
+            <div class="text-content">${data.report.work_content || ''}</div>
+          </div>
+
+          ${data.report.external_work_location ? `
+            <div class="form-section">
+              <label class="past-form-label">施設外就労先</label>
+              <div class="past-form-value">${data.report.external_work_location}</div>
+            </div>
+          ` : ''}
+
+          <!-- 健康状態 -->
+          <div class="health-row">
+            <div class="form-section">
+              <label class="past-form-label">体温</label>
+              <div class="past-form-value">${data.report.temperature}℃</div>
+            </div>
+            <div class="form-section">
+              <label class="past-form-label">食欲</label>
+              <div class="past-form-value">${formatAppetite(data.report.appetite)}</div>
+            </div>
+            <div class="form-section">
+              <label class="past-form-label">頓服</label>
+              <div class="past-form-value">${data.report.medication_time ? data.report.medication_time + '時' : 'なし'}</div>
+            </div>
+            <div class="form-section">
+              <label class="past-form-label">睡眠</label>
+              <div class="past-form-value">${calculateSleepHours(data.report.bedtime, data.report.wakeup_time)}</div>
+            </div>
+          </div>
+
+          <!-- 振り返り -->
+          <div class="form-section">
+            <label class="past-form-label">振り返り・感想</label>
+            <div class="text-content">${data.report.reflection || ''}</div>
+          </div>
+
+          ${data.report.interview_request ? `
+            <div class="form-section">
+              <label class="past-form-label">面談希望</label>
+              <div class="past-form-value">${formatInterviewRequest(data.report.interview_request)}</div>
+            </div>
+          ` : ''}
+        </div>
+
+        ${data.comment ? `
+          <!-- スタッフコメント -->
+          <div class="comment-section">
+            <div class="comment-title">💬 スタッフコメント</div>
+            <div class="comment-content">${data.comment.comment}</div>
+            <div class="comment-author">${data.comment.staff_name}</div>
+          </div>
+        ` : ''}
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+// データ正規化とヘルパー関数は既存のものを使用
 function normalizeReportData(reportData, userData, commentData, date) {
-  console.log('[データ正規化] 開始:', { 
-    reportDataKeys: Object.keys(reportData || {}),
-    userDataKeys: Object.keys(userData || {}),
-    hasComment: !!commentData?.comment 
-  });
-
-  // 出勤データの取得（複数のソースから統合）
+  // 既存の実装を維持
   const attendance = {
     clock_in: reportData.clock_in || reportData.attendance?.clock_in || '-',
     clock_out: reportData.clock_out || reportData.attendance?.clock_out || '-',
@@ -351,7 +611,6 @@ function normalizeReportData(reportData, userData, commentData, date) {
     break_end: reportData.break_end || reportData.attendance?.break_end || null
   };
 
-  // 休憩時間の表示計算
   let breakTimeDisplay = '-';
   if (userData.role === 'user' && userData.service_type !== 'home') {
     if (reportData.breakRecord && reportData.breakRecord.start_time) {
@@ -365,7 +624,7 @@ function normalizeReportData(reportData, userData, commentData, date) {
       `${attendance.break_start}〜 (進行中)`;
   }
 
-  const normalized = {
+  return {
     user: userData,
     date: date || reportData.date,
     attendance: attendance,
@@ -388,337 +647,6 @@ function normalizeReportData(reportData, userData, commentData, date) {
       created_at: commentData.created_at
     } : null
   };
-
-  console.log('[データ正規化] 完了:', {
-    userName: normalized.user.name,
-    clockIn: normalized.attendance.clock_in,
-    clockOut: normalized.attendance.clock_out,
-    hasComment: !!normalized.comment
-  });
-
-  return normalized;
-}
-
-/**
- * システムスタイル統一HTMLテンプレート生成
- */
-function generateSystemStyleHTML(data) {
-  return `
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>日報詳細</title>
-      <style>
-        body {
-          font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
-          margin: 0;
-          padding: 10px 15px 5px 15px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          min-height: 100vh;
-          color: #333;
-        }
-        
-        .report-container {
-          background: white;
-          border-radius: 15px;
-          padding: 30px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-          max-width: 750px;
-          margin: 60px auto 10px auto;
-        }
-        
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          border-bottom: 3px solid #667eea;
-          padding-bottom: 20px;
-        }
-        
-        .title {
-          font-size: 32px;
-          font-weight: bold;
-          color: #333;
-          margin-bottom: 10px;
-        }
-        
-        .date {
-          font-size: 20px;
-          color: #666;
-        }
-        
-        /* 出勤情報セクション - システムと同じスタイル */
-        .attendance-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 15px;
-          margin-bottom: 30px;
-        }
-        
-        .detail-section {
-          text-align: center;
-          padding: 15px;
-          background: #f8f9ff;
-          border-radius: 8px;
-          border-left: 4px solid #667eea;
-        }
-        
-        .detail-section h6 {
-          font-size: 18px;
-          color: #666;
-          margin: 0 0 8px 0;
-          font-weight: normal;
-        }
-        
-        .detail-value {
-          font-size: 26px;
-          font-weight: bold;
-          margin: 0;
-        }
-        
-        .text-success { color: #28a745; }
-        .text-info { color: #17a2b8; }
-        .text-warning { color: #ffc107; }
-        .text-muted { color: #6c757d; }
-        
-        hr {
-          border: none;
-          border-top: 1px solid #e9ecef;
-          margin: 25px 0;
-        }
-        
-        /* 日報内容セクション */
-        .report-summary {
-          margin-bottom: 20px;
-        }
-        
-        .report-summary h6 {
-          font-size: 24px;
-          font-weight: bold;
-          color: #333;
-          margin-bottom: 20px;
-          display: flex;
-          align-items: center;
-        }
-        
-        .report-summary h6 i {
-          margin-right: 8px;
-        }
-        
-        .form-section {
-          margin-bottom: 20px;
-        }
-        
-        .past-form-label {
-          display: block;
-          font-size: 18px;
-          font-weight: 600;
-          color: #495057;
-          margin-bottom: 5px;
-        }
-        
-        .past-form-label i {
-          margin-right: 6px;
-          width: 16px;
-          text-align: center;
-        }
-        
-        .past-form-value {
-          font-size: 20px;
-          color: #333;
-          padding: 8px 12px;
-          background: #f8f9fa;
-          border-radius: 4px;
-          min-height: 20px;
-        }
-        
-        .text-content {
-          font-size: 20px;
-          line-height: 1.6;
-          color: #333;
-          background: #f8f9fa;
-          padding: 12px;
-          border-radius: 4px;
-          white-space: pre-wrap;
-          min-height: 20px;
-        }
-        
-        /* 健康状態グリッド */
-        .health-row {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 15px;
-          margin-bottom: 20px;
-        }
-        
-        .health-detail-row {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 15px;
-          margin-bottom: 20px;
-        }
-        
-        /* スタッフコメントセクション */
-        .comment-section {
-          background: linear-gradient(135deg, #667eea, #764ba2);
-          color: white;
-          padding: 25px;
-          border-radius: 10px;
-          margin-top: 30px;
-        }
-        
-        .comment-title {
-          font-size: 24px;
-          font-weight: bold;
-          margin-bottom: 15px;
-          display: flex;
-          align-items: center;
-        }
-        
-        .comment-title i {
-          margin-right: 8px;
-        }
-        
-        .comment-content {
-          font-size: 20px;
-          line-height: 1.6;
-          background: rgba(255,255,255,0.1);
-          padding: 15px;
-          border-radius: 8px;
-          margin-bottom: 10px;
-          white-space: pre-wrap;
-        }
-        
-        .comment-author {
-          font-size: 18px;
-          opacity: 0.9;
-          text-align: right;
-        }
-        
-        /* アイコンのスタイル */
-        .fas {
-          display: inline-block;
-          width: 16px;
-          text-align: center;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="report-container">
-        <!-- ヘッダー -->
-        <div class="header">
-          <div class="title">📋 ${data.user.name}さんの日報詳細</div>
-          <div class="date">${formatDateJapanese(data.date)}</div>
-        </div>
-        
-        <!-- 出勤情報 -->
-        <div class="attendance-row">
-          <div class="detail-section">
-            <h6><i class="fas">🕘</i> 出勤時間</h6>
-            <div class="detail-value text-success">${data.attendance.clock_in}</div>
-          </div>
-          <div class="detail-section">
-            <h6><i class="fas">☕</i> 休憩時間</h6>
-            <div class="detail-value text-warning">${data.breakTimeDisplay}</div>
-          </div>
-          <div class="detail-section">
-            <h6><i class="fas">🕕</i> 退勤時間</h6>
-            <div class="detail-value ${data.attendance.clock_out !== '-' ? 'text-info' : 'text-muted'}">
-              ${data.attendance.clock_out === '-' ? '未退勤' : data.attendance.clock_out}
-            </div>
-          </div>
-        </div>
-
-        <hr>
-
-        <!-- 日報内容 -->
-        <div class="report-summary">
-          <h6><i class="fas">📝</i> 日報内容</h6>
-          
-          <!-- 作業内容 -->
-          <div class="form-section">
-            <label class="past-form-label"><i class="fas">📋</i> 作業内容</label>
-            <div class="text-content">${data.report.work_content || ''}</div>
-          </div>
-
-          ${data.report.external_work_location ? `
-            <!-- 施設外就労先 -->
-            <div class="form-section">
-              <label class="past-form-label">
-                <i class="fas">🏢</i> 施設外就労先
-              </label>
-              <div class="past-form-value text-info">${data.report.external_work_location}</div>
-            </div>
-          ` : ''}
-
-          <!-- 健康状態 -->
-          <div class="health-row">
-            <div class="form-section">
-              <label class="past-form-label"><i class="fas">🌡️</i> 体温</label>
-              <div class="past-form-value">${data.report.temperature}℃</div>
-            </div>
-            <div class="form-section">
-              <label class="past-form-label"><i class="fas">🍽️</i> 食欲</label>
-              <div class="past-form-value">${formatAppetite(data.report.appetite)}</div>
-            </div>
-            <div class="form-section">
-              <label class="past-form-label"><i class="fas">💊</i> 頓服服用</label>
-              <div class="past-form-value">${data.report.medication_time ? data.report.medication_time + '時頃' : 'なし'}</div>
-            </div>
-            <div class="form-section">
-              <label class="past-form-label"><i class="fas">😴</i> 睡眠時間</label>
-              <div class="past-form-value">${calculateSleepHours(data.report.bedtime, data.report.wakeup_time)}</div>
-            </div>
-          </div>
-
-          ${data.report.bedtime || data.report.wakeup_time ? `
-            <!-- 睡眠情報詳細 -->
-            <div class="health-detail-row">
-              <div class="form-section">
-                <label class="past-form-label"><i class="fas">🌙</i> 就寝時間</label>
-                <div class="past-form-value">${data.report.bedtime || '-'}</div>
-              </div>
-              <div class="form-section">
-                <label class="past-form-label"><i class="fas">☀️</i> 起床時間</label>
-                <div class="past-form-value">${data.report.wakeup_time || '-'}</div>
-              </div>
-              <div class="form-section">
-                <label class="past-form-label"><i class="fas">😴</i> 睡眠状態</label>
-                <div class="past-form-value">${formatSleepQuality(data.report.sleep_quality)}</div>
-              </div>
-            </div>
-          ` : ''}
-
-          <!-- 振り返り -->
-          <div class="form-section">
-            <label class="past-form-label"><i class="fas">💭</i> 振り返り・感想</label>
-            <div class="text-content">${data.report.reflection || ''}</div>
-          </div>
-
-          ${data.report.interview_request ? `
-            <!-- 面談希望 -->
-            <div class="form-section">
-              <label class="past-form-label"><i class="fas">💬</i> 面談希望</label>
-              <div class="past-form-value text-info">${formatInterviewRequest(data.report.interview_request)}</div>
-            </div>
-          ` : ''}
-        </div>
-
-        ${data.comment ? `
-          <!-- スタッフコメント -->
-          <div class="comment-section">
-            <div class="comment-title">
-              <i class="fas">💬</i>スタッフからのコメント
-            </div>
-            <div class="comment-content">${data.comment.comment}</div>
-            <div class="comment-author">記入者: ${data.comment.staff_name}</div>
-          </div>
-        ` : ''}
-      </div>
-    </body>
-    </html>
-  `;
 }
 
 // ヘルパー関数
@@ -805,12 +733,70 @@ function calculateSleepHours(bedtime, wakeupTime) {
   }
 }
 
-// routes/line.js に追加 - ボット設定確認用
+// 既存のテスト送信・Webhook・ボット状態確認は維持
+router.post('/test-send', async (req, res) => {
+  // 既存の実装を維持
+  try {
+    if (!lineClient) {
+      throw new Error('LINE APIが初期化されていません');
+    }
+    
+    const targetUserId = req.body.lineUserId || process.env.DEFAULT_LINE_USER_ID;
+    
+    if (!targetUserId) {
+      throw new Error('送信先LINEユーザーIDが設定されていません');
+    }
+    
+    console.log('[テスト送信] 開始:', { targetUserId: targetUserId.substring(0, 10) + '...', sdkInfo: lineSDKInfo });
+    
+    const message = {
+      type: 'text',
+      text: [
+        '✅ LINE連携テスト送信',
+        '',
+        'このメッセージが届いていれば、LINE連携は正常に動作しています。',
+        '',
+        `📅 送信日時: ${new Date().toLocaleString('ja-JP')}`,
+        `🔧 SDK情報: ${lineSDKInfo}`,
+        `📱 送信先ID: ${targetUserId.substring(0, 10)}...`
+      ].join('\n')
+    };
+    
+    try {
+      if (lineSDKInfo.includes('v8')) {
+        await lineClient.pushMessage({
+          to: targetUserId,
+          messages: [message]
+        });
+      } else {
+        await lineClient.pushMessage(targetUserId, message);
+      }
+      
+      console.log('[テスト送信] 送信成功');
+      
+      res.json({ 
+        success: true, 
+        message: 'テストメッセージを送信しました',
+        sdkInfo: lineSDKInfo
+      });
+      
+    } catch (lineError) {
+      console.error('[テスト送信] LINE APIエラー:', lineError.response?.data || lineError);
+      throw lineError;
+    }
+    
+  } catch (error) {
+    console.error('[テスト送信] エラー:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'テスト送信に失敗しました',
+      sdkInfo: lineSDKInfo
+    });
+  }
+});
 
-/**
- * ボット設定状況の確認エンドポイント
- */
 router.get('/bot-status', async (req, res) => {
+  // 既存の実装を維持
   try {
     let clientStatus = 'not_initialized';
     let clientType = 'unknown';
@@ -868,10 +854,8 @@ router.get('/bot-status', async (req, res) => {
   }
 });
 
-/**
- * Webhook受信テスト（改良版）
- */
 router.post('/webhook', (req, res) => {
+  // 既存の実装を維持
   try {
     console.log('\n🔔 === Webhook受信 ===');
     console.log('受信時刻:', new Date().toLocaleString('ja-JP'));
@@ -919,13 +903,10 @@ router.post('/webhook', (req, res) => {
     
     console.log('==================\n');
     
-    // 正常応答（重要！）
     res.status(200).send('OK');
     
   } catch (error) {
     console.error('❌ Webhook処理エラー:', error);
-    
-    // エラーでも200で応答（LINEのリトライを防ぐ）
     res.status(200).send('Error logged');
   }
 });

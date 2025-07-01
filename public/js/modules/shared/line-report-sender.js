@@ -61,42 +61,73 @@ export class LineReportSender {
    * サーバーサイドでの画像生成とLINE送信
    */
   async sendToLineServer(reportData, userData, commentData) {
-    try {
-      // 1. まず画像を生成
-      const imageResponse = await this.app.apiCall(API_ENDPOINTS.LINE.GENERATE_IMAGE, {
-        method: 'POST',
-        body: JSON.stringify({
-          reportData: reportData,
-          userData: userData,
-          commentData: commentData,
-          date: reportData.date
-        })
-      });
+  try {
+    // 1. まず画像を生成
+    const imageResponse = await this.app.apiCall(API_ENDPOINTS.LINE.GENERATE_IMAGE, {
+      method: 'POST',
+      body: JSON.stringify({
+        reportData: reportData,
+        userData: userData,
+        commentData: commentData,
+        date: reportData.date
+      })
+    });
+    
+    if (!imageResponse.success) {
+      // 画像生成エラーの詳細化
+      const errorMsg = imageResponse.message || '画像生成に失敗しました';
       
-      if (!imageResponse.success) {
-        throw new Error('画像生成に失敗しました: ' + imageResponse.message);
+      if (errorMsg.includes('Puppeteer')) {
+        throw new Error('画像生成エンジンエラー: ブラウザの起動に失敗しました');
+      } else if (errorMsg.includes('sharp')) {
+        throw new Error('画像処理エラー: 画像の変換に失敗しました');
+      } else {
+        throw new Error(`画像生成エラー: ${errorMsg}`);
       }
-      
-      console.log('[LINE送信] 画像生成完了:', imageResponse.imageId);
-      
-      // 2. LINEに送信（lineUserIdはサーバー側で環境変数から取得）
-      const sendResponse = await this.app.apiCall(API_ENDPOINTS.LINE.SEND_REPORT, {
-        method: 'POST',
-        body: JSON.stringify({
-          imageId: imageResponse.imageId,
-          userName: userData.name,
-          date: reportData.date
-          // lineUserIdはサーバー側で自動設定
-        })
-      });
-      
-      return sendResponse;
-      
-    } catch (error) {
-      console.error('[サーバー送信] エラー:', error);
-      throw error;
     }
+    
+    console.log('[LINE送信] 画像生成完了:', {
+      imageId: imageResponse.imageId,
+      originalSize: `${(imageResponse.originalSize / 1024).toFixed(2)}KB`,
+      previewSize: `${(imageResponse.previewSize / 1024).toFixed(2)}KB`
+    });
+    
+    // サイズ警告
+    if (imageResponse.originalSize > 900 * 1024) {
+      console.warn('[LINE送信] 警告: 画像サイズが900KBを超えています');
+    }
+    
+    // 2. LINEに送信
+    const sendResponse = await this.app.apiCall(API_ENDPOINTS.LINE.SEND_REPORT, {
+      method: 'POST',
+      body: JSON.stringify({
+        imageId: imageResponse.imageId,
+        userName: userData.name,
+        date: reportData.date
+      })
+    });
+    
+    return sendResponse;
+    
+  } catch (error) {
+    console.error('[サーバー送信] エラー:', error);
+    
+    // ユーザーフレンドリーなエラーメッセージ
+    if (error.message.includes('画像')) {
+      this.app.showNotification(
+        '画像の生成に失敗しました。システム管理者にお問い合わせください。', 
+        'danger'
+      );
+    } else if (error.message.includes('LINE')) {
+      this.app.showNotification(
+        'LINEへの送信に失敗しました。しばらく待ってから再度お試しください。', 
+        'danger'
+      );
+    }
+    
+    throw error;
   }
+}
 
   /**
    * テスト送信

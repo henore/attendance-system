@@ -9,17 +9,17 @@
     "init-db": "node scripts/init-db.js"
   },
   "dependencies": {
-    "@line/bot-sdk": "^10.0.0",
-    "bcryptjs": "^2.4.3",
+    "@line/bot-sdk": "^7.5.2",
+    "bcrypt": "^5.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
     "helmet": "^7.0.0",
     "morgan": "^1.10.0",
-    "multer": "^2.0.1",
-    "puppeteer": "^24.11.1",
-    "sqlite3": "^5.1.7"
+    "puppeteer": "^22.0.0",
+    "sharp": "^0.33.0",
+    "sqlite3": "^5.1.4"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
