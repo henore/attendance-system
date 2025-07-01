@@ -68,7 +68,7 @@ export default class AdminUserManagement {
                                 </div>
                                 <div class="mb-3" id="ServiceNoGroup" style="display: none;">
                                     <label for="newServiceNo" class="form-label">受給者番号</label>
-                                    <input type="text" class="form-control" id="newServiceNo" required>
+                                    <input type="text" class="form-control" id="newServiceNo">
                                     <div class="form-text">受給者番号入力（印刷で使用）</div>
                                 </div>
                                 <button type="submit" class="btn btn-primary w-100" id="registerUserBtn">
@@ -177,7 +177,7 @@ export default class AdminUserManagement {
                                 </div>
                                 <div class="mb-3" id="editServiceNoGroup" style="display: none;>
                                         <label for="editServiceNo" class="form-label">受給者番号</label>
-                                        <input type="text" class="form-control" id="editServiceNo" required>
+                                        <input type="text" class="form-control" id="editServiceNo">
                                 </div>
                             </form>
                         </div>

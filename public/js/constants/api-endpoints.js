@@ -25,10 +25,12 @@ export const API_ENDPOINTS = {
 
   // LINE連携（api-endpoints.jsに追加）
   LINE: {
+
     STATUS: '/api/line/status',
     GENERATE_IMAGE: '/api/line/generate-report-image',
     SEND_REPORT: '/api/line/send-report',
     TEST_SEND: '/api/line/test-send'  // テスト用エンドポイント
+
   },
   
   // 利用者用
@@ -76,9 +78,9 @@ export const API_ENDPOINTS = {
     USERS: '/api/admin/users',
     USER_CREATE: '/api/admin/users/create',
     USER_UPDATE: (userId) => `/api/admin/users/${userId}`,
-    USER_DELETE: (userId) => `/api/admin/users/${userId}`,
+    //USER_DELETE: (userId) => `/api/admin/users/${userId}`,
     USER_TOGGLE: (userId) => `/api/admin/users/${userId}/toggle`,
-    USER_RETIRE: (userId) => `/api/admin/retire/${userId}`, // 追加
+    RETIRE_USER: (userId) => `/api/admin/retire/${userId}`, // 追加
     MONTHLY_REPORT: '/api/admin/monthly-report',
     EXPORT_CSV: '/api/admin/export/csv',
     AUDIT_LOG: '/api/admin/audit-log',

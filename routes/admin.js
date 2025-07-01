@@ -40,6 +40,15 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     error: '利用者の場合はサービス区分を選択してください' 
                 });
             }
+
+            if (role === 'user' && !ServiceNo) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '利用者の場合は受給者番号を入力して下さい' 
+                });
+            }else{
+                ServiceNo = NULL
+            }
             
             // パスワードのハッシュ化
             const hashedPassword = await bcrypt.hash(password, 10);
@@ -100,7 +109,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         try {
             const { role } = req.query;
             let query = `
-                SELECT id, username, name, role, service_type, created_at ,service_no
+                SELECT id, username, name, role, service_type, created_at ,service_no 
                 FROM users 
                 WHERE is_active = 1
             `;
@@ -602,7 +611,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             }
             
             // 更新クエリ構築
-            let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, service_no = ?,updated_at = CURRENT_TIMESTAMP';
+            let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, service_no = ?, updated_at = CURRENT_TIMESTAMP';
             const params = [username, name, role, serviceType, service_no];
             
             // パスワード変更がある場合
