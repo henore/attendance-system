@@ -66,6 +66,11 @@ export default class AdminUserManagement {
                                     </select>
                                     <div class="form-text">利用者の場合は必須です</div>
                                 </div>
+                                <div class="mb-3" id="ServiceNoGroup" style="display: none;">
+                                    <label for="newServiceNo" class="form-label">受給者番号</label>
+                                    <input type="text" class="form-control" id="newServiceNo" required>
+                                    <div class="form-text">受給者番号入力（印刷で使用）</div>
+                                </div>
                                 <button type="submit" class="btn btn-primary w-100" id="registerUserBtn">
                                     <i class="fas fa-user-plus"></i> ユーザー登録
                                 </button>
@@ -170,6 +175,10 @@ export default class AdminUserManagement {
                                         <option value="home">在宅</option>
                                     </select>
                                 </div>
+                                <div class="mb-3" id="editServiceNoGroup" style="display: none;>
+                                        <label for="editServiceNo" class="form-label">受給者番号</label>
+                                        <input type="text" class="form-control" id="editServiceNo" required>
+                                </div>
                             </form>
                         </div>
                         <div class="modal-footer">
@@ -262,19 +271,29 @@ export default class AdminUserManagement {
             document.getElementById('editName').value = user.name;
             document.getElementById('editRole').value = user.role;
             document.getElementById('editPassword').value = '';
+            
 
             // サービス区分の表示制御
             const serviceTypeGroup = document.getElementById('editServiceTypeGroup');
             const serviceTypeSelect = document.getElementById('editServiceType');
-            
+             
             if (user.role === 'user') {
                 serviceTypeGroup.style.display = 'block';
                 serviceTypeSelect.value = user.service_type || '';
                 serviceTypeSelect.required = true;
+
+                document.getElementById('editServiceNo').value = user.service_no;
+                editServiceNoGroup.style.display = 'block';
+                editServiceNoGroup.required = true;
+
+
             } else {
                 serviceTypeGroup.style.display = 'none';
                 serviceTypeSelect.value = '';
                 serviceTypeSelect.required = false;
+
+                editServiceNoGroup.style.display = 'none';
+                editServiceNoGroup.required = false;
             }
 
             // パスワード生成ボタン
@@ -298,10 +317,17 @@ export default class AdminUserManagement {
                     if (e.target.value === 'user') {
                         editServiceTypeGroup.style.display = 'block';
                         editServiceType.required = true;
+
+                        document.getElementById('editServiceNo').value = user.service_no;
+                        editServiceNoGroup.style.display = 'block';
+                        editServiceNoGroup.required = true;
                     } else {
                         editServiceTypeGroup.style.display = 'none';
                         editServiceType.required = false;
                         editServiceType.value = '';
+
+                        editServiceNoGroup.style.display = 'none';
+                        editServiceNoGroup.required = false;
                     }
                 });
             }
@@ -347,6 +373,7 @@ export default class AdminUserManagement {
         const name = document.getElementById('editName').value.trim();
         const role = document.getElementById('editRole').value;
         const serviceType = document.getElementById('editServiceType').value;
+        const service_no = document.getElementById('editServiceNo').value;
 
         // バリデーション
         if (!username || !name || !role) {
@@ -356,6 +383,11 @@ export default class AdminUserManagement {
 
         if (role === 'user' && !serviceType) {
             this.parent.showNotification('利用者の場合はサービス区分を選択してください', 'warning');
+            return;
+        }
+
+        if (role === 'user' && !service_no) {
+            this.parent.showNotification('利用者の場合は受給者番号を入力して下さい', 'warning');
             return;
         }
 
@@ -376,7 +408,8 @@ export default class AdminUserManagement {
                 username,
                 name,
                 role,
-                serviceType: role === 'user' ? serviceType : null
+                serviceType: role === 'user' ? serviceType : null,
+                service_no
             };
 
             if (password) {
@@ -424,6 +457,7 @@ export default class AdminUserManagement {
         const name = document.getElementById('editName').value.trim();
         const role = document.getElementById('editRole').value;
         const serviceType = document.getElementById('editServiceType').value;
+        const service_no = document.getElementById('editServiceNo').value;
 
         // バリデーション
         if (!username || !name || !role) {
@@ -433,6 +467,10 @@ export default class AdminUserManagement {
 
         if (role === 'user' && !serviceType) {
             this.parent.showNotification('利用者の場合はサービス区分を選択してください', 'warning');
+            return;
+        }
+        if (role === 'user' && !service_no) {
+            this.parent.showNotification('利用者の場合は受給者番号を入力して下さい', 'warning');
             return;
         }
 
@@ -453,7 +491,8 @@ export default class AdminUserManagement {
                 username,
                 name,
                 role,
-                serviceType: role === 'user' ? serviceType : null
+                serviceType: role === 'user' ? serviceType : null,
+                service_no
             };
 
             if (password) {
@@ -501,27 +540,36 @@ export default class AdminUserManagement {
         const roleSelect = this.container.querySelector('#newRole');
         const serviceTypeGroup = this.container.querySelector('#serviceTypeGroup');
         const serviceTypeSelect = this.container.querySelector('#newServiceType');
+        const ServiesNoGroup = this.container.querySelector('#ServiceNoGroup');
         
         if (roleSelect.value === 'user') {
             serviceTypeGroup.style.display = 'block';
             serviceTypeSelect.required = true;
+
+            ServiesNoGroup.style.display = 'block';
+            ServiesNoGroup.required = true;
+
         } else {
             serviceTypeGroup.style.display = 'none';
             serviceTypeSelect.required = false;
             serviceTypeSelect.value = '';
+            
+            ServiesNoGroup.style.display = 'none';
+            ServiesNoGroup.required = false;
         }
     }
 
     async handleUserRegistration(e) {
         e.preventDefault();
-        
+
         const formData = {
             username: this.container.querySelector('#newUsername').value.trim(),
             password: this.container.querySelector('#newPassword').value,
             name: this.container.querySelector('#newName').value.trim(),
             role: this.container.querySelector('#newRole').value,
-            serviceType: this.container.querySelector('#newServiceType').value
-        };
+            serviceType: this.container.querySelector('#newServiceType').value,
+            ServiceNo: this.container.querySelector('#newServiceNo').value.trim()
+         };
 
         // バリデーション
         if (!this.validateUserRegistration(formData)) {
@@ -600,7 +648,11 @@ export default class AdminUserManagement {
             this.parent.showNotification('利用者の場合はサービス区分を選択してください', 'warning');
             return false;
         }
-
+        // 受給者番号
+        if (formData.role === 'user' && !formData.ServiceNo) {
+            this.parent.showNotification('利用者の場合は受給者番号を入力して下さい', 'warning');
+            return false;
+        }
         return true;
     }
 

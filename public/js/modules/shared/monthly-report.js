@@ -508,9 +508,10 @@ export default class SharedMonthlyReport {
                     user_id: user.id,
                     user_name: user.name,
                     user_role: user.role,
+                    service_no: user.service_no,
                     service_type: user.service_type
                 };
-                
+
                 // 利用者の休憩記録を含める（APIから直接取得したデータをマッピング）
                 if (user.role === 'user' && user.service_type !== 'home') {
                     // break_recordsテーブルからのデータ（admin/staff APIはbreak_start/break_endとして返す）
@@ -539,12 +540,13 @@ export default class SharedMonthlyReport {
                     user_name: user.name,
                     user_role: user.role,
                     service_type: user.service_type,
+                    service_no:user.service_no,
                     clock_in: null,
                     clock_out: null
                 });
             }
         }
-        
+
         let html = `
             <div class="monthly-attendance-report">
                 <h5 class="mb-3">
@@ -553,7 +555,8 @@ export default class SharedMonthlyReport {
                         ${this.parent.getRoleDisplayName(user.role)}
                         ${user.service_type ? ` - ${this.parent.getServiceTypeDisplayName(user.service_type)}` : ''}
                     </small>
-                </h5>
+                    <span>${user.service_no ? `受給者番号:${user.service_no}` : ''}</span>
+                  </h5>
                 
                 ${this.attendanceTable.generateTable(dailyRecords, {
                     showOnlyWorking: false,  // 月別は全日付表示
@@ -602,9 +605,10 @@ export default class SharedMonthlyReport {
                 <table class="table">
                     <tfoot class="table-secondary">
                         <tr>
-                            <th colspan="9" class="text-end">月間集計</th>
-                            <th class="text-center">出勤日数: ${workingDays}日</th>
-                            <th class="text-center">総実働: ${totalWorkHours.toFixed(2)}時間</th>
+                            <th colspan="2" class="text-center">月間集計</th>
+                            <th colspan="2" class="text-center">出勤日数: ${workingDays}日</th>
+                            <th colspan="4" class="text-center">総実働: ${totalWorkHours.toFixed(2)}時間</th>
+                            <th colspan="1" class="stamp print-only">印</th>
                         </tr>
                     </tfoot>
                 </table>
@@ -713,15 +717,13 @@ export default class SharedMonthlyReport {
                 /* 月間集計のスタイル */
                 .table-secondary {
                     background-color: #f0f0f0 !important;
-                    -webkit-print-color-adjust: exact;
-                    print-color-adjust: exact;
-                    font-weight: bold;
+
                 }
-                
-                /* 月間集計のcolspan調整 */
-                .monthly-attendance-report tfoot tr th:first-child {
-                    text-align: right;
-                    padding-right: 10px;
+                .table-secondary th {
+                   height: 75px; 
+                    }
+                .stamp{
+                    font-size:6px;
                 }
                 
                 /* バッジのスタイル（非表示対象外の場合） */

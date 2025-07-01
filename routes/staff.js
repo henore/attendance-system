@@ -407,7 +407,7 @@ router.post('/break/end', async (req, res) => {
       
       // 指定されたユーザーが利用者かチェック
       const targetUser = await dbGet(
-        'SELECT id, name, role, service_type FROM users WHERE id = ? AND is_active = 1',
+        'SELECT id, name, role, service_type ,service_no FROM users WHERE id = ? AND is_active = 1',
         [userId]
       );
       

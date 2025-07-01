@@ -10,7 +10,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // ユーザー登録
     router.post('/register', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { username, password, name, role, serviceType } = req.body;
+            const { username, password, name, role, serviceType, ServiesNo} = req.body;
             
             // バリデーション
             if (!username || !password || !name || !role) {
@@ -59,8 +59,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             
             // ユーザー登録
             const result = await dbRun(
-                'INSERT INTO users (username, password, name, role, service_type) VALUES (?, ?, ?, ?, ?)', 
-                [username, hashedPassword, name, role, serviceType || null]
+                'INSERT INTO users (username, password, name, role, service_type, service_no) VALUES (?, ?, ?, ?, ? ,?)', 
+                [username, hashedPassword, name, role, serviceType ,ServiesNo || null]
             );
             
             // 監査ログ記録
@@ -100,7 +100,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         try {
             const { role } = req.query;
             let query = `
-                SELECT id, username, name, role, service_type, created_at 
+                SELECT id, username, name, role, service_type, created_at ,service_no
                 FROM users 
                 WHERE is_active = 1
             `;
@@ -578,7 +578,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // ユーザー情報更新
     router.put('/user/update', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { userId, username, password, name, role, serviceType } = req.body;
+            const { userId, username, password, name, role, serviceType, service_no } = req.body;
             
             // バリデーション
             if (!userId || !username || !name || !role) {
@@ -602,8 +602,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             }
             
             // 更新クエリ構築
-            let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, updated_at = CURRENT_TIMESTAMP';
-            const params = [username, name, role, serviceType];
+            let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, service_no = ?,updated_at = CURRENT_TIMESTAMP';
+            const params = [username, name, role, serviceType, service_no];
             
             // パスワード変更がある場合
             if (password) {
