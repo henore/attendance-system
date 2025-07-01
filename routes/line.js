@@ -154,7 +154,7 @@ router.post('/generate-report-image', async (req, res) => {
         position: 'top'
       })
       .jpeg({ 
-        quality: 75,  // 品質を75%に下げて容量削減
+        quality: 60,  // 品質を75%に下げて容量削減
         progressive: true,
         mozjpeg: true
       })
@@ -168,7 +168,7 @@ router.post('/generate-report-image', async (req, res) => {
         position: 'top'
       })
       .jpeg({ 
-        quality: 70  // プレビューも品質調整
+        quality: 55  // プレビューも品質調整
       })
       .toFile(previewPath);
     
@@ -187,7 +187,7 @@ router.post('/generate-report-image', async (req, res) => {
       console.log('[画像生成] オリジナル画像が1MBを超えたため品質を調整');
       await sharp(pngBuffer)
         .resize(1024, 1024, { fit: 'cover', position: 'top' })
-        .jpeg({ quality: 60 })  // さらに品質を下げる
+        .jpeg({ quality: 50 })  // さらに品質を下げる
         .toFile(originalPath);
     }
     
@@ -398,7 +398,6 @@ function generateSquareLayoutHTML(data) {
           grid-template-columns: 1fr 1fr 1fr;
           gap: 8px;
           margin-bottom: 15px;
-          font-size: 40px;
         }
         
         .detail-section {
@@ -407,17 +406,17 @@ function generateSquareLayoutHTML(data) {
           background: #f8f9ff;
           border-radius: 6px;
           border-left: 3px solid #667eea;
-          font-size: 40px;
+          font-size: 20px;
         }
         
         .detail-section h6 {
-          font-size: 12px;
+          font-size: 8px;
           color: #666;
           margin: 0 0 3px 0;
         }
         
         .detail-value {
-          font-size: 12px;
+          font-size: 8px;
           font-weight: bold;
         }
         
