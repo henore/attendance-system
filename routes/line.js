@@ -398,6 +398,7 @@ function generateSquareLayoutHTML(data) {
           grid-template-columns: 1fr 1fr 1fr;
           gap: 8px;
           margin-bottom: 15px;
+          font-size: 60px;
         }
         
         .detail-section {
@@ -444,14 +445,14 @@ function generateSquareLayoutHTML(data) {
         }
         
         .past-form-label {
-          font-size: 20px;
+          font-size: 14px;
           font-weight: 600;
           color: #495057;
           margin-bottom: 2px;
         }
         
         .past-form-value {
-          font-size: 20px;
+          font-size: 14px;
           color: #333;
           padding: 4px 8px;
           background: #f8f9fa;
@@ -459,7 +460,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .text-content {
-          font-size: 20px;
+          font-size: 18px;
           line-height: 1.3;
           color: #333;
           background: #f8f9fa;
