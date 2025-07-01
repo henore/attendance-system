@@ -154,7 +154,7 @@ router.post('/generate-report-image', async (req, res) => {
         position: 'top'
       })
       .jpeg({ 
-        quality: 60,  // 品質を75%に下げて容量削減
+        quality: 55,  // 品質を75%に下げて容量削減
         progressive: true,
         mozjpeg: true
       })
@@ -168,7 +168,7 @@ router.post('/generate-report-image', async (req, res) => {
         position: 'top'
       })
       .jpeg({ 
-        quality: 55  // プレビューも品質調整
+        quality: 50  // プレビューも品質調整
       })
       .toFile(previewPath);
     
@@ -416,7 +416,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .detail-value {
-          font-size: 24px;
+          font-size: 30px;
           font-weight: bold;
         }
         
