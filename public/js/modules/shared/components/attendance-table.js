@@ -29,6 +29,10 @@ export class AttendanceTable {
       ? records.filter(record => record.clock_in) 
       : records;
 
+     if (context === 'monthly') {
+    this.generateMonthlyFooter(records, this.calculateWorkDurationDay.bind(this));
+     }
+
     if (filteredRecords.length === 0) {
       return this.generateEmptyState(showOnlyWorking);
     }
@@ -106,7 +110,7 @@ export class AttendanceTable {
     const roleClass = this.getRoleColor(record.user_role);
     const roleDisplay = this.getRoleDisplayName(record.user_role);
     const breakDisplay = this.formatBreakTime(record);
-    const workHours = this.calculateWorkDuration(record);
+    const netHours = this.calculateWorkDurationDay(record);
     const statusBadge = this.getStatusBadge(record.status || 'normal');
     const reportStatus = this.getReportCommentStatus(record);
     const operations = showOperations ? 
@@ -120,7 +124,7 @@ export class AttendanceTable {
         <td class="text-center">${record.clock_in || '-'}</td>
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
-        <td class="text-center">${workHours ? workHours + 'h' : '-'}</td>
+        <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
         <td class="text-center">${statusBadge}</td>
         <td class="text-center">${reportStatus}</td>
         ${showOperations ? `<td class="text-center">${operations}</td>` : ''}
@@ -138,8 +142,8 @@ export class AttendanceTable {
     const breakDisplay = this.formatBreakTime(record);
     
     // 実働時間計算
-    const workHours = this.calculateWorkDuration(record);
-    
+    const netHours = this.calculateWorkDurationDay(record);
+
     // ステータス表示
     const statusBadge = record.clock_in ? 
       this.getStatusBadge(record.status || 'normal') : '-';
@@ -163,7 +167,7 @@ export class AttendanceTable {
         <td class="text-center">${record.clock_in || '-'}</td>
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
-        <td class="text-center">${workHours ? workHours + 'h' : '-'}</td>
+        <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
         <td class="text-center">${statusBadge}</td>
         <td class="text-center">${reportStatus}</td>
         ${showOperations ? `<td class="text-center">${operations}</td>` : ''}
@@ -182,13 +186,10 @@ export class AttendanceTable {
       break_end: record.break_end,
       break_start_time: record.break_start_time,
       break_end_time: record.break_end_time,
-      br_start: record.br_start,
-      br_end: record.br_end,
-      breakRecord: record.breakRecord
     });
     
-    // スタッフ・管理者の場合
-    if (record.user_role === 'staff' || record.user_role === 'admin') {
+    // スタッフ
+    if (record.user_role === 'staff') {
       if (record.break_start) {
         console.log('[DEBUG] スタッフ/管理者の休憩:', record.break_start, record.break_end);
         return record.break_end ? 
@@ -196,38 +197,14 @@ export class AttendanceTable {
           `${record.break_start}〜`;
       }
     }
-    // 利用者の場合
-    else if (record.user_role === 'user') {
-      // 1. breakRecordオブジェクトがある場合（最優先）
-      if (record.breakRecord) {
-        console.log('[DEBUG] 利用者の休憩(breakRecord):', record.breakRecord);
-        return record.breakRecord.end_time ? 
-          `${record.breakRecord.start_time}〜${record.breakRecord.end_time}` : 
-          `${record.breakRecord.start_time}〜`;
-      }
-      // 2. break_start_time/break_end_timeがある場合
-      else if (record.break_start_time) {
+    // 利用者
+    else
+      if (record.break_start_time) {
         console.log('[DEBUG] 利用者の休憩(break_start_time):', record.break_start_time, record.break_end_time);
         return record.break_end_time ? 
           `${record.break_start_time}〜${record.break_end_time}` : 
           `${record.break_start_time}〜`;
-      }
-      // 3. APIから直接のbreak_start/break_endがある場合（月別出勤簿用）
-      else if (record.break_start) {
-        console.log('[DEBUG] 利用者の休憩(break_start):', record.break_start, record.break_end);
-        return record.break_end ? 
-          `${record.break_start}〜${record.break_end}` : 
-          `${record.break_start}〜`;
-      }
-      // 4. br_start/br_endがある場合
-      else if (record.br_start) {
-        console.log('[DEBUG] 利用者の休憩(br_start):', record.br_start, record.br_end);
-        return record.br_end ? 
-          `${record.br_start}〜${record.br_end}` : 
-          `${record.br_start}〜`;
-      }
-    }
-    
+      }  
     console.log('[DEBUG] 休憩なし');
     return '-';
   }
@@ -235,7 +212,8 @@ export class AttendanceTable {
   /**
    * 実働時間計算（休憩時間考慮）
    */
-  calculateWorkDuration(record) {
+  
+  calculateWorkDurationDay(record) {
     if (!record.clock_in || !record.clock_out) return null;
     
     try {
@@ -245,31 +223,29 @@ export class AttendanceTable {
         record.clock_out, 
         0 // 休憩時間は後で引く
       );
-      
+      console.log('[DEBUG] 実働のスタッフ休憩:', record.break_start, record.break_end);
+      console.log('[DEBUG] 実働のUSER休憩:', record.break_start_time, record.break_end_time);
       if (!workHours) return null;
       
-      // 休憩時間の取得
-      let breakMinutes = 0;
-      
-      // スタッフ・管理者（固定60分）
-      if (record.user_role === 'staff' || record.user_role === 'admin') {
-        if (record.break_start && record.break_end) {
-          breakMinutes = 60;
+        // 休憩時間の取得
+        let breakMinutes = 0;
+        
+        // スタッフ・管理者（固定60分）
+        if (record.user_role === 'staff') {
+          if (record.break_start && record.break_end) {
+            breakMinutes = 60;
+          }
         }
-      }
-      // 利用者（実際の休憩時間）
-      else if (record.user_role === 'user') {
-        if (record.break && record.break.duration) {
-          breakMinutes = record.break.duration;
-        } else if (record.break_duration) {
-          breakMinutes = record.break_duration;
-        } else if (record.break_start_time && record.break_end_time) {
-          breakMinutes = 60; // デフォルト
+        // 利用者（実際の休憩時間）
+        if (record.user_role === 'user') {
+          if (record.break_start_time && record.break_end_time){
+            breakMinutes = 60; // デフォルト
+          }
         }
-      }
       
       const netHours = workHours - (breakMinutes / 60);
-      return netHours > 0 ? netHours.toFixed(2) : workHours.toFixed(2);
+      console.log('[DEBUG] 実働時間:', netHours);
+      return netHours;
       
     } catch (error) {
       console.error('勤務時間計算エラー:', error);

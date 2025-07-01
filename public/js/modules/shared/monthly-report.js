@@ -6,7 +6,6 @@ import { modalManager } from './modal-manager.js';
 import { formatDate, getDaysInMonth, formatDateTime } from '../../utils/date-time.js';
 import { AttendanceTable } from './components/attendance-table.js';
 import { ReportDetailModal } from './modals/report-detail-modal.js';
-
 export default class SharedMonthlyReport {
     constructor(app, parentModule) {
         this.app = app;
@@ -563,7 +562,7 @@ export default class SharedMonthlyReport {
                     showFooter: false       // フッターは独自実装
                 })}
                 
-                ${this.generateMonthlyFooter(dailyRecords)}
+                ${this.attendanceTable.generateMonthlyFooter(dailyRecords)}
                 ${this.getPrintStyles()}
             </div>
         `;
@@ -580,7 +579,8 @@ export default class SharedMonthlyReport {
         
         records.forEach(record => {
             if (record.clock_in && record.clock_out) {
-                const hours = this.parent.calculateWorkDuration(record);
+                const hours = this.parent.calculateWorkDurationDay(record);
+                console.log('[DEBUG] calculateWorkDurationDay レコード例:', hours);
                 if (hours) {
                     const roundedHours = roundToQuarter(parseFloat(hours));
                     totalWorkHours += roundedHours;
