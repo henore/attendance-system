@@ -16,6 +16,7 @@
 @import url('./modules/staff.css');
 @import url('./modules/admin.css');
 
+
 /* 追加のスタイル（既存の特殊なスタイルなど） */
 /* ... */
 /* カレンダーコンテナの最大幅制限 */
@@ -31,9 +32,49 @@
   font-size: 0.85rem;
 }
 
-/* 印刷時の調整 */
 @media print {
-  .calendar-container {
-    max-width: 100%;
-  }
+    /* システム全体のヘッダーを非表示 */
+    body > header,
+    body > nav,
+    #app-header,
+    .navbar,
+    .header-container,
+    .system-header,
+    h1:contains("勤怠管理システム"),
+    *[class*="header"]:not(.table-header):not(.modal-header) {
+        display: none !important;
+    }
+    
+    /* ナビゲーションバーを確実に非表示 */
+    nav,
+    .navigation,
+    .nav-menu,
+    .menu-bar {
+        display: none !important;
+    }
+    
+    /* ボタン類を非表示 */
+    button,
+    .btn,
+    input[type="button"],
+    input[type="submit"] {
+        display: none !important;
+    }
+    
+    /* フォーム要素を非表示（印刷時は不要） */
+    input[type="text"],
+    input[type="date"],
+    select:not(.print-show),
+    .form-control:not(.print-show) {
+        display: none !important;
+    }
+    
+    /* アプリケーションのメインコンテナの余白削除 */
+    #app-content,
+    .container,
+    .container-fluid {
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
 }

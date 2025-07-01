@@ -390,13 +390,13 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         }
     });
 
-    // 前回の未日報記録取得
+    // 前回の日報記録取得
     router.get('/last-record', requireAuth, async (req, res) => {
         try {
             const userId = req.session.user.id;
             const today = getCurrentDate();
             
-            // 最新の未日報記録を取得（今日を除く、退勤済みで日報なし）
+            // 最新の日報記録を取得（今日を除く、退勤済みで日報なし）
             const lastRecord = await dbGet(`
                 SELECT a.* 
                 FROM attendance a

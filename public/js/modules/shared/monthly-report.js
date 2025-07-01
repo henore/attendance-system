@@ -498,8 +498,8 @@ export default class SharedMonthlyReport {
             const record = recordMap[day];
             
             if (record) {
-                // 既存のレコードに日付情報を追加
-                dailyRecords.push({
+                // 既存のレコードに日付情報を追加（休憩データも含む）
+                const dailyRecord = {
                     ...record,
                     date: dateStr,
                     day: day,
@@ -507,8 +507,27 @@ export default class SharedMonthlyReport {
                     dayName: dayNames[date.getDay()],
                     user_id: user.id,
                     user_name: user.name,
-                    user_role: user.role
-                });
+                    user_role: user.role,
+                    service_type: user.service_type
+                };
+                
+                // 利用者の休憩記録を含める（APIから直接取得したデータをマッピング）
+                if (user.role === 'user' && user.service_type !== 'home') {
+                    // break_recordsテーブルからのデータ（admin/staff APIはbreak_start/break_endとして返す）
+                    if (record.break_start || record.break_end) {
+                        dailyRecord.breakRecord = {
+                            start_time: record.break_start,
+                            end_time: record.break_end,
+                            duration: record.break_duration || 60
+                        };
+                        // attendance-table.jsでも使用するために別名でも保持
+                        dailyRecord.break_start_time = record.break_start;
+                        dailyRecord.break_end_time = record.break_end;
+                        dailyRecord.break_duration = record.break_duration;
+                    }
+                }
+                
+                dailyRecords.push(dailyRecord);
             } else {
                 // 空のレコードを作成
                 dailyRecords.push({
@@ -519,6 +538,7 @@ export default class SharedMonthlyReport {
                     user_id: user.id,
                     user_name: user.name,
                     user_role: user.role,
+                    service_type: user.service_type,
                     clock_in: null,
                     clock_out: null
                 });
@@ -555,12 +575,15 @@ export default class SharedMonthlyReport {
         // 集計
         const workingDays = records.filter(r => r.clock_in).length;
         let totalWorkHours = 0;
+
+        const roundToQuarter = (num) => Math.round(num * 4) / 4;
         
         records.forEach(record => {
             if (record.clock_in && record.clock_out) {
                 const hours = this.parent.calculateWorkDuration(record);
                 if (hours) {
-                    totalWorkHours += parseFloat(hours);
+                    const roundedHours = roundToQuarter(parseFloat(hours));
+                    totalWorkHours += roundedHours;
                 }
             }
         });
@@ -572,7 +595,7 @@ export default class SharedMonthlyReport {
                         <tr>
                             <th colspan="9" class="text-end">月間集計</th>
                             <th class="text-center">出勤日数: ${workingDays}日</th>
-                            <th class="text-center">総実働: ${totalWorkHours.toFixed(1)}時間</th>
+                            <th class="text-center">総実働: ${totalWorkHours.toFixed(2)}時間</th>
                         </tr>
                     </tfoot>
                 </table>
@@ -583,16 +606,175 @@ export default class SharedMonthlyReport {
     getPrintStyles() {
         return `
             <style>
-                @media print {
-                    .shared-section .custom-card-header,
-                    .shared-section .row.mb-4,
-                    .btn { 
-                        display: none !important; 
-                    }
-                    .monthly-attendance-report table { 
-                        font-size: 10px; 
-                    }
+           /* 月別出勤簿 A4印刷用スタイル */
+            @media print {
+                /* 基本的な印刷設定 */
+                @page {
+                    size: A4;
+                    margin: 10mm;
                 }
+                
+                body {
+                    margin: 0;
+                    font-size: 10pt;
+                    font-family: "游ゴシック", "Yu Gothic", sans-serif;
+                }
+                
+                /* ヘッダーとフィルター部分を非表示 */
+                .shared-section .custom-card-header,
+                .shared-section .row.mb-4,
+                .btn,
+                .btn-group,
+                .btn-outline-light,
+                .btn-primary,
+                .btn-secondary { 
+                    display: none !important; 
+                }
+                
+                /* カード枠線を削除 */
+                .custom-card {
+                    border: none !important;
+                    box-shadow: none !important;
+                }
+                
+                /* 月別出勤簿のタイトル */
+                .monthly-attendance-report h5 {
+                    font-size: 14pt;
+                    margin-bottom: 10px;
+                    font-weight: bold;
+                }
+                
+                .monthly-attendance-report small {
+                    font-size: 10pt;
+                }
+                
+                /* テーブルの印刷設定 */
+                .monthly-attendance-report table { 
+                    font-size: 9pt;
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                }
+                
+                .monthly-attendance-report table th,
+                .monthly-attendance-report table td {
+                    padding: 3px 5px;
+                    border: 1px solid #333;
+                    text-align: center;
+                }
+                
+                /* テーブルヘッダー */
+                .table-primary {
+                    background-color: #e3f2fd !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                
+                /* 月別出勤簿の印刷時に非表示にしたい列 */
+                .attendance-table thead tr th:nth-child(7),  /* 状態 */
+                .attendance-table tbody tr td:nth-child(7),
+                .attendance-table thead tr th:nth-child(8),  /* 日報・コメント */
+                .attendance-table tbody tr td:nth-child(8),
+                .attendance-table thead tr th:nth-child(9),  /* 操作 */
+                .attendance-table tbody tr td:nth-child(9) {
+                display: none !important;
+                }
+                
+                /* カラム幅の調整（表示される6列分） */
+                .attendance-table thead tr th:nth-child(1) { width: 8%; }  /* 日 */
+                .attendance-table thead tr th:nth-child(2) { width: 8%; }  /* 曜 */
+                .attendance-table thead tr th:nth-child(3) { width: 15%; } /* 出勤 */
+                .attendance-table thead tr th:nth-child(4) { width: 15%; } /* 退勤 */
+                .attendance-table thead tr th:nth-child(5) { width: 26%; } /* 休憩 */
+                .attendance-table thead tr th:nth-child(6) { width: 12%; } /* 実働 */
+                
+                /* 土日の背景色 */
+                .table-danger { /* 日曜日 */
+                    background-color: #ffebee !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                
+                .table-info { /* 土曜日 */
+                    background-color: #e3f2fd !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                
+                /* 月間集計のスタイル */
+                .table-secondary {
+                    background-color: #f0f0f0 !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                    font-weight: bold;
+                }
+                
+                /* 月間集計のcolspan調整 */
+                .monthly-attendance-report tfoot tr th:first-child {
+                    text-align: right;
+                    padding-right: 10px;
+                }
+                
+                /* バッジのスタイル（非表示対象外の場合） */
+                .badge {
+                    display: none !important;
+                }
+                
+                /* 改ページ制御 */
+                .monthly-attendance-report {
+                    page-break-inside: avoid;
+                }
+                
+                /* テーブル行の高さを固定 */
+                .monthly-attendance-report tbody tr {
+                    height: 20px;
+                }
+                
+                /* フォントサイズの微調整 */
+                .monthly-attendance-report .text-nowrap {
+                    font-size: 8pt;
+                }
+                
+                /* 余白の調整 */
+                .table-responsive {
+                    margin: 0;
+                    padding: 0;
+                }
+                
+                /* ページヘッダー（必要に応じて） */
+                .print-header {
+                    display: block !important;
+                    text-align: center;
+                    margin-bottom: 20px;
+                }
+            }
+
+            /* 印刷プレビュー用のスタイル */
+            @media screen {
+                .print-only {
+                    display: none;
+                }
+                
+                /* 印刷ボタンのスタイル */
+                #printMonthlyReportBtn {
+                    margin-left: 10px;
+                }
+            }
+
+            /* 印刷時のみ表示される要素 */
+            .print-only {
+                display: none;
+            }
+
+            @media print {
+                .print-only {
+                    display: block !important;
+                }
+                
+                .screen-only {
+                    display: none !important;
+                }
+            }
             </style>
         `;
     }

@@ -1,4 +1,4 @@
-// public/js/modules/shared/components/attendance-table.js
+// public/js/modules/shared/components/attendance-table".js
 // 出勤記録テーブル表示の一元管理コンポーネント
 
 import { calculateWorkHours } from '../../../utils/date-time.js';
@@ -34,7 +34,7 @@ export class AttendanceTable {
     }
 
     return `
-      <div class="table-responsive">
+      <div class="table-responsive attendance-table">
         <table class="table table-hover">
           ${this.generateTableHeader(options)}
           <tbody>
@@ -171,7 +171,7 @@ export class AttendanceTable {
     `;
   }
 
-  /**
+   /**
    * 休憩時間のフォーマット（シンプル版）
    */
   formatBreakTime(record) {
@@ -184,7 +184,7 @@ export class AttendanceTable {
       break_end_time: record.break_end_time,
       br_start: record.br_start,
       br_end: record.br_end,
-      break: record.break
+      breakRecord: record.breakRecord
     });
     
     // スタッフ・管理者の場合
@@ -198,22 +198,33 @@ export class AttendanceTable {
     }
     // 利用者の場合
     else if (record.user_role === 'user') {
-      // break_recordsテーブルのデータ（複数のパターンをチェック）
-      if (record.break_start_time) {
+      // 1. breakRecordオブジェクトがある場合（最優先）
+      if (record.breakRecord) {
+        console.log('[DEBUG] 利用者の休憩(breakRecord):', record.breakRecord);
+        return record.breakRecord.end_time ? 
+          `${record.breakRecord.start_time}〜${record.breakRecord.end_time}` : 
+          `${record.breakRecord.start_time}〜`;
+      }
+      // 2. break_start_time/break_end_timeがある場合
+      else if (record.break_start_time) {
         console.log('[DEBUG] 利用者の休憩(break_start_time):', record.break_start_time, record.break_end_time);
         return record.break_end_time ? 
           `${record.break_start_time}〜${record.break_end_time}` : 
           `${record.break_start_time}〜`;
-      } else if (record.br_start) {
+      }
+      // 3. APIから直接のbreak_start/break_endがある場合（月別出勤簿用）
+      else if (record.break_start) {
+        console.log('[DEBUG] 利用者の休憩(break_start):', record.break_start, record.break_end);
+        return record.break_end ? 
+          `${record.break_start}〜${record.break_end}` : 
+          `${record.break_start}〜`;
+      }
+      // 4. br_start/br_endがある場合
+      else if (record.br_start) {
         console.log('[DEBUG] 利用者の休憩(br_start):', record.br_start, record.br_end);
         return record.br_end ? 
           `${record.br_start}〜${record.br_end}` : 
           `${record.br_start}〜`;
-      } else if (record.break && record.break.start) {
-        console.log('[DEBUG] 利用者の休憩(break.start):', record.break.start, record.break.end);
-        return record.break.end ? 
-          `${record.break.start}〜${record.break.end}` : 
-          `${record.break.start}〜`;
       }
     }
     
@@ -258,7 +269,7 @@ export class AttendanceTable {
       }
       
       const netHours = workHours - (breakMinutes / 60);
-      return netHours > 0 ? netHours.toFixed(1) : workHours.toFixed(1);
+      return netHours > 0 ? netHours.toFixed(2) : workHours.toFixed(2);
       
     } catch (error) {
       console.error('勤務時間計算エラー:', error);
