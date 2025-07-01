@@ -1,11 +1,12 @@
 // modules/shared/monthly-report.js
-// 共通月別出勤簿機能（リファクタリング版）
+// 共通月別出勤簿機能（実働時間計算修正版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from './modal-manager.js';
 import { formatDate, getDaysInMonth, formatDateTime } from '../../utils/date-time.js';
 import { AttendanceTable } from './components/attendance-table.js';
 import { ReportDetailModal } from './modals/report-detail-modal.js';
+
 export default class SharedMonthlyReport {
     constructor(app, parentModule) {
         this.app = app;
@@ -562,7 +563,7 @@ export default class SharedMonthlyReport {
                     showFooter: false       // フッターは独自実装
                 })}
                 
-                ${this.attendanceTable.generateMonthlyFooter(dailyRecords)}
+                ${this.generateMonthlyFooter(dailyRecords)}
                 ${this.getPrintStyles()}
             </div>
         `;
@@ -579,8 +580,16 @@ export default class SharedMonthlyReport {
         
         records.forEach(record => {
             if (record.clock_in && record.clock_out) {
-                const hours = this.parent.calculateWorkDurationDay(record);
-                console.log('[DEBUG] calculateWorkDurationDay レコード例:', hours);
+                // AttendanceTableクラスのcalculateWorkDurationDayメソッドを使用
+                const hours = this.attendanceTable.calculateWorkDurationDay(record);
+                console.log('[DEBUG] calculateWorkDurationDay result:', hours, 'for record:', {
+                    user_name: record.user_name,
+                    date: record.date,
+                    clock_in: record.clock_in,
+                    clock_out: record.clock_out,
+                    break_start_time: record.break_start_time,
+                    break_end_time: record.break_end_time
+                });
                 if (hours) {
                     const roundedHours = roundToQuarter(parseFloat(hours));
                     totalWorkHours += roundedHours;

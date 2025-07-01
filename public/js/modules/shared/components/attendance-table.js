@@ -1,5 +1,5 @@
-// public/js/modules/shared/components/attendance-table".js
-// 出勤記録テーブル表示の一元管理コンポーネント
+// public/js/modules/shared/components/attendance-table.js
+// 出勤記録テーブル表示の一元管理コンポーネント（修正版）
 
 import { calculateWorkHours } from '../../../utils/date-time.js';
 
@@ -28,10 +28,6 @@ export class AttendanceTable {
     const filteredRecords = showOnlyWorking 
       ? records.filter(record => record.clock_in) 
       : records;
-
-     if (context === 'monthly') {
-    this.generateMonthlyFooter(records, this.calculateWorkDurationDay.bind(this));
-     }
 
     if (filteredRecords.length === 0) {
       return this.generateEmptyState(showOnlyWorking);
@@ -245,7 +241,7 @@ export class AttendanceTable {
       
       const netHours = workHours - (breakMinutes / 60);
       console.log('[DEBUG] 実働時間:', netHours);
-      return netHours;
+      return netHours.toFixed(2);
       
     } catch (error) {
       console.error('勤務時間計算エラー:', error);
