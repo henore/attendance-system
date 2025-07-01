@@ -10,7 +10,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // ユーザー登録
     router.post('/register', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { username, password, name, role, serviceType, ServiesNo} = req.body;
+            const { username, password, name, role, serviceType, ServiceNo} = req.body;
             
             // バリデーション
             if (!username || !password || !name || !role) {
@@ -60,7 +60,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             // ユーザー登録
             const result = await dbRun(
                 'INSERT INTO users (username, password, name, role, service_type, service_no) VALUES (?, ?, ?, ?, ? ,?)', 
-                [username, hashedPassword, name, role, serviceType ,ServiesNo || null]
+                [username, hashedPassword, name, role, serviceType ,ServiceNo || null]
             );
             
             // 監査ログ記録

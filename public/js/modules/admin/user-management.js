@@ -568,7 +568,7 @@ export default class AdminUserManagement {
             name: this.container.querySelector('#newName').value.trim(),
             role: this.container.querySelector('#newRole').value,
             serviceType: this.container.querySelector('#newServiceType').value,
-            ServiceNo: this.container.querySelector('#newServiceNo').value.trim()
+            ServiceNo: this.container.querySelector('#newServiceNo').value
          };
 
         // バリデーション
