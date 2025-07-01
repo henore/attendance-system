@@ -381,14 +381,14 @@ function generateSquareLayoutHTML(data) {
         }
         
         .title {
-          font-size: 24px;
+          font-size: 30px;
           font-weight: bold;
           color: #333;
           margin-bottom: 3px;
         }
         
         .date {
-          font-size: 16px;
+          font-size: 20px;
           color: #666;
         }
         
@@ -409,13 +409,13 @@ function generateSquareLayoutHTML(data) {
         }
         
         .detail-section h6 {
-          font-size: 12px;
+          font-size: 20px;
           color: #666;
           margin: 0 0 3px 0;
         }
         
         .detail-value {
-          font-size: 18px;
+          font-size: 20px;
           font-weight: bold;
         }
         
@@ -432,7 +432,7 @@ function generateSquareLayoutHTML(data) {
         
         /* 日報内容 - よりコンパクトに */
         .report-summary h6 {
-          font-size: 18px;
+          font-size: 24px;
           font-weight: bold;
           color: #333;
           margin-bottom: 10px;
@@ -443,14 +443,14 @@ function generateSquareLayoutHTML(data) {
         }
         
         .past-form-label {
-          font-size: 12px;
+          font-size: 20px;
           font-weight: 600;
           color: #495057;
           margin-bottom: 2px;
         }
         
         .past-form-value {
-          font-size: 14px;
+          font-size: 20px;
           color: #333;
           padding: 4px 8px;
           background: #f8f9fa;
@@ -458,7 +458,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .text-content {
-          font-size: 12px;
+          font-size: 20px;
           line-height: 1.3;
           color: #333;
           background: #f8f9fa;
@@ -503,13 +503,13 @@ function generateSquareLayoutHTML(data) {
         }
         
         .comment-title {
-          font-size: 16px;
+          font-size: 26px;
           font-weight: bold;
           margin-bottom: 6px;
         }
         
         .comment-content {
-          font-size: 12px;
+          font-size: 22px;
           line-height: 1.3;
           background: rgba(255,255,255,0.1);
           padding: 8px;
@@ -519,7 +519,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .comment-author {
-          font-size: 11px;
+          font-size: 20px;
           opacity: 0.9;
           text-align: right;
         }
@@ -530,7 +530,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .form-section.compact .past-form-value {
-          font-size: 13px;
+          font-size: 28px;
           padding: 3px 6px;
         }
       </style>
