@@ -154,7 +154,7 @@ router.post('/generate-report-image', async (req, res) => {
         position: 'top'
       })
       .jpeg({ 
-        quality: 90,
+        quality: 75,  // 品質を75%に下げて容量削減
         progressive: true,
         mozjpeg: true
       })
@@ -168,7 +168,7 @@ router.post('/generate-report-image', async (req, res) => {
         position: 'top'
       })
       .jpeg({ 
-        quality: 80 
+        quality: 70  // プレビューも品質調整
       })
       .toFile(previewPath);
     
@@ -187,7 +187,7 @@ router.post('/generate-report-image', async (req, res) => {
       console.log('[画像生成] オリジナル画像が1MBを超えたため品質を調整');
       await sharp(pngBuffer)
         .resize(1024, 1024, { fit: 'cover', position: 'top' })
-        .jpeg({ quality: 70 })
+        .jpeg({ quality: 60 })  // さらに品質を下げる
         .toFile(originalPath);
     }
     
@@ -328,7 +328,7 @@ router.post('/send-report', async (req, res) => {
 });
 
 /**
- * 正方形レイアウト用HTMLテンプレート生成
+ * 正方形レイアウト用HTMLテンプレート生成（全内容表示版）
  */
 function generateSquareLayoutHTML(data) {
   return `
@@ -358,10 +358,10 @@ function generateSquareLayoutHTML(data) {
         
         .report-container {
           background: white;
-          border-radius: 20px;
-          padding: 40px;
-          width: 920px;
-          height: 920px;
+          border-radius: 15px;
+          padding: 25px;
+          width: 960px;
+          height: 960px;
           box-shadow: 0 10px 30px rgba(0,0,0,0.2);
           overflow-y: auto;
           display: flex;
@@ -375,20 +375,20 @@ function generateSquareLayoutHTML(data) {
         
         .header {
           text-align: center;
-          margin-bottom: 25px;
-          border-bottom: 3px solid #667eea;
-          padding-bottom: 15px;
+          margin-bottom: 15px;
+          border-bottom: 2px solid #667eea;
+          padding-bottom: 10px;
         }
         
         .title {
-          font-size: 28px;
+          font-size: 24px;
           font-weight: bold;
           color: #333;
-          margin-bottom: 5px;
+          margin-bottom: 3px;
         }
         
         .date {
-          font-size: 18px;
+          font-size: 16px;
           color: #666;
         }
         
@@ -396,26 +396,26 @@ function generateSquareLayoutHTML(data) {
         .attendance-row {
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
-          gap: 10px;
-          margin-bottom: 20px;
+          gap: 8px;
+          margin-bottom: 15px;
         }
         
         .detail-section {
           text-align: center;
-          padding: 10px;
+          padding: 8px 5px;
           background: #f8f9ff;
-          border-radius: 8px;
-          border-left: 4px solid #667eea;
+          border-radius: 6px;
+          border-left: 3px solid #667eea;
         }
         
         .detail-section h6 {
-          font-size: 14px;
+          font-size: 12px;
           color: #666;
-          margin: 0 0 5px 0;
+          margin: 0 0 3px 0;
         }
         
         .detail-value {
-          font-size: 20px;
+          font-size: 18px;
           font-weight: bold;
         }
         
@@ -427,84 +427,111 @@ function generateSquareLayoutHTML(data) {
         hr {
           border: none;
           border-top: 1px solid #e9ecef;
-          margin: 15px 0;
+          margin: 10px 0;
         }
         
-        /* コンパクトな日報内容 */
+        /* 日報内容 - よりコンパクトに */
         .report-summary h6 {
-          font-size: 20px;
+          font-size: 18px;
           font-weight: bold;
           color: #333;
-          margin-bottom: 15px;
+          margin-bottom: 10px;
         }
         
         .form-section {
-          margin-bottom: 12px;
+          margin-bottom: 8px;
         }
         
         .past-form-label {
-          font-size: 14px;
+          font-size: 12px;
           font-weight: 600;
           color: #495057;
-          margin-bottom: 3px;
+          margin-bottom: 2px;
         }
         
         .past-form-value {
-          font-size: 16px;
+          font-size: 14px;
           color: #333;
-          padding: 6px 10px;
+          padding: 4px 8px;
           background: #f8f9fa;
           border-radius: 4px;
         }
         
         .text-content {
-          font-size: 14px;
-          line-height: 1.4;
+          font-size: 12px;
+          line-height: 1.3;
           color: #333;
           background: #f8f9fa;
-          padding: 8px 10px;
+          padding: 6px 8px;
           border-radius: 4px;
           white-space: pre-wrap;
-          max-height: 80px;
-          overflow: hidden;
         }
         
-        /* コンパクトな健康状態 */
+        /* 作業内容は高さ制限 */
+        .work-content {
+          max-height: 65px;
+          overflow-y: auto;
+        }
+        
+        /* 振り返りは基本2行程度なので制限なし */
+        .reflection-content {
+          min-height: 30px;
+        }
+        
+        /* 健康状態 - 2行表示 */
         .health-row {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
-          gap: 8px;
-          margin-bottom: 12px;
+          gap: 6px;
+          margin-bottom: 8px;
+        }
+        
+        .health-detail-row {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 6px;
+          margin-bottom: 8px;
         }
         
         /* スタッフコメント */
         .comment-section {
           background: linear-gradient(135deg, #667eea, #764ba2);
           color: white;
-          padding: 15px;
-          border-radius: 10px;
+          padding: 12px;
+          border-radius: 8px;
           margin-top: auto;
         }
         
         .comment-title {
-          font-size: 18px;
+          font-size: 16px;
           font-weight: bold;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
         
         .comment-content {
-          font-size: 14px;
-          line-height: 1.4;
+          font-size: 12px;
+          line-height: 1.3;
           background: rgba(255,255,255,0.1);
-          padding: 10px;
-          border-radius: 6px;
-          margin-bottom: 5px;
+          padding: 8px;
+          border-radius: 5px;
+          margin-bottom: 4px;
+          white-space: pre-wrap;
         }
         
         .comment-author {
-          font-size: 12px;
+          font-size: 11px;
           opacity: 0.9;
           text-align: right;
+        }
+        
+        /* 小さめのフォント調整 */
+        .form-section.compact {
+          margin-bottom: 6px;
+        }
+        
+        .form-section.compact .past-form-value {
+          font-size: 13px;
+          padding: 3px 6px;
         }
       </style>
     </head>
@@ -512,22 +539,22 @@ function generateSquareLayoutHTML(data) {
       <div class="report-container">
         <!-- ヘッダー -->
         <div class="header">
-          <div class="title">📋 ${data.user.name}さんの日報</div>
+          <div class="title">📋 ${data.user.name}さんの日報詳細</div>
           <div class="date">${formatDateJapanese(data.date)}</div>
         </div>
         
         <!-- 出勤情報 -->
         <div class="attendance-row">
           <div class="detail-section">
-            <h6>出勤</h6>
+            <h6>🕘 出勤</h6>
             <div class="detail-value text-success">${data.attendance.clock_in}</div>
           </div>
           <div class="detail-section">
-            <h6>休憩</h6>
+            <h6>☕ 休憩</h6>
             <div class="detail-value text-warning">${data.breakTimeDisplay.split(' ')[0]}</div>
           </div>
           <div class="detail-section">
-            <h6>退勤</h6>
+            <h6>🕕 退勤</h6>
             <div class="detail-value ${data.attendance.clock_out !== '-' ? 'text-info' : 'text-muted'}">
               ${data.attendance.clock_out === '-' ? '未退勤' : data.attendance.clock_out}
             </div>
@@ -536,52 +563,70 @@ function generateSquareLayoutHTML(data) {
 
         <hr>
 
-        <!-- 日報内容（コンパクト版） -->
-        <div class="report-summary" style="flex: 1;">
+        <!-- 日報内容（全表示版） -->
+        <div class="report-summary">
           <h6>📝 日報内容</h6>
           
           <!-- 作業内容 -->
           <div class="form-section">
-            <label class="past-form-label">作業内容</label>
-            <div class="text-content">${data.report.work_content || ''}</div>
+            <label class="past-form-label">📋 作業内容</label>
+            <div class="text-content work-content">${data.report.work_content || ''}</div>
           </div>
 
           ${data.report.external_work_location ? `
-            <div class="form-section">
-              <label class="past-form-label">施設外就労先</label>
+            <div class="form-section compact">
+              <label class="past-form-label">🏢 施設外就労先</label>
               <div class="past-form-value">${data.report.external_work_location}</div>
             </div>
           ` : ''}
 
-          <!-- 健康状態 -->
+          <!-- 健康状態（1行目） -->
           <div class="health-row">
-            <div class="form-section">
-              <label class="past-form-label">体温</label>
+            <div class="form-section compact">
+              <label class="past-form-label">🌡️ 体温</label>
               <div class="past-form-value">${data.report.temperature}℃</div>
             </div>
-            <div class="form-section">
-              <label class="past-form-label">食欲</label>
+            <div class="form-section compact">
+              <label class="past-form-label">🍽️ 食欲</label>
               <div class="past-form-value">${formatAppetite(data.report.appetite)}</div>
             </div>
-            <div class="form-section">
-              <label class="past-form-label">頓服</label>
+            <div class="form-section compact">
+              <label class="past-form-label">💊 頓服</label>
               <div class="past-form-value">${data.report.medication_time ? data.report.medication_time + '時' : 'なし'}</div>
             </div>
-            <div class="form-section">
-              <label class="past-form-label">睡眠</label>
+            <div class="form-section compact">
+              <label class="past-form-label">😴 睡眠</label>
               <div class="past-form-value">${calculateSleepHours(data.report.bedtime, data.report.wakeup_time)}</div>
             </div>
           </div>
 
-          <!-- 振り返り -->
+          <!-- 睡眠情報詳細（2行目） -->
+          ${(data.report.bedtime || data.report.wakeup_time || data.report.sleep_quality) ? `
+            <div class="health-detail-row">
+              <div class="form-section compact">
+                <label class="past-form-label">🌙 就寝</label>
+                <div class="past-form-value">${data.report.bedtime || '-'}</div>
+              </div>
+              <div class="form-section compact">
+                <label class="past-form-label">☀️ 起床</label>
+                <div class="past-form-value">${data.report.wakeup_time || '-'}</div>
+              </div>
+              <div class="form-section compact">
+                <label class="past-form-label">😴 睡眠状態</label>
+                <div class="past-form-value">${formatSleepQuality(data.report.sleep_quality)}</div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- 振り返り（基本2行程度なので余裕を持たせる） -->
           <div class="form-section">
-            <label class="past-form-label">振り返り・感想</label>
-            <div class="text-content">${data.report.reflection || ''}</div>
+            <label class="past-form-label">💭 振り返り・感想</label>
+            <div class="text-content reflection-content">${data.report.reflection || ''}</div>
           </div>
 
           ${data.report.interview_request ? `
-            <div class="form-section">
-              <label class="past-form-label">面談希望</label>
+            <div class="form-section compact">
+              <label class="past-form-label">💬 面談希望</label>
               <div class="past-form-value">${formatInterviewRequest(data.report.interview_request)}</div>
             </div>
           ` : ''}
@@ -590,9 +635,9 @@ function generateSquareLayoutHTML(data) {
         ${data.comment ? `
           <!-- スタッフコメント -->
           <div class="comment-section">
-            <div class="comment-title">💬 スタッフコメント</div>
+            <div class="comment-title">💬 スタッフからのコメント</div>
             <div class="comment-content">${data.comment.comment}</div>
-            <div class="comment-author">${data.comment.staff_name}</div>
+            <div class="comment-author">記入者: ${data.comment.staff_name}</div>
           </div>
         ` : ''}
       </div>
