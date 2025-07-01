@@ -381,14 +381,14 @@ function generateSquareLayoutHTML(data) {
         }
         
         .title {
-          font-size: 30px;
+          font-size: 24px;
           font-weight: bold;
           color: #333;
           margin-bottom: 3px;
         }
         
         .date {
-          font-size: 20px;
+          font-size: 18px;
           color: #666;
         }
         
@@ -398,7 +398,6 @@ function generateSquareLayoutHTML(data) {
           grid-template-columns: 1fr 1fr 1fr;
           gap: 8px;
           margin-bottom: 15px;
-          font-size: 60px;
         }
         
         .detail-section {
@@ -411,13 +410,13 @@ function generateSquareLayoutHTML(data) {
         }
         
         .detail-section h6 {
-          font-size: 8px;
+          font-size: 10px;
           color: #666;
           margin: 0 0 3px 0;
         }
         
         .detail-value {
-          font-size: 8px;
+          font-size: 24px;
           font-weight: bold;
         }
         
@@ -452,7 +451,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .past-form-value {
-          font-size: 14px;
+          font-size: 10px;
           color: #333;
           padding: 4px 8px;
           background: #f8f9fa;
@@ -460,7 +459,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .text-content {
-          font-size: 18px;
+          font-size: 20px;
           line-height: 1.3;
           color: #333;
           background: #f8f9fa;
@@ -478,7 +477,7 @@ function generateSquareLayoutHTML(data) {
         /* 振り返りは基本2行程度なので制限なし */
         .reflection-content {
           min-height: 30px;
-          font-size: 30px;
+          font-size: 22px;
         }
         
         /* 健康状態 - 2行表示 */
@@ -506,13 +505,13 @@ function generateSquareLayoutHTML(data) {
         }
         
         .comment-title {
-          font-size: 26px;
+          font-size: 18px;
           font-weight: bold;
           margin-bottom: 6px;
         }
         
         .comment-content {
-          font-size: 24px;
+          font-size: 22px;
           line-height: 1.3;
           background: rgba(255,255,255,0.1);
           padding: 8px;
