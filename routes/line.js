@@ -398,7 +398,7 @@ function generateSquareLayoutHTML(data) {
           grid-template-columns: 1fr 1fr 1fr;
           gap: 8px;
           margin-bottom: 15px;
-          font-size: 24px;
+          font-size: 40px;
         }
         
         .detail-section {
@@ -407,17 +407,17 @@ function generateSquareLayoutHTML(data) {
           background: #f8f9ff;
           border-radius: 6px;
           border-left: 3px solid #667eea;
-          font-size: 24px;
+          font-size: 40px;
         }
         
         .detail-section h6 {
-          font-size: 16px;
+          font-size: 12px;
           color: #666;
           margin: 0 0 3px 0;
         }
         
         .detail-value {
-          font-size: 16px;
+          font-size: 12px;
           font-weight: bold;
         }
         
@@ -434,7 +434,7 @@ function generateSquareLayoutHTML(data) {
         
         /* 日報内容 - よりコンパクトに */
         .report-summary h6 {
-            font-size: 24px;
+            font-size: 30px;
           font-weight: bold;
           color: #333;
           margin-bottom: 10px;
@@ -478,7 +478,7 @@ function generateSquareLayoutHTML(data) {
         /* 振り返りは基本2行程度なので制限なし */
         .reflection-content {
           min-height: 30px;
-          font-size: 20px;
+          font-size: 30px;
         }
         
         /* 健康状態 - 2行表示 */
@@ -522,7 +522,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .comment-author {
-          font-size: 20px;
+          font-size: 16px;
           opacity: 0.9;
           text-align: right;
         }
@@ -533,7 +533,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .form-section.compact .past-form-value {
-          font-size: 28px;
+          font-size: 26px;
           padding: 3px 6px;
         }
       </style>
