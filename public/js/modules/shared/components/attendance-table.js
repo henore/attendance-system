@@ -109,7 +109,7 @@ export class AttendanceTable {
       return this.generateMonthlyTableRow(record, options);
     }
 
-    if(!record.clock_in){
+    if(!record.clock_in && context !== 'monthly'){
       record.clock_in = `出勤予定`;
     }
     
