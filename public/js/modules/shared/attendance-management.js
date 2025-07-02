@@ -483,8 +483,8 @@ async searchAttendanceRecords() {
     }
     
     let records = response.records || [];
-    console.log('[DEBUG] 取得レコード数:', records.length);
-    
+    console.log('[DEBUG] 取得レコード:', records);
+  
     // スタッフ画面では利用者のみにフィルタリング（追加の安全策）
     if (this.userRole === 'staff') {
       records = records.filter(record => record.user_role === 'user');
@@ -567,7 +567,7 @@ async searchAttendanceRecords() {
       recordsList.innerHTML = '<p class="text-muted text-center">検索条件に該当する記録がありません</p>';
       return;
     }
-
+    console.log('updateRecordsListデータ内容確認', records);
     // AttendanceTableコンポーネントを使用
     recordsList.innerHTML = this.attendanceTable.generateTable(records, {
       showOnlyWorking: this.showOnlyWorking,

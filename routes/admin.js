@@ -117,7 +117,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         try {
             const { role } = req.query;
             let query = `
-                SELECT id, username, name, role, service_type, created_at ,service_no 
+                SELECT id, username, name, role, service_type, created_at ,service_no ,workweek
                 FROM users 
                 WHERE is_active = 1
             `;
@@ -193,7 +193,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       SELECT 
         a.id, a.user_id, a.date, a.clock_in, a.clock_out, a.status,
         a.break_start, a.break_end,
-        u.name as user_name, u.role as user_role, u.service_type,
+        u.name as user_name, u.role as user_role, u.service_type, u.workweek as user_workweek,
         dr.id as report_id,
         sc.id as comment_id,
         br.start_time as br_start, br.end_time as br_end, br.duration as br_duration
@@ -229,6 +229,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         user_name: record.user_name,
         user_role: record.user_role,
         service_type: record.service_type,
+        workweek: record.user_workweek,
         date: date,
         clock_in: record.clock_in,
         clock_out: record.clock_out,
@@ -595,7 +596,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // ユーザー情報更新
     router.put('/user/update', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { userId, username, password, name, role, serviceType, service_no } = req.body;
+            const { userId, username, password, name, role, serviceType, service_no ,workweek } = req.body;
             
             // バリデーション
             if (!userId || !username || !name || !role) {
@@ -622,13 +623,19 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             
             // 更新クエリ構築
             let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, service_no = ?, updated_at = CURRENT_TIMESTAMP';
-            const params = [username, name, role, finalServiceNo, service_no];
+            const params = [username, name, role, serviceType, finalServiceNo];
             
             // パスワード変更がある場合
             if (password) {
                 const hashedPassword = await bcrypt.hash(password, 10);
                 updateQuery += ', password = ?';
                 params.push(hashedPassword);
+            }
+            
+            if(workweek){
+                const updateworkweek = workweek
+                updateQuery += ', workweek = ?';
+                params.push(updateworkweek);
             }
             
             updateQuery += ' WHERE id = ?';

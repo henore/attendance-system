@@ -1,7 +1,7 @@
 // public/js/modules/shared/components/attendance-table.js
 // 出勤記録テーブル表示の一元管理コンポーネント（修正版）
 
-import { calculateWorkHours } from '../../../utils/date-time.js';
+import { calculateWorkHours ,getJapaneseDayOfWeek} from '../../../utils/date-time.js';
 
 export class AttendanceTable {
   constructor(parentModule) {
@@ -16,6 +16,7 @@ export class AttendanceTable {
    * @returns {string} HTML文字列
    */
   generateTable(records, options = {}) {
+    console.log('generateTableデータ内容確認', records);
     const {
       showOnlyWorking = false,      // 出勤者のみ表示
       showDate = false,              // 日付列を表示
@@ -24,15 +25,21 @@ export class AttendanceTable {
       currentDate = null             // 現在の日付（月別出勤簿用）
     } = options;
 
-    // 出勤者のみフィルタリング
-    const filteredRecords = showOnlyWorking 
-      ? records.filter(record => record.clock_in) 
-      : records;
+    // 出勤者、出勤予定者のみフィルタリング
+      const filteredRecords = showOnlyWorking
+        ? records.filter(record => {
+            const day = getJapaneseDayOfWeek(record.date);
+            const workweekArray = (record.workweek ?? '').split(',');
+            const isPlanned = workweekArray.includes(day);      //曜日で予定者を抽出
+            const isPresent = !!record.clock_in;      //出勤時刻判定
+            return isPlanned || isPresent;
+          })
+        : records;
 
     if (filteredRecords.length === 0) {
       return this.generateEmptyState(showOnlyWorking);
     }
-
+ 
     return `
       <div class="table-responsive attendance-table">
         <table class="table table-hover">
@@ -100,6 +107,10 @@ export class AttendanceTable {
     // 月別出勤簿用の特別な処理
     if (context === 'monthly') {
       return this.generateMonthlyTableRow(record, options);
+    }
+
+    if(!record.clock_in){
+      record.clock_in = `出勤予定`;
     }
     
     // 通常の出勤管理用の行生成

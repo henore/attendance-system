@@ -78,7 +78,7 @@ export const API_ENDPOINTS = {
     USERS: '/api/admin/users',
     USER_CREATE: '/api/admin/users/create',
     USER_UPDATE: (userId) => `/api/admin/users/${userId}`,
-    //USER_DELETE: (userId) => `/api/admin/users/${userId}`,
+    USER_DELETE: (userId) => `/api/admin/users/${userId}`,
     USER_TOGGLE: (userId) => `/api/admin/users/${userId}/toggle`,
     RETIRE_USER: (userId) => `/api/admin/retire/${userId}`, // 追加
     MONTHLY_REPORT: '/api/admin/monthly-report',

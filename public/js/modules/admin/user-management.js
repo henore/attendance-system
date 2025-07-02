@@ -175,9 +175,17 @@ export default class AdminUserManagement {
                                         <option value="home">在宅</option>
                                     </select>
                                 </div>
-                                <div class="mb-3" id="editServiceNoGroup" style="display: none;>
+                                <div class="mb-3" id="editServiceNoGroup" style="display: none;">
                                         <label for="editServiceNo" class="form-label">受給者番号</label>
                                         <input type="text" class="form-control" id="editServiceNo">
+                                </div>
+                                <div class="mb-3" id="editWorkWeekGroup" style="display: none;">
+                                <label for="editWorkWeek" class="form-label">出勤予定</label>
+                                <input type="checkbox" id="editWorkWeek1" value="月"> 月
+                                <input type="checkbox" id="editWorkWeek2" value="火"> 火
+                                <input type="checkbox" id="editWorkWeek3" value="水"> 水
+                                <input type="checkbox" id="editWorkWeek4" value="木"> 木
+                                <input type="checkbox" id="editWorkWeek5" value="金"> 金
                                 </div>
                             </form>
                         </div>
@@ -286,6 +294,13 @@ export default class AdminUserManagement {
                 editServiceNoGroup.style.display = 'block';
                 editServiceNoGroup.required = true;
 
+                editWorkWeekGroup.style.display = 'block';
+                editWorkWeekGroup.required = true;
+
+                const workWeekArray = (user?.workweek ?? "").split(',');
+                document.querySelectorAll('input[type="checkbox"][id^="editWorkWeek"]').forEach(cb => {
+                cb.checked = workWeekArray.includes(cb.value);
+                  });
 
             } else {
                 serviceTypeGroup.style.display = 'none';
@@ -294,6 +309,9 @@ export default class AdminUserManagement {
 
                 editServiceNoGroup.style.display = 'none';
                 editServiceNoGroup.required = false;
+
+                editWorkWeekGroup.style.display = 'none';
+                editWorkWeekGroup.required = false;
             }
 
             // パスワード生成ボタン
@@ -321,6 +339,15 @@ export default class AdminUserManagement {
                         document.getElementById('editServiceNo').value = user.service_no;
                         editServiceNoGroup.style.display = 'block';
                         editServiceNoGroup.required = true;
+
+                        editWorkWeekGroup.style.display = 'block';
+                        editWorkWeekGroup.required = true;
+
+                        const workWeekArray = (user?.workweek ?? "").split(',');
+                        document.querySelectorAll('input[type="checkbox"][id^="editWorkWeek"]').forEach(cb => {
+                        cb.checked = workWeekArray.includes(cb.value);
+                        });
+                        
                     } else {
                         editServiceTypeGroup.style.display = 'none';
                         editServiceType.required = false;
@@ -328,6 +355,9 @@ export default class AdminUserManagement {
 
                         editServiceNoGroup.style.display = 'none';
                         editServiceNoGroup.required = false;
+
+                        editWorkWeekGroup.style.display = 'none';
+                        editWorkWeekGroup.required = false;
                     }
                 });
             }
@@ -362,7 +392,6 @@ export default class AdminUserManagement {
         }
         return password;
     }
-
     /**
      * ユーザー編集保存
      */
@@ -374,90 +403,11 @@ export default class AdminUserManagement {
         const role = document.getElementById('editRole').value;
         const serviceType = document.getElementById('editServiceType').value;
         const service_no = document.getElementById('editServiceNo').value;
+        const workweek = Array.from(
+        document.querySelectorAll('input[type="checkbox"][id^="editWorkWeek"]:checked')
+        ).map(cb => cb.value);
 
-        // バリデーション
-        if (!username || !name || !role) {
-            this.parent.showNotification('必須項目を入力してください', 'warning');
-            return;
-        }
-
-        if (role === 'user' && !serviceType) {
-            this.parent.showNotification('利用者の場合はサービス区分を選択してください', 'warning');
-            return;
-        }
-
-        if (role === 'user' && !service_no) {
-            this.parent.showNotification('利用者の場合は受給者番号を入力して下さい', 'warning');
-            return;
-        }
-
-        // 確認ダイアログ
-        const confirmed = await this.parent.showConfirm({
-            title: 'ユーザー情報変更',
-            message: `${name}さんの情報を変更しますか？`,
-            confirmText: '変更する',
-            confirmClass: 'btn-warning',
-            icon: 'fas fa-edit'
-        });
-
-        if (!confirmed) return;
-
-        try {
-            const requestData = {
-                userId,
-                username,
-                name,
-                role,
-                serviceType: role === 'user' ? serviceType : null,
-                service_no
-            };
-
-            if (password) {
-                requestData.password = password;
-            }
-
-            await this.parent.callApi('/api/admin/user/update', {
-                method: 'PUT',
-                body: JSON.stringify(requestData)
-            });
-
-            this.parent.showNotification('ユーザー情報を更新しました', 'success');
-            
-            // モーダルを閉じる
-            bootstrap.Modal.getInstance(document.getElementById('userEditModal')).hide();
-            
-            // ユーザー一覧を更新
-            await this.loadExistingUsers();
-
-        } catch (error) {
-            console.error('ユーザー編集エラー:', error);
-            this.parent.showNotification(error.message || 'ユーザー情報の更新に失敗しました', 'danger');
-        }
-    }
-
-    /**
-     * ランダムパスワード生成
-     */
-    generateRandomPassword() {
-        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let password = '';
-        for (let i = 0; i < 8; i++) {
-            password += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return password;
-    }
-
-    /**
-     * ユーザー編集保存
-     */
-    async saveUserEdit() {
-        const userId = document.getElementById('editUserId').value;
-        const username = document.getElementById('editUsername').value.trim();
-        const password = document.getElementById('editPassword').value;
-        const name = document.getElementById('editName').value.trim();
-        const role = document.getElementById('editRole').value;
-        const serviceType = document.getElementById('editServiceType').value;
-        const service_no = document.getElementById('editServiceNo').value;
+        console.log('出勤曜日:', workweek); 
 
         // バリデーション
         if (!username || !name || !role) {
@@ -492,7 +442,8 @@ export default class AdminUserManagement {
                 name,
                 role,
                 serviceType: role === 'user' ? serviceType : null,
-                service_no
+                service_no,
+                workweek:workweek.join(',')
             };
 
             if (password) {
@@ -548,6 +499,7 @@ export default class AdminUserManagement {
 
             ServiesNoGroup.style.display = 'block';
             ServiesNoGroup.required = true;
+            
 
         } else {
             serviceTypeGroup.style.display = 'none';
