@@ -109,10 +109,11 @@ export class AttendanceTable {
       return this.generateMonthlyTableRow(record, options);
     }
 
-    if(!record.clock_in && context !== 'monthly'){
-      record.clock_in = `出勤予定`;
+        // 月別出勤簿用の特別な処理
+    if (!record.clock_in  && context !== 'monthly') {
+      record.clock_in = `出勤予定`
     }
-    
+
     // 通常の出勤管理用の行生成
     const roleClass = this.getRoleColor(record.user_role);
     const roleDisplay = this.getRoleDisplayName(record.user_role);

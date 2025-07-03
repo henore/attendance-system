@@ -193,7 +193,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       SELECT 
         a.id, a.user_id, a.date, a.clock_in, a.clock_out, a.status,
         a.break_start, a.break_end,
-        u.name as user_name, u.role as user_role, u.service_type, u.workweek as user_workweek,
+        u.name as user_name, u.role as user_role, u.service_type, u.workweek as user_workweek,u.id as user_id,
         dr.id as report_id,
         sc.id as comment_id,
         br.start_time as br_start, br.end_time as br_end, br.duration as br_duration

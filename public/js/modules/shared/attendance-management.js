@@ -19,7 +19,7 @@ export class SharedAttendanceManagement {
     this.attendanceTable = new AttendanceTable(parentModule);
     this.reportDetailModal = new ReportDetailModal(app, parentModule);
     
-    // 出勤者のみ表示フラグ
+    // 出勤者、出勤予定者のみ表示フラグ
     this.showOnlyWorking = true; // デフォルトで出勤者のみ表示
   }
 
@@ -95,7 +95,7 @@ export class SharedAttendanceManagement {
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" id="showOnlyWorkingSwitch" checked>
               <label class="form-check-label" for="showOnlyWorkingSwitch">
-                出勤者のみ表示
+                出勤者、出勤予定者のみ表示
               </label>
             </div>
             <small class="text-muted">

@@ -81,6 +81,7 @@ export class UserBreakHandler {
   /**
    * 未出勤時のUI
    */
+ 
   renderNotWorkingUI(breakElement, breakDisplay) {
     breakElement.innerHTML = `
       <p class="text-muted">出勤後に休憩機能が利用できます</p>
@@ -89,8 +90,7 @@ export class UserBreakHandler {
       </button>
     `;
     if (breakDisplay) breakDisplay.style.display = 'none';
-  }
-
+}
   /**
    * 休憩不可UIを表示（通所者の午後出勤）
    */
