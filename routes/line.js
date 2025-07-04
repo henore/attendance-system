@@ -10,42 +10,6 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
-// LINE SDK の初期化
-let lineClient = null;
-let lineSDKInfo = 'SDK未初期化';
-
-// LINE設定
-const lineConfig = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET
-};
-
-// SDK初期化関数
-function initializeLineSDK() {
-  try {
-    // @line/bot-sdk v7.x系の場合
-    const line = require('@line/bot-sdk');
-    lineClient = new line.Client(lineConfig);
-    lineSDKInfo = 'Client (v7.x)';
-    console.log('✅ LINE Client (v7.x) 初期化完了');
-  } catch (error) {
-    try {
-      // @line/bot-sdk v8.x系の場合
-      const { MessagingApiClient } = require('@line/bot-sdk');
-      lineClient = new MessagingApiClient({
-        channelAccessToken: lineConfig.channelAccessToken
-      });
-      lineSDKInfo = 'MessagingApiClient (v8.x)';
-      console.log('✅ LINE MessagingApiClient (v8.x) 初期化完了');
-    } catch (innerError) {
-      console.error('❌ LINE SDK初期化失敗:', innerError.message);
-      lineSDKInfo = `エラー: ${innerError.message}`;
-    }
-  }
-}
-
-// 初期化実行
-initializeLineSDK();
 
 // 必要なディレクトリを作成
 async function ensureDirectories() {
@@ -63,25 +27,6 @@ async function ensureDirectories() {
 
 // 起動時にディレクトリを作成
 ensureDirectories();
-
-/**
- * LINE送信機能の状態確認
- */
-router.get('/status', (req, res) => {
-  const enabled = !!(lineClient && process.env.LINE_CHANNEL_ACCESS_TOKEN);
-  res.json({ 
-    enabled,
-    configured: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
-    clientReady: !!lineClient,
-    sdkInfo: lineSDKInfo,
-    envCheck: {
-      hasToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
-      tokenLength: process.env.LINE_CHANNEL_ACCESS_TOKEN?.length || 0,
-      hasSecret: !!process.env.LINE_CHANNEL_SECRET,
-      defaultUserId: process.env.DEFAULT_LINE_USER_ID || 'not set'
-    }
-  });
-});
 
 /**
  * 日報画像生成（LINE API要件対応版）

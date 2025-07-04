@@ -72,7 +72,7 @@ export class ReportDetailModal {
                   <i class="fas fa-save"></i> コメントを保存
                 </button>
                 <button type="button" class="btn btn-success" id="${this.modalId}SaveAndSendBtn" style="display: none;">
-                  <i class="fas fa-share"></i> 保存してLINE送信
+                  <i class="fas fa-share"></i> 保存して画像をDL
                 </button>
               ` : ''}
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -790,23 +790,14 @@ export class ReportDetailModal {
               staff_name: this.app.currentUser.name || 'スタッフ',
               created_at: new Date().toISOString()
             };
-            
-            console.log('[LINE送信] 送信データ:', {
-              reportData: lineReportData,
-              userData: lineUserData,
-              commentData: lineCommentData
-            });
-            
+           
             await this.lineSender.sendReportCompletion(
               lineReportData,
               lineUserData,
               lineCommentData
             );
-            
-            console.log('[LINE送信] 完了');
           } catch (lineError) {
-            console.error('[LINE送信] エラー詳細:', lineError);
-            this.app.showNotification('コメントは保存されましたが、LINE送信に失敗しました', 'warning');
+
           }
         }
         

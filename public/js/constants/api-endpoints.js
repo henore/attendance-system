@@ -25,12 +25,7 @@ export const API_ENDPOINTS = {
 
   // LINE連携（api-endpoints.jsに追加）
   LINE: {
-
-    STATUS: '/api/line/status',
     GENERATE_IMAGE: '/api/line/generate-report-image',
-    SEND_REPORT: '/api/line/send-report',
-    TEST_SEND: '/api/line/test-send'  // テスト用エンドポイント
-
   },
   
   // 利用者用

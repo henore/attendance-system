@@ -1,0 +1,245 @@
+/* /css/components/table-attendance.css
+   月別出勤簿テーブル専用スタイル */
+
+/* ==========================================
+   通常表示スタイル
+   ========================================== */
+
+/* コピー機能 */
+.copyable-time {
+    cursor: pointer;
+    transition: background-color 0.2s;
+    position: relative;
+}
+
+.copyable-time:hover {
+    background-color: #f8f9fa;
+}
+
+.copy-btn {
+    opacity: 0.5;
+    transition: opacity 0.2s;
+    font-size: 0.75rem;
+}
+
+.copyable-time:hover .copy-btn {
+    opacity: 1;
+}
+
+/* 土日のスタイル（行レベル） */
+.weekend-row, .table-secondary {
+    background-color: #f8f9fa;
+}
+
+.weekend-row td, .table-secondary td {
+    background-color: #f8f9fa !important;
+}
+
+.text-danger.fw-bold {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* 月別出勤簿タイトル */
+.monthly-attendance-report h5 {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.monthly-attendance-report h5 small {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+}
+
+/* テーブル列幅の調整 */
+.monthly-attendance-report .date-column {
+    width: 8%;
+}
+
+.monthly-attendance-report .time-column {
+    width: 12%;
+}
+
+.monthly-attendance-report .status-column {
+    width: 10%;
+}
+
+.monthly-attendance-report .work-hours-column {
+    width: 12%;
+}
+
+.monthly-attendance-report .operation-column {
+    width: 15%;
+}
+
+/* 状態別カラー */
+.text-success { color: #198754; }
+.text-warning { color: #fd7e14; }
+.text-danger { color: #dc3545; }
+.text-primary { color: #0d6efd; }
+.text-info { color: #0dcaf0; }
+.text-secondary { color: #6c757d; }
+.text-muted { color: #6c757d; }
+
+/* ==========================================
+   印刷専用スタイル
+   ========================================== */
+
+@media print {
+    /* 非表示要素 */
+    .shared-section .custom-card-header,
+    .shared-section .row.mb-4,
+    .btn, .btn-group, .alert, .modal,
+    .navbar, .sidebar, .operation-column,
+    .copy-btn, nav, header, footer,
+    .d-print-none { 
+        display: none !important; 
+    }
+    
+    /* ページ設定 */
+    @page {
+        size: A4;
+        margin: 8mm 6mm;
+    }
+    
+    /* 全体レイアウト */
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 9px !important;
+        line-height: 1.1 !important;
+        background: white !important;
+        color: black !important;
+    }
+    
+    .custom-card, .card-body {
+        border: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* レイアウト調整 */
+    .container, .container-fluid {
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: none !important;
+    }
+    
+    /* タイトル（印刷時） */
+    .monthly-attendance-report h5 {
+        font-size: 12px !important;
+        margin-bottom: 6px !important;
+        text-align: center;
+        border-bottom: 1px solid #333;
+        padding-bottom: 3px;
+    }
+    
+    .monthly-attendance-report h5 small {
+        font-size: 8px !important;
+        display: block;
+        margin-top: 2px;
+    }
+    
+    /* テーブル（印刷時） */
+    .table-responsive {
+        overflow: visible !important;
+    }
+    
+    .monthly-attendance-report table {
+        font-size: 7px !important;
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin: 0 !important;
+    }
+    
+    .monthly-attendance-report th,
+    .monthly-attendance-report td {
+        padding: 1px 2px !important;
+        border: 0.5px solid #333 !important;
+        text-align: center !important;
+        vertical-align: middle !important;
+        font-size: 7px !important;
+        line-height: 1 !important;
+        height: 14px !important;
+    }
+    
+    .monthly-attendance-report thead th {
+        background-color: #f0f0f0 !important;
+        font-weight: bold !important;
+        color: black !important;
+        font-size: 6px !important;
+        height: 16px !important;
+    }
+    
+    /* 列幅調整（印刷時） */
+    .date-column { width: 6% !important; }
+    .time-column { width: 9% !important; }
+    .status-column { width: 8% !important; }
+    .work-hours-column { width: 10% !important; }
+    
+    /* 土日・祝日（印刷時） */
+    .weekend-row, .table-secondary {
+        background-color: #f8f8f8 !important;
+    }
+    
+    .weekend-row td, .table-secondary td {
+        background-color: #f8f8f8 !important;
+        color: black !important;
+    }
+    
+    .text-danger.fw-bold {
+        color: #dc3545 !important;
+        font-weight: bold !important;
+    }
+    
+    /* 状態別カラー（印刷時も見やすく） */
+    .text-success { color: #198754 !important; }
+    .text-warning { color: #fd7e14 !important; }
+    .text-danger { color: #dc3545 !important; }
+    .text-primary { color: #0d6efd !important; }
+    .text-info { color: #0dcaf0 !important; }
+    .text-secondary { color: #6c757d !important; }
+    .text-muted { color: #6c757d !important; }
+    
+    /* フッター（印刷時） */
+    .monthly-attendance-report tfoot th {
+        background-color: #e8e8e8 !important;
+        font-weight: bold !important;
+        color: black !important;
+        font-size: 8px !important;
+        border: 1px solid #333 !important;
+    }
+}
+
+/* ==========================================
+   レスポンシブ対応
+   ========================================== */
+
+@media (max-width: 768px) {
+    .monthly-attendance-report table {
+        font-size: 0.75rem;
+    }
+    
+    .monthly-attendance-report th,
+    .monthly-attendance-report td {
+        padding: 0.25rem;
+    }
+    
+    .copy-btn {
+        font-size: 0.625rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .monthly-attendance-report {
+        overflow-x: auto;
+    }
+    
+    .monthly-attendance-report table {
+        min-width: 800px;
+        font-size: 0.7rem;
+    }
+}
