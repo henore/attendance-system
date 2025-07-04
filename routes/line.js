@@ -152,58 +152,33 @@ router.post('/generate-report-image', async (req, res) => {
     
     // sharpを使用して画像を処理
     const imageId = `report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-    const tempDir = path.join(__dirname, '..', 'temp');
+    const imageDir = path.join(__dirname, '..', 'public', 'images');
     
     // 1024x1024のオリジナル画像（JPEG変換）
-    const originalPath = path.join(tempDir, `${imageId}_original.jpg`);
+    const originalPath = path.join(imageDir, `${imageId}_original.jpg`);
     await sharp(pngBuffer)
       .resize(1024, 1024, { 
         fit: 'cover',
         position: 'top'
       })
       .jpeg({ 
-        quality: 55,  // 品質を75%に下げて容量削減
         progressive: true,
         mozjpeg: true
       })
       .toFile(originalPath);
-    
-    // 240x240のプレビュー画像
-    const previewPath = path.join(tempDir, `${imageId}_preview.jpg`);
-    await sharp(pngBuffer)
-      .resize(240, 240, { 
-        fit: 'cover',
-        position: 'top'
-      })
-      .jpeg({ 
-        quality: 50  // プレビューも品質調整
-      })
-      .toFile(previewPath);
-    
-    // ファイルサイズチェック
-    const originalStats = await fs.stat(originalPath);
-    const previewStats = await fs.stat(previewPath);
+       
     
     console.log('[画像生成] 完了:', {
       imageId,
       originalSize: `${(originalStats.size / 1024).toFixed(2)}KB`,
-      previewSize: `${(previewStats.size / 1024).toFixed(2)}KB`
     });
-    
-    // 1MB超えの場合は品質を下げて再生成
-    if (originalStats.size > 1024 * 1024) {
-      console.log('[画像生成] オリジナル画像が1MBを超えたため品質を調整');
-      await sharp(pngBuffer)
-        .resize(1024, 1024, { fit: 'cover', position: 'top' })
-        .jpeg({ quality: 50 })  // さらに品質を下げる
-        .toFile(originalPath);
-    }
     
     res.json({ 
       success: true, 
       imageId,
       originalSize: originalStats.size,
       previewSize: previewStats.size,
+      imageUrl: `/images/${imageId}_original.jpg`,
       message: '画像生成完了'
     });
     
@@ -214,123 +189,6 @@ router.post('/generate-report-image', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: '画像生成に失敗しました: ' + error.message
-    });
-  }
-});
-
-/**
- * LINE送信（オリジナル・プレビュー画像対応）
- */
-router.post('/send-report', async (req, res) => {
-  try {
-    if (!lineClient) {
-      throw new Error('LINE APIが初期化されていません');
-    }
-    
-    const { imageId, userName, date, lineUserId } = req.body;
-    const targetUserId = lineUserId || process.env.DEFAULT_LINE_USER_ID;
-    
-    if (!targetUserId) {
-      throw new Error('送信先LINEユーザーIDが設定されていません');
-    }
-    
-    console.log('[LINE送信] 開始:', { imageId, userName, date });
-    
-    // 画像ファイルの存在確認
-    const tempDir = path.join(__dirname, '..', 'temp');
-    const originalPath = path.join(tempDir, `${imageId}_original.jpg`);
-    const previewPath = path.join(tempDir, `${imageId}_preview.jpg`);
-    
-    try {
-      await fs.access(originalPath);
-      await fs.access(previewPath);
-    } catch (error) {
-      throw new Error('画像ファイルが見つかりません: ' + imageId);
-    }
-    
-    // 画像を公開ディレクトリにコピー
-    const timestamp = Date.now();
-    const publicOriginalName = `report_${timestamp}_original.jpg`;
-    const publicPreviewName = `report_${timestamp}_preview.jpg`;
-    
-    const publicDir = path.join(__dirname, '..', 'public', 'temp');
-    const publicOriginalPath = path.join(publicDir, publicOriginalName);
-    const publicPreviewPath = path.join(publicDir, publicPreviewName);
-    
-    await fs.copyFile(originalPath, publicOriginalPath);
-    await fs.copyFile(previewPath, publicPreviewPath);
-    
-    // 公開URLを生成
-    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
-    const originalUrl = `${baseUrl}/temp/${publicOriginalName}`;
-    const previewUrl = `${baseUrl}/temp/${publicPreviewName}`;
-    
-    console.log('[LINE送信] 画像URL:', { originalUrl, previewUrl });
-    
-    // メッセージを送信
-    const messages = [
-      {
-        type: 'text',
-        text: `📋 ${userName}さんの日報が完了しました\n📅 ${formatDateJapanese(date)}\n\n詳細は添付画像をご確認ください。`
-      },
-      {
-        type: 'image',
-        originalContentUrl: originalUrl,
-        previewImageUrl: previewUrl
-      }
-    ];
-    
-    try {
-      if (lineSDKInfo.includes('v8')) {
-        await lineClient.pushMessage({
-          to: targetUserId,
-          messages: messages
-        });
-      } else {
-        await lineClient.pushMessage(targetUserId, messages);
-      }
-      
-      console.log('[LINE送信] 送信成功');
-    } catch (lineError) {
-      console.error('[LINE API] エラー:', lineError.response?.data || lineError);
-      
-      let errorMessage = 'LINE送信に失敗しました';
-      if (lineError.statusCode === 400) {
-        if (lineError.response?.data?.message?.includes('Invalid user')) {
-          errorMessage = 'LINE ユーザーIDが無効です。';
-        } else {
-          errorMessage = lineError.response?.data?.message || errorMessage;
-        }
-      } else if (lineError.statusCode === 401) {
-        errorMessage = 'LINE認証エラー: アクセストークンを確認してください';
-      }
-      
-      throw new Error(errorMessage);
-    }
-    
-    // 一時ファイルを削除（5分後）
-    setTimeout(async () => {
-      try {
-        await fs.unlink(originalPath);
-        await fs.unlink(previewPath);
-        await fs.unlink(publicOriginalPath);
-        await fs.unlink(publicPreviewPath);
-        console.log('[クリーンアップ] 一時ファイル削除完了');
-      } catch (err) {
-        console.error('[クリーンアップ] エラー:', err.message);
-      }
-    }, 5 * 60 * 1000);
-    
-    res.json({ 
-      success: true, 
-      message: 'LINE送信完了'
-    });
-    
-  } catch (error) {
-    console.error('[LINE送信] エラー:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || 'LINE送信に失敗しました'
     });
   }
 });
@@ -787,183 +645,5 @@ function calculateSleepHours(bedtime, wakeupTime) {
     return '-';
   }
 }
-
-// 既存のテスト送信・Webhook・ボット状態確認は維持
-router.post('/test-send', async (req, res) => {
-  // 既存の実装を維持
-  try {
-    if (!lineClient) {
-      throw new Error('LINE APIが初期化されていません');
-    }
-    
-    const targetUserId = req.body.lineUserId || process.env.DEFAULT_LINE_USER_ID;
-    
-    if (!targetUserId) {
-      throw new Error('送信先LINEユーザーIDが設定されていません');
-    }
-    
-    console.log('[テスト送信] 開始:', { targetUserId: targetUserId.substring(0, 10) + '...', sdkInfo: lineSDKInfo });
-    
-    const message = {
-      type: 'text',
-      text: [
-        '✅ LINE連携テスト送信',
-        '',
-        'このメッセージが届いていれば、LINE連携は正常に動作しています。',
-        '',
-        `📅 送信日時: ${new Date().toLocaleString('ja-JP')}`,
-        `🔧 SDK情報: ${lineSDKInfo}`,
-        `📱 送信先ID: ${targetUserId.substring(0, 10)}...`
-      ].join('\n')
-    };
-    
-    try {
-      if (lineSDKInfo.includes('v8')) {
-        await lineClient.pushMessage({
-          to: targetUserId,
-          messages: [message]
-        });
-      } else {
-        await lineClient.pushMessage(targetUserId, message);
-      }
-      
-      console.log('[テスト送信] 送信成功');
-      
-      res.json({ 
-        success: true, 
-        message: 'テストメッセージを送信しました',
-        sdkInfo: lineSDKInfo
-      });
-      
-    } catch (lineError) {
-      console.error('[テスト送信] LINE APIエラー:', lineError.response?.data || lineError);
-      throw lineError;
-    }
-    
-  } catch (error) {
-    console.error('[テスト送信] エラー:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || 'テスト送信に失敗しました',
-      sdkInfo: lineSDKInfo
-    });
-  }
-});
-
-router.get('/bot-status', async (req, res) => {
-  // 既存の実装を維持
-  try {
-    let clientStatus = 'not_initialized';
-    let clientType = 'unknown';
-    
-    if (lineClient) {
-      clientStatus = 'initialized';
-      clientType = lineSDKInfo;
-    }
-    
-    const status = {
-      environment: {
-        hasAccessToken: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
-        tokenLength: process.env.LINE_CHANNEL_ACCESS_TOKEN?.length || 0,
-        hasChannelSecret: !!process.env.LINE_CHANNEL_SECRET,
-        defaultUserId: process.env.DEFAULT_LINE_USER_ID || 'not_set',
-        baseUrl: process.env.BASE_URL || 'not_set'
-      },
-      client: {
-        status: clientStatus,
-        type: clientType,
-        ready: !!lineClient
-      },
-      webhookUrl: `${process.env.BASE_URL || 'http://localhost:3000'}/api/line/webhook`,
-      instructions: {
-        step1: 'LINE Developersでグループトーク参加を許可',
-        step2: 'Webhook URLを設定',
-        step3: 'Webhookを有効化',
-        step4: 'ボットを個人で友達追加してからグループ招待',
-        step5: 'グループで「テスト」と送信してWebhook動作確認'
-      },
-      troubleshooting: {
-        immediateLeave: [
-          'グループトーク機能が無効',
-          'Webhook URLが間違っている',
-          'Webhook応答エラー',
-          'ボットが友達追加されていない'
-        ],
-        solutions: [
-          'LINE Developersでグループトーク許可をON',
-          'Webhook URLを正確に設定',
-          'サーバーが正常に動作しているか確認',
-          '先に個人でボットを友達追加'
-        ]
-      }
-    };
-    
-    res.json(status);
-    
-  } catch (error) {
-    console.error('ボット状況確認エラー:', error);
-    res.status(500).json({ 
-      error: error.message,
-      status: 'error'
-    });
-  }
-});
-
-router.post('/webhook', (req, res) => {
-  // 既存の実装を維持
-  try {
-    console.log('\n🔔 === Webhook受信 ===');
-    console.log('受信時刻:', new Date().toLocaleString('ja-JP'));
-    console.log('Headers:', req.headers);
-    console.log('Body:', JSON.stringify(req.body, null, 2));
-    
-    const events = req.body.events;
-    
-    if (!events || events.length === 0) {
-      console.log('イベントなし - 設定確認用リクエスト');
-      return res.status(200).send('OK');
-    }
-    
-    events.forEach((event, index) => {
-      console.log(`\n--- イベント ${index + 1} ---`);
-      console.log('タイプ:', event.type);
-      console.log('送信元:', event.source);
-      
-      if (event.source.type === 'group') {
-        console.log('✅ グループメッセージ受信!');
-        console.log('🎯 グループID:', event.source.groupId);
-        console.log('👤 ユーザーID:', event.source.userId);
-        
-        if (event.type === 'message') {
-          console.log('💬 メッセージ内容:', event.message.text);
-          
-          // .envファイル用の設定を出力
-          console.log('\n📋 === .env設定用 ===');
-          console.log(`DEFAULT_LINE_USER_ID=${event.source.groupId}`);
-          console.log('==================\n');
-        }
-        
-        if (event.type === 'join') {
-          console.log('🎉 グループ参加イベント!');
-        }
-      } else if (event.source.type === 'user') {
-        console.log('👤 個人メッセージ');
-        console.log('ユーザーID:', event.source.userId);
-      }
-      
-      if (event.type === 'message' && event.message.type === 'text') {
-        console.log('メッセージ:', event.message.text);
-      }
-    });
-    
-    console.log('==================\n');
-    
-    res.status(200).send('OK');
-    
-  } catch (error) {
-    console.error('❌ Webhook処理エラー:', error);
-    res.status(200).send('Error logged');
-  }
-});
 
 module.exports = router;

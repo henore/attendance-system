@@ -163,6 +163,7 @@ app.use('/api/staff', requireAuth, requireRole(['staff', 'admin']), staffRouter)
 app.use('/api/admin', requireAuth, requireRole(['admin']), adminRouter);
 app.use('/api/attendance', requireAuth, attendanceRouter);
 app.use('/api/handover', requireAuth, handoverRouter);
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
 // サーバー日付取得エンドポイント（JST統一モジュール使用）
 app.get('/api/server-date', requireAuth, (req, res) => {

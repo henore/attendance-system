@@ -85,7 +85,13 @@ export class LineReportSender {
     if (!imageResponse.success) {
       // 画像生成エラーの詳細化
       const errorMsg = imageResponse.message || '画像生成に失敗しました';
-      
+      const link = document.createElement('a');
+      link.href = imageResponse.imageUrl;
+      link.download = 'daylyreport.jpg';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
       if (errorMsg.includes('Puppeteer')) {
         throw new Error('画像生成エンジンエラー: ブラウザの起動に失敗しました');
       } else if (errorMsg.includes('sharp')) {
@@ -107,7 +113,7 @@ export class LineReportSender {
     if (imageResponse.originalSize > 900 * 1024) {
       console.warn('[LINE送信] 警告: 画像サイズが900KBを超えています');
     }
-    
+//    
     // 2. LINEに送信
     const sendResponse = await this.app.apiCall(API_ENDPOINTS.LINE.SEND_REPORT, {
       method: 'POST',
