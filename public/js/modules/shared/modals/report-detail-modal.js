@@ -94,15 +94,15 @@ export class ReportDetailModal {
       const saveBtn = document.getElementById(`${this.modalId}SaveCommentBtn`);
       if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-          this.saveComment(false); // LINE送信なし
+          this.saveComment(false); // 画像保存なし
         });
       }
       
-      // LINE送信付き保存ボタン（新規追加）
+      // 画像付き保存ボタン（新規追加）
       const saveAndSendBtn = document.getElementById(`${this.modalId}SaveAndSendBtn`);
       if (saveAndSendBtn) {
         saveAndSendBtn.addEventListener('click', () => {
-          this.saveComment(true); // LINE送信あり
+          this.saveComment(true); // 画像DLあり
         });
       }
     }
@@ -659,7 +659,7 @@ export class ReportDetailModal {
     });
     
     newSaveAndSendBtn.addEventListener('click', () => {
-      console.log('[イベントリスナー] 保存＆LINE送信ボタンクリック');
+      console.log('[イベントリスナー] 保存＆画像DLボタンクリック');
       this.saveComment(true);
     });
   }
@@ -682,11 +682,11 @@ export class ReportDetailModal {
   }
 
   /**
-   * コメント保存（LINE送信機能付き）
-   * @param {boolean} sendToLine - LINE送信するかどうか
+   * コメント保存（画像DL機能付き）
+   * @param {boolean} sendToLine - 画像DLするかどうか
    */
   async saveComment(sendToLine = false) {
-    console.log('[コメント保存] メソッド開始 - LINE送信:', sendToLine);
+    console.log('[コメント保存] メソッド開始 - 画像DL:', sendToLine);
     
     try {
       const textarea = document.getElementById('staffCommentTextarea');
@@ -767,10 +767,10 @@ export class ReportDetailModal {
       if (saveResponse.success !== false) {
         this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
         
-        // LINE送信処理
+        // 画像DL処理
         if (sendToLine) {
           try {
-            console.log('[LINE送信] 開始');
+            console.log('[画像DL] 開始');
             await this.lineSender.sendReportCompletion(
               this.currentData.report,
               this.currentData.user,
@@ -780,10 +780,10 @@ export class ReportDetailModal {
                 created_at: new Date().toISOString()
               }
             );
-            console.log('[LINE送信] 完了');
+            console.log('[画像DL] 完了');
           } catch (lineError) {
-            console.error('[LINE送信] エラー:', lineError);
-            this.app.showNotification('コメントは保存されましたが、LINE送信に失敗しました', 'warning');
+            console.error('[画像DL] エラー:', lineError);
+            this.app.showNotification('画像の保存に失敗しました', 'warning');
           }
         }
         

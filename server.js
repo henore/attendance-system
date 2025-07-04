@@ -128,18 +128,6 @@ const adminRouter = require('./routes/admin')(dbGet, dbAll, dbRun, requireAuth, 
 const attendanceRouter = require('./routes/attendance')(dbGet, dbAll, dbRun, requireAuth);
 const handoverRouter = require('./routes/handover')(dbGet, dbAll, dbRun, requireAuth);
 
-// ✅ LINEルートをここに追加
-if (process.env.LINE_CHANNEL_ACCESS_TOKEN) {
-  try {
-    const lineRoutes = require('./routes/line');
-    app.use('/api/line', lineRoutes);
-    app.use('/temp', express.static(path.join(__dirname, 'public/temp')));
-    console.log('✅ LINE Messaging API ルートを追加しました');
-  } catch (error) {
-    console.warn('⚠️ LINE機能をスキップ:', error.message);
-  }
-}
-
 // 認証チェック用エンドポイント（認証前でもアクセス可能）
 app.get('/api/auth/check-auth', (req, res) => {
   if (req.session.user) {
