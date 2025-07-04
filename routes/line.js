@@ -49,7 +49,7 @@ initializeLineSDK();
 
 // 必要なディレクトリを作成
 async function ensureDirectories() {
-  const dirs = ['temp', 'public/temp'];
+  const dirs = ['temp', 'public/temp', 'public/images']; 
   for (const dir of dirs) {
     const fullPath = path.join(__dirname, '..', dir);
     try {
