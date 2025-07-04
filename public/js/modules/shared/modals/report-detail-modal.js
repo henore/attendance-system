@@ -72,7 +72,7 @@ export class ReportDetailModal {
                   <i class="fas fa-save"></i> コメントを保存
                 </button>
                 <button type="button" class="btn btn-success" id="${this.modalId}SaveAndSendBtn" style="display: none;">
-                  <i class="fas fa-share"></i> 保存してLINE送信
+                  <i class="fas fa-share"></i> 保存して画像にする
                 </button>
               ` : ''}
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
