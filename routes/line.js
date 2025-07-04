@@ -200,14 +200,14 @@ function generateSquareLayoutHTML(data) {
         }
         
         .title {
-          font-size: 24px;
+          font-size: 30px;
           font-weight: bold;
           color: #333;
           margin-bottom: 3px;
         }
         
         .date {
-          font-size: 18px;
+          font-size: 30px;
           color: #666;
         }
         
@@ -229,7 +229,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .detail-section h6 {
-          font-size: 10px;
+          font-size: 20px;
           color: #666;
           margin: 0 0 3px 0;
         }
@@ -263,14 +263,14 @@ function generateSquareLayoutHTML(data) {
         }
         
         .past-form-label {
-          font-size: 14px;
+          font-size: 16px;
           font-weight: 600;
           color: #495057;
           margin-bottom: 2px;
         }
         
         .past-form-value {
-          font-size: 10px;
+          font-size: 16px;
           color: #333;
           padding: 4px 8px;
           background: #f8f9fa;
@@ -296,7 +296,7 @@ function generateSquareLayoutHTML(data) {
         /* 振り返りは基本2行程度なので制限なし */
         .reflection-content {
           min-height: 30px;
-          font-size: 22px;
+          font-size: 24px;
         }
         
         /* 健康状態 - 2行表示 */
@@ -330,7 +330,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .comment-content {
-          font-size: 22px;
+          font-size: 24px;
           line-height: 1.3;
           background: rgba(255,255,255,0.1);
           padding: 8px;
@@ -340,7 +340,7 @@ function generateSquareLayoutHTML(data) {
         }
         
         .comment-author {
-          font-size: 16px;
+          font-size: 18px;
           opacity: 0.9;
           text-align: right;
         }
