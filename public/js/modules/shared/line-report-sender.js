@@ -81,16 +81,29 @@ export class LineReportSender {
         date: reportData?.date || new Date().toISOString().split('T')[0]
       })
     });
-    
-    if (!imageResponse.success) {
-      // 画像生成エラーの詳細化
-      const errorMsg = imageResponse.message || '画像生成に失敗しました';
-      const link = document.createElement('a');
-      link.href = imageResponse.imageUrl;
-      link.download = 'daylyreport.jpg';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+
+    if (imageResponse.success) {
+        console.log('[画像生成] 完了:', imageResponse);
+
+  // 自動ダウンロード処理を追加
+        if (imageResponse.imageUrl) {
+            const link = document.createElement('a');
+            link.href = imageResponse.imageUrl;
+            link.download = 'report_image.jpg'; // 任意の名前
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+              return;
+}
+         }else if (!imageResponse.success) {
+            // 画像生成エラーの詳細化
+            const errorMsg = imageResponse.message || '画像生成に失敗しました';
+            const link = document.createElement('a');
+            link.href = imageResponse.imageUrl;
+            link.download = 'daylyreport.jpg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
       if (errorMsg.includes('Puppeteer')) {
         throw new Error('画像生成エンジンエラー: ブラウザの起動に失敗しました');
