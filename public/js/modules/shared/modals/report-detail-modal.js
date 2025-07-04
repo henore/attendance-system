@@ -757,29 +757,55 @@ export class ReportDetailModal {
           try {
             console.log('[LINE送信] 開始');
             
-            // LINE送信用のデータを準備
+            // currentDataの内容を確認
+            console.log('[LINE送信] currentData:', {
+              hasReport: !!this.currentData.report,
+              hasUser: !!this.currentData.user,
+              hasAttendance: !!this.currentData.attendance,
+              date: this.currentData.date
+            });
+            
+            // LINE送信用のデータを準備（安全なアクセス）
             const lineReportData = {
               ...this.currentData.report,
               date: this.currentData.date,
-              attendance: this.currentData.attendance,
-              breakRecord: this.currentData.breakRecord
+              attendance: this.currentData.attendance || {},
+              breakRecord: this.currentData.breakRecord || null,
+              // attendance情報も含める
+              clock_in: this.currentData.attendance?.clock_in,
+              clock_out: this.currentData.attendance?.clock_out,
+              break_start: this.currentData.attendance?.break_start,
+              break_end: this.currentData.attendance?.break_end
+            };
+            
+            const lineUserData = {
+              id: this.currentData.userId,
+              name: this.currentData.userName || this.currentData.user?.name || '利用者',
+              role: this.currentData.user?.role || 'user',
+              service_type: this.currentData.user?.service_type || null
             };
             
             const lineCommentData = {
               comment: comment,
-              staff_name: this.app.currentUser.name,
+              staff_name: this.app.currentUser.name || 'スタッフ',
               created_at: new Date().toISOString()
             };
             
+            console.log('[LINE送信] 送信データ:', {
+              reportData: lineReportData,
+              userData: lineUserData,
+              commentData: lineCommentData
+            });
+            
             await this.lineSender.sendReportCompletion(
               lineReportData,
-              this.currentData.user,
+              lineUserData,
               lineCommentData
             );
             
             console.log('[LINE送信] 完了');
           } catch (lineError) {
-            console.error('[LINE送信] エラー:', lineError);
+            console.error('[LINE送信] エラー詳細:', lineError);
             this.app.showNotification('コメントは保存されましたが、LINE送信に失敗しました', 'warning');
           }
         }

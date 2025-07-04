@@ -93,8 +93,16 @@ router.post('/generate-report-image', async (req, res) => {
     
     console.log('[画像生成] 開始:', { 
       userName: userData?.name, 
-      date: date || reportData?.date
+      date: date || reportData?.date,
+      hasReportData: !!reportData,
+      hasUserData: !!userData,
+      hasCommentData: !!commentData
     });
+    
+    // 必須データの検証
+    if (!reportData || !userData) {
+      throw new Error('必須データ（reportData, userData）が不足しています');
+    }
     
     // データの正規化
     const normalizedData = normalizeReportData(reportData, userData, commentData, date);

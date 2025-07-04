@@ -57,19 +57,28 @@ export class LineReportSender {
     }
   }
 
-  /**
+ /**
    * サーバーサイドでの画像生成とLINE送信
    */
   async sendToLineServer(reportData, userData, commentData) {
   try {
+    // データの検証とログ出力
+    console.log('[LINE送信] データ確認:', {
+      hasReportData: !!reportData,
+      hasUserData: !!userData,
+      hasCommentData: !!commentData,
+      userName: userData?.name,
+      date: reportData?.date
+    });
+    
     // 1. まず画像を生成
     const imageResponse = await this.app.apiCall(API_ENDPOINTS.LINE.GENERATE_IMAGE, {
       method: 'POST',
       body: JSON.stringify({
-        reportData: reportData,
-        userData: userData,
-        commentData: commentData,
-        date: reportData.date
+        reportData: reportData || {},
+        userData: userData || {},
+        commentData: commentData || null,
+        date: reportData?.date || new Date().toISOString().split('T')[0]
       })
     });
     
@@ -81,6 +90,8 @@ export class LineReportSender {
         throw new Error('画像生成エンジンエラー: ブラウザの起動に失敗しました');
       } else if (errorMsg.includes('sharp')) {
         throw new Error('画像処理エラー: 画像の変換に失敗しました');
+      } else if (errorMsg.includes('必須データ')) {
+        throw new Error('データエラー: 必要な情報が不足しています');
       } else {
         throw new Error(`画像生成エラー: ${errorMsg}`);
       }
@@ -102,15 +113,19 @@ export class LineReportSender {
       method: 'POST',
       body: JSON.stringify({
         imageId: imageResponse.imageId,
-        userName: userData.name,
-        date: reportData.date
+        userName: userData?.name || '利用者',
+        date: reportData?.date || new Date().toISOString().split('T')[0]
       })
     });
     
     return sendResponse;
     
   } catch (error) {
-    console.error('[サーバー送信] エラー:', error);
+    console.error('[サーバー送信] エラー詳細:', {
+      message: error.message,
+      response: error.response,
+      stack: error.stack
+    });
     
     // ユーザーフレンドリーなエラーメッセージ
     if (error.message.includes('画像')) {
