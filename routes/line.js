@@ -170,7 +170,6 @@ router.post('/generate-report-image', async (req, res) => {
     
     console.log('[画像生成] 完了:', {
       imageId,
-      originalSize: `${(originalStats.size / 1024).toFixed(2)}KB`,
     });
     
     res.json({ 
