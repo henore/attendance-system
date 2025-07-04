@@ -1,10 +1,10 @@
 // public/js/modules/shared/modals/report-detail-modal.js
-// 日報詳細表示とコメント編集機能の統合モーダル（LINE送信機能統一版）
+// 日報詳細表示とコメント編集機能の統合モーダル（LINE送信機能付き）
 
 import { API_ENDPOINTS } from '../../../constants/api-endpoints.js';
 import { modalManager } from '../modal-manager.js';
 import { formatDate, formatDateTime } from '../../../utils/date-time.js';
-import { LineReportSender } from '../line-report-sender.js';
+import { LineReportSender } from '../line-report-sender.js'; // 新規追加
 
 export class ReportDetailModal {
   constructor(app, parentModule) {
@@ -23,7 +23,7 @@ export class ReportDetailModal {
     this.lastCheckTime = null;
     this.checkInterval = null;
     
-    // LINE送信機能
+    // LINE送信機能を追加
     this.lineSender = new LineReportSender(app);
   }
 
@@ -72,7 +72,7 @@ export class ReportDetailModal {
                   <i class="fas fa-save"></i> コメントを保存
                 </button>
                 <button type="button" class="btn btn-success" id="${this.modalId}SaveAndSendBtn" style="display: none;">
-                  <i class="fas fa-share"></i> 保存して画像をDL
+                  <i class="fas fa-share"></i> 保存してLINE送信
                 </button>
               ` : ''}
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -98,7 +98,7 @@ export class ReportDetailModal {
         });
       }
       
-      // LINE送信付き保存ボタン
+      // LINE送信付き保存ボタン（新規追加）
       const saveAndSendBtn = document.getElementById(`${this.modalId}SaveAndSendBtn`);
       if (saveAndSendBtn) {
         saveAndSendBtn.addEventListener('click', () => {
@@ -167,7 +167,7 @@ export class ReportDetailModal {
         return;
       }
       
-      // 現在のデータを保存（LINE送信用にデータ構造を改善）
+      // 現在のデータを保存
       this.currentData = {
         userId: userId,
         userName: userName || 'ユーザー',
@@ -201,6 +201,8 @@ export class ReportDetailModal {
     } catch (error) {
       console.error('日報詳細取得エラー:', error);
       this.app.showNotification('日報の取得に失敗しました', 'danger');
+      
+      // エラー時はcurrentDataをリセット
       this.currentData = null;
     }
   }
@@ -409,7 +411,7 @@ export class ReportDetailModal {
   }
 
   /**
-   * 詳細コンテンツ生成
+   * 詳細コンテンツ生成（月別レポート表示を維持）
    */
   generateDetailContent() {
     const { user, attendance, report, comment, breakRecord } = this.currentData;
@@ -614,7 +616,7 @@ export class ReportDetailModal {
    * コメントエリアの設定
    */
   setupCommentArea() {
-    console.log('[setupCommentArea] 開始');
+    console.log('[setupCommentArea] 開始 - currentData:', this.currentData);
     
     const textarea = document.getElementById('staffCommentTextarea');
     const saveBtn = document.getElementById(`${this.modalId}SaveCommentBtn`);
@@ -625,6 +627,7 @@ export class ReportDetailModal {
       return;
     }
     
+    // currentDataの存在確認
     if (!this.currentData) {
       console.error('[setupCommentArea] currentDataが存在しません');
       return;
@@ -633,6 +636,8 @@ export class ReportDetailModal {
     // 編集可否の判定
     const { comment } = this.currentData;
     const isEditable = !comment || this.userRole === 'admin';
+    
+    console.log('[setupCommentArea] 編集可否:', isEditable);
     
     // ボタンの表示制御
     saveBtn.style.display = isEditable ? 'inline-block' : 'none';
@@ -649,10 +654,12 @@ export class ReportDetailModal {
     saveAndSendBtn.parentNode.replaceChild(newSaveAndSendBtn, saveAndSendBtn);
     
     newSaveBtn.addEventListener('click', () => {
+      console.log('[イベントリスナー] コメント保存ボタンクリック');
       this.saveComment(false);
     });
     
     newSaveAndSendBtn.addEventListener('click', () => {
+      console.log('[イベントリスナー] 保存＆LINE送信ボタンクリック');
       this.saveComment(true);
     });
   }
@@ -675,21 +682,25 @@ export class ReportDetailModal {
   }
 
   /**
-   * コメント保存（LINE送信機能統一版）
+   * コメント保存（LINE送信機能付き）
    * @param {boolean} sendToLine - LINE送信するかどうか
    */
   async saveComment(sendToLine = false) {
-    console.log('[コメント保存] 開始 - LINE送信:', sendToLine);
+    console.log('[コメント保存] メソッド開始 - LINE送信:', sendToLine);
     
     try {
       const textarea = document.getElementById('staffCommentTextarea');
       const comment = textarea ? textarea.value.trim() : '';
+      
+      console.log('[コメント保存] textarea:', textarea);
+      console.log('[コメント保存] comment値:', comment);
       
       if (!comment) {
         this.app.showNotification('コメントを入力してください', 'warning');
         return;
       }
       
+      // currentDataの存在チェック
       if (!this.currentData) {
         console.error('[コメント保存] currentDataが存在しません');
         this.app.showNotification('データが正しく読み込まれていません。モーダルを閉じて再度開いてください。', 'danger');
@@ -698,6 +709,7 @@ export class ReportDetailModal {
       
       const { userId, userName, date } = this.currentData;
       
+      // 必須データの存在チェック
       if (!userId || !date) {
         console.error('[コメント保存] 必須データが不足しています:', { userId, userName, date });
         this.app.showNotification('必要なデータが不足しています', 'danger');
@@ -713,6 +725,7 @@ export class ReportDetailModal {
         if (latestResponse && latestResponse.comment) {
           const latestComment = latestResponse.comment;
           
+          // コメントが他のユーザーによって更新されているかチェック
           if (this.hasCommentChanged(latestComment)) {
             const confirmSave = confirm(
               `警告: ${latestComment.staff_name || '他のスタッフ'}さんが既にコメントを記入しています。\n\n` +
@@ -722,6 +735,7 @@ export class ReportDetailModal {
             );
             
             if (!confirmSave) {
+              // 最新のコメントを表示
               this.currentData.comment = latestComment;
               this.originalComment = {
                 comment: latestComment.comment,
@@ -734,6 +748,7 @@ export class ReportDetailModal {
         }
       } catch (error) {
         console.error('最新状態チェックエラー:', error);
+        // エラーがあっても保存は続行
       }
       
       console.log('[コメント保存] データ確認:', { userId, userName, date, comment });
@@ -752,60 +767,22 @@ export class ReportDetailModal {
       if (saveResponse.success !== false) {
         this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
         
-        // LINE送信処理（改善されたデータ構造で送信）
+        // LINE送信処理
         if (sendToLine) {
           try {
             console.log('[LINE送信] 開始');
-            
-            // currentDataの内容を確認
-            console.log('[LINE送信] currentData:', {
-              hasReport: !!this.currentData.report,
-              hasUser: !!this.currentData.user,
-              hasAttendance: !!this.currentData.attendance,
-              date: this.currentData.date
-            });
-            
-            // LINE送信用のデータを準備（安全なアクセス）
-            const lineReportData = {
-              ...this.currentData.report,
-              date: this.currentData.date,
-              attendance: this.currentData.attendance || {},
-              breakRecord: this.currentData.breakRecord || null,
-              // attendance情報も含める
-              clock_in: this.currentData.attendance?.clock_in,
-              clock_out: this.currentData.attendance?.clock_out,
-              break_start: this.currentData.attendance?.break_start,
-              break_end: this.currentData.attendance?.break_end
-            };
-            
-            const lineUserData = {
-              id: this.currentData.userId,
-              name: this.currentData.userName || this.currentData.user?.name || '利用者',
-              role: this.currentData.user?.role || 'user',
-              service_type: this.currentData.user?.service_type || null
-            };
-            
-            const lineCommentData = {
-              comment: comment,
-              staff_name: this.app.currentUser.name || 'スタッフ',
-              created_at: new Date().toISOString()
-            };
-            
-            console.log('[LINE送信] 送信データ:', {
-              reportData: lineReportData,
-              userData: lineUserData,
-              commentData: lineCommentData
-            });
-            
             await this.lineSender.sendReportCompletion(
-              lineReportData,
-              lineUserData,
-              lineCommentData
+              this.currentData.report,
+              this.currentData.user,
+              {
+                comment: comment,
+                staff_name: this.app.currentUser.name,
+                created_at: new Date().toISOString()
+              }
             );
-            
             console.log('[LINE送信] 完了');
           } catch (lineError) {
-            console.error('[LINE送信] エラー詳細:', lineError);
+            console.error('[LINE送信] エラー:', lineError);
             this.app.showNotification('コメントは保存されましたが、LINE送信に失敗しました', 'warning');
           }
         }
@@ -818,10 +795,12 @@ export class ReportDetailModal {
           this.parent.onCommentSaved();
         }
       } else {
+        // エラー処理
         if (saveResponse.message) {
           this.app.showNotification(saveResponse.message, 'danger');
         }
         
+        // 競合が発生した場合は最新データを再取得
         if (saveResponse.conflict) {
           await this.show(userId, userName, date);
         }
@@ -830,6 +809,7 @@ export class ReportDetailModal {
     } catch (error) {
       console.error('コメント保存エラー:', error);
       
+      // エラーメッセージの詳細化
       let errorMessage = 'コメントの保存に失敗しました';
       
       if (error.message && error.message.includes('already exists')) {
@@ -844,6 +824,9 @@ export class ReportDetailModal {
 
   /**
    * 就寝時間と起床時間から睡眠時間を計算
+   * @param {string} bedtime HH:MM形式
+   * @param {string} wakeupTime HH:MM形式
+   * @returns {string} 睡眠時間の表示文字列
    */
   calculateSleepHours(bedtime, wakeupTime) {
     if (!bedtime || !wakeupTime) return '-';
@@ -852,18 +835,24 @@ export class ReportDetailModal {
       const [bedHours, bedMinutes] = bedtime.split(':').map(Number);
       const [wakeHours, wakeMinutes] = wakeupTime.split(':').map(Number);
       
+      // 分に変換
       const bedTotalMinutes = bedHours * 60 + bedMinutes;
       const wakeTotalMinutes = wakeHours * 60 + wakeMinutes;
       
       let sleepMinutes;
       
+      // 日をまたぐ場合を考慮
       if (wakeTotalMinutes >= bedTotalMinutes) {
+        // 同日内（例：22:00就寝 → 06:00起床は不可能なので翌日とみなす）
         if (bedTotalMinutes > 12 * 60 && wakeTotalMinutes < 12 * 60) {
+          // 夜遅く就寝して朝早く起床（通常パターン）
           sleepMinutes = (24 * 60 - bedTotalMinutes) + wakeTotalMinutes;
         } else {
+          // 同日内（昼寝など）
           sleepMinutes = wakeTotalMinutes - bedTotalMinutes;
         }
       } else {
+        // 日をまたぐ場合
         sleepMinutes = (24 * 60 - bedTotalMinutes) + wakeTotalMinutes;
       }
       
