@@ -55,18 +55,29 @@ router.post('/generate-report-image', async (req, res) => {
     const html = generateSquareLayoutHTML(normalizedData);
     
     // Puppeteerで画像生成
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox', 
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--single-process'
-      ]
+  browser = await puppeteer.launch({
+  headless: 'new',
+  args: [
+    '--no-sandbox', 
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--disable-gpu',
+    '--single-process',
+    '--disable-web-security',
+    '--disable-features=IsolateOrigins',
+    '--disable-site-isolation-trials'
+  ],
+    // 追加の安定化オプション
+    ignoreDefaultArgs: ['--disable-extensions'],
+    timeout: 30000 // 30秒のタイムアウト
+    });
+
+    // エラーハンドリングを追加
+    browser.on('disconnected', () => {
+      console.log('[Puppeteer] ブラウザが切断されました');
     });
     
     const page = await browser.newPage();

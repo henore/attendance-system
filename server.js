@@ -127,6 +127,7 @@ const staffRouter = require('./routes/staff')(dbGet, dbAll, dbRun, requireAuth, 
 const adminRouter = require('./routes/admin')(dbGet, dbAll, dbRun, requireAuth, requireRole);
 const attendanceRouter = require('./routes/attendance')(dbGet, dbAll, dbRun, requireAuth);
 const handoverRouter = require('./routes/handover')(dbGet, dbAll, dbRun, requireAuth);
+const lineRouter = require('./routes/line'); 
 
 // 認証チェック用エンドポイント（認証前でもアクセス可能）
 app.get('/api/auth/check-auth', (req, res) => {
