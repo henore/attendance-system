@@ -176,7 +176,6 @@ router.post('/generate-report-image', async (req, res) => {
       success: true, 
       imageId,
       originalSize: originalPath,
-      previewSize: previewStats.size,
       imageUrl: `/images/${imageId}_original.jpg`,
       message: '画像生成完了'
     });

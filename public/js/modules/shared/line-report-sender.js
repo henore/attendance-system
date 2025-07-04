@@ -102,17 +102,6 @@ export class LineReportSender {
         throw new Error(`画像生成エラー: ${errorMsg}`);
       }
     }
-    
-    console.log('[LINE送信] 画像生成完了:', {
-      imageId: imageResponse.imageId,
-      originalSize: `${(imageResponse.originalSize / 1024).toFixed(2)}KB`,
-      previewSize: `${(imageResponse.previewSize / 1024).toFixed(2)}KB`
-    });
-    
-    // サイズ警告
-    if (imageResponse.originalSize > 900 * 1024) {
-      console.warn('[LINE送信] 警告: 画像サイズが900KBを超えています');
-    }
 //    
     // 2. LINEに送信
     const sendResponse = await this.app.apiCall(API_ENDPOINTS.LINE.SEND_REPORT, {
