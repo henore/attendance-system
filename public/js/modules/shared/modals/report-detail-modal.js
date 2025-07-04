@@ -790,14 +790,23 @@ export class ReportDetailModal {
               staff_name: this.app.currentUser.name || 'スタッフ',
               created_at: new Date().toISOString()
             };
-           
+            
+            console.log('[LINE送信] 送信データ:', {
+              reportData: lineReportData,
+              userData: lineUserData,
+              commentData: lineCommentData
+            });
+            
             await this.lineSender.sendReportCompletion(
               lineReportData,
               lineUserData,
               lineCommentData
             );
+            
+            console.log('[LINE送信] 完了');
           } catch (lineError) {
-
+            console.error('[LINE送信] エラー詳細:', lineError);
+            this.app.showNotification('コメントは保存されましたが、LINE送信に失敗しました', 'warning');
           }
         }
         
