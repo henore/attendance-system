@@ -2,7 +2,7 @@
 // 利用者の日報機能ハンドラー（施設外就労先対応完全版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-import { MESSAGES } from '../../constants/labels.js';
+import { MESSAGES, EXTERNAL_WORK_LOCATION } from '../../constants/labels.js';
 import { formatAppetite, formatSleepQuality, formatInterviewRequest, formatMedicationTime } from '../../utils/formatter.js';
 import { getCurrentDate } from '../../utils/date-time.js';
 
@@ -31,7 +31,7 @@ export class UserReportHandler {
     return `
       <div class="text-center text-muted p-5">
         <i class="fas fa-info-circle fa-3x mb-3"></i>
-        <p>出勤後に日報を入力できます</p>
+        <p>退勤後に日報を入力できます</p>
       </div>
     `;
   }
@@ -164,7 +164,7 @@ export class UserReportHandler {
               <input class="form-check-input" type="checkbox" id="externalWorkLocation" 
                      ${report.external_work_location ? 'checked' : ''}>
               <label class="form-check-label" for="externalWorkLocation">
-                <i class="fas fa-building"></i> 施設外就労先名：PC作業（暫定）
+                <i class="fas fa-building"></i> ${EXTERNAL_WORK_LOCATION}
               </label>
             </div>
           </div>
@@ -384,7 +384,7 @@ export class UserReportHandler {
     
     const formData = {
       workContent: document.getElementById('workContent').value,
-      externalWorkLocation: isChecked ? 'PC作業（暫定）' : null,
+      externalWorkLocation: isChecked ? EXTERNAL_WORK_LOCATION : null,
       temperature: parseFloat(document.getElementById('temperature').value),
       appetite: document.getElementById('appetite').value,
       medicationTime: document.getElementById('medicationTime').value ? parseInt(document.getElementById('medicationTime').value) : null,

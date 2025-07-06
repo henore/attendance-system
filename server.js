@@ -57,7 +57,7 @@ const dbRun = (sql, params = []) => {
     });
 };
 
-// ミドルウェア設定
+// セキュリティ強化ミドルウェア設定
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -66,8 +66,24 @@ app.use(helmet({
             scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
             fontSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'self'"],
+            frameSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
         },
     },
+    crossOriginEmbedderPolicy: false, // 互換性のため
+    hsts: {
+        maxAge: 31536000, // 1年
+        includeSubDomains: true,
+        preload: true
+    },
+    noSniff: true,
+    frameguard: { action: 'deny' },
+    xssFilter: true,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
 
 app.use(cors({

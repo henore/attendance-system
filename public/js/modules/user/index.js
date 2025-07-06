@@ -306,8 +306,12 @@ export default class UserModule extends BaseModule {
     
     if (this.state.isWorking) {
       this.breakHandler.updateUI(statusElement);
-    } else {
+    } else if (this.state.hasWorkedToday && !this.state.isWorking) {
+      // 退勤後の状態
       this.breakHandler.disableUI();
+    } else {
+      // 出勤前の状態
+      this.breakHandler.updateUI(statusElement);
     }
   }
 

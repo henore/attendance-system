@@ -20,6 +20,16 @@ const hashPassword = (password) => {
     return bcrypt.hashSync(password, 10);
 };
 
+// 強力なランダムパスワード生成
+const generateSecurePassword = (length = 16) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < length; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+};
+
 db.serialize(() => {
     console.log('🔧 データベース初期化開始...');
 
@@ -144,12 +154,17 @@ db.serialize(() => {
     db.run(`CREATE INDEX IF NOT EXISTS idx_staff_comments_user_date ON staff_comments(user_id, date)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)`);
 
-    // デフォルトユーザー作成
+    // デフォルトユーザー作成（セキュアなランダムパスワード）
+    const adminPassword = generateSecurePassword(20);
+    const staffPassword = generateSecurePassword(16);
+    const user1Password = generateSecurePassword(16);
+    const user2Password = generateSecurePassword(16);
+    
     const defaultUsers = [
-        { username: 'admin', password: 'admin123', name: '管理者', role: 'admin' },
-        { username: 'staff1', password: 'staff123', name: 'スタッフ1', role: 'staff' },
-        { username: 'user1', password: 'user123', name: '利用者1', role: 'user', service_type: 'commute' },
-        { username: 'user2', password: 'user123', name: '利用者2', role: 'user', service_type: 'home' }
+        { username: 'admin', password: adminPassword, name: '管理者', role: 'admin' },
+        { username: 'staff1', password: staffPassword, name: 'スタッフ1', role: 'staff' },
+        { username: 'user1', password: user1Password, name: '利用者1', role: 'user', service_type: 'commute' },
+        { username: 'user2', password: user2Password, name: '利用者2', role: 'user', service_type: 'home' }
     ];
 
     const stmt = db.prepare(`
@@ -175,11 +190,32 @@ db.serialize(() => {
         VALUES ('システムを開始しました。', 'システム')
     `);
 
+    // パスワードを安全なファイルに保存
+    const credentialsPath = path.join(dbDir, 'initial-credentials.txt');
+    const credentialsContent = [
+        '=================================================',
+        '          初期ユーザー認証情報',
+        '=================================================',
+        '',
+        '⚠️  セキュリティ上重要: このファイルは初回ログイン後に削除してください',
+        '',
+        `管理者    : admin     / ${adminPassword}`,
+        `スタッフ  : staff1    / ${staffPassword}`,
+        `利用者1   : user1     / ${user1Password} (通所)`,
+        `利用者2   : user2     / ${user2Password} (在宅)`,
+        '',
+        '=================================================',
+        '初回ログイン後は必ずパスワードを変更してください',
+        '=================================================',
+        ''
+    ].join('\n');
+    
+    fs.writeFileSync(credentialsPath, credentialsContent, 'utf8');
+
     console.log('✅ データベース初期化完了');
-    console.log('\n📝 デフォルトユーザー:');
-    defaultUsers.forEach(user => {
-        console.log(`   ${user.role}: ${user.username} / ${user.password}`);
-    });
+    console.log('\n🔐 セキュリティ情報:');
+    console.log(`   初期認証情報: ${credentialsPath}`);
+    console.log('   ⚠️  初回ログイン後にパスワードを変更し、認証情報ファイルを削除してください');
 });
 
 db.close((err) => {

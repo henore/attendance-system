@@ -42,6 +42,9 @@ export const INTERVIEW_REQUEST_LABELS = {
     interview: '面談希望'
 };
 
+// 施設外就労先名
+export const EXTERNAL_WORK_LOCATION = '施設外就労先名（佐藤美幸）';
+
 // システムメッセージ
 export const MESSAGES = {
     // 認証関連

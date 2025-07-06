@@ -3,7 +3,7 @@
 
 const express = require('express');
 const puppeteer = require('puppeteer');
-const sharp = require('sharp'); // 画像処理ライブラリ（要インストール）
+//const sharp = require('sharp'); // 画像処理ライブラリ（要インストール）
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
