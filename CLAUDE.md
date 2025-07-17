@@ -117,31 +117,10 @@ Each role has its own module in `public/js/modules/`:
 - Report status updates sent to LINE
 - Configured through environment variables
 
-## コーディング方針
-- 効率的かつベストプラクティスに従ったコード提供
-- 大きなファイルは適切に分割して提案
-- 機能追加時は既存コードとの連携を重視
-- コードの肥大化を避けた設計
-- 単純な上書きではなく、必要に応じて他の部分との連携も考慮
-
 ## プロジェクト構造
 - [使用している技術スタック: Node.js, JavaScript,sqlite3]
-- [主要なディレクトリ構造]
-
-## 重要な規約
-- レイアウト変更は要望がある時のみ実行
-- 既存のアーキテクチャパターンを尊重
-- コメントは日本語で記述
-
-## セキュリティ管理
 
 ### 本番環境デプロイ前のチェックリスト
-- [ ] 初期認証情報ファイル（`database/initial-credentials.txt`）の削除
-- [ ] 環境変数（`SESSION_SECRET`、`NODE_ENV=production`）の設定
-- [ ] データベースファイル権限の確認（`chmod 600 database/*.db`）
-- [ ] SSL/TLS証明書の設定
-- [ ] ファイアウォール設定
-- [ ] 定期バックアップの設定
 
 ### セキュリティ強化スクリプト
 ```bash
