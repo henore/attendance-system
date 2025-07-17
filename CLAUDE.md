@@ -112,11 +112,6 @@ Each role has its own module in `public/js/modules/`:
 - Error handling includes both user-friendly messages and detailed logging
 - The system supports both commute and home-based service types with different break tracking rules
 
-### LINE Bot Integration
-- LINE messaging API integration for notifications
-- Report status updates sent to LINE
-- Configured through environment variables
-
 ## プロジェクト構造
 - [使用している技術スタック: Node.js, JavaScript,sqlite3]
 
