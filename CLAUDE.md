@@ -1,6 +1,6 @@
-# CLAUDE.md
+# プロジェクト開発ガイド
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides development guidelines and project documentation for the attendance management system.
 
 ## Development Commands
 
@@ -112,10 +112,41 @@ Each role has its own module in `public/js/modules/`:
 - Error handling includes both user-friendly messages and detailed logging
 - The system supports both commute and home-based service types with different break tracking rules
 
+### LINE Bot Integration
+- LINE messaging API integration for notifications
+- Report status updates sent to LINE
+- Configured through environment variables
+
+## 開発方針
+- 効率的かつベストプラクティスに従った開発
+- 大きなファイルは適切に分割して保守性を向上
+- 機能追加時は既存コードとの連携を重視
+- コードの肥大化を避けたシンプルな設計
+- モジュール間の結合度を最小限に抑制
+- YAGNI(You Aren't Gonna Need It) :今必要じゃない機能は作らない。
+- DRY(Don't Repeat Yourself) : 同じコードを繰り返さない。
+- KISS(Keep It Simple Stupid) : シンプルに保つ。
+
 ## プロジェクト構造
-- [使用している技術スタック: Node.js, JavaScript,sqlite3]
+- 使用している技術スタック: Node.js, JavaScript, SQLite3
+- モジュラー設計による保守性の確保
+- レスポンシブWebデザインの採用
+
+## 重要な開発規約
+- レイアウト変更は要望がある時のみ実行
+- 既存のアーキテクチャパターンを尊重
+- コメントは日本語で記述
+- 統一されたコーディングスタイルの維持
+
+## セキュリティ管理
 
 ### 本番環境デプロイ前のチェックリスト
+- [ ] 初期認証情報ファイル（`database/initial-credentials.txt`）の削除
+- [ ] 環境変数（`SESSION_SECRET`、`NODE_ENV=production`）の設定
+- [ ] データベースファイル権限の確認（`chmod 600 database/*.db`）
+- [ ] SSL/TLS証明書の設定
+- [ ] ファイアウォール設定
+- [ ] 定期バックアップの設定
 
 ### セキュリティ強化スクリプト
 ```bash
@@ -130,3 +161,8 @@ ls -la database/
 - `utils/security-validation.js` - 入力検証とサニタイゼーション
 - 全ての入力値は自動的にXSS対策処理が適用されます
 - SQLインジェクション対策はパラメータ化クエリで実装済み
+
+## 開発者向け注意事項
+- このファイルは開発チーム向けの技術仕様書です
+- プロジェクトの構造や開発方針について記載しています
+- 新しい開発者のオンボーディング資料として使用してください

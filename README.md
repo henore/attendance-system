@@ -1,258 +1,189 @@
-# 就労支援B型作業所勤怠管理システム 要件定義書
+# 勤怠管理システム
 
-## システム概要
-- **目的**: 就労支援B型作業所の勤怠管理・日報管理の効率化・デジタル化
-- **技術スタック**: HTML　+　boostrap + Javascript　+ SQLite
-- **形態**: WEBアプリケーション
-- **利用人数**: 10-15人程度
+障害者福祉サービス事業所向けの包括的な勤怠管理システムです。通所サービスと在宅サービスの両方に対応し、利用者・スタッフ・管理者それぞれに最適化されたインターフェースを提供します。
 
-## データベース構成
+## 🌟 主な機能
 
-### 1. users（ユーザー管理）
-```sql
-users (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    password TEXT NOT NULL,  -- ハッシュ化
-    beneficiary_number TEXT,  -- 受給者番号
-    role TEXT NOT NULL,  -- "user", "staff", "staff_trainee", "admin"
-    is_visible BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
-)
+### 👤 利用者機能
+- 出退勤の打刻管理
+- 日報の作成・提出
+- 健康状態の記録
+- 月次出勤カレンダー表示
+- 在宅サービス利用者向け休憩時間管理
+
+### 👥 スタッフ機能
+- 利用者の出退勤状況管理
+- 日報の確認・コメント追加
+- 利用者別出勤状況の確認
+- 申し送り情報の管理
+- LINE通知連携
+
+### ⚙️ 管理者機能
+- ユーザー管理（追加・編集・削除）
+- システム監査ログ
+- 全社的な出勤状況の把握
+- 月次レポートの生成
+
+## 🛠️ 技術スタック
+
+- **バックエンド**: Node.js, Express.js
+- **データベース**: SQLite
+- **フロントエンド**: Vanilla JavaScript (ES6 modules), Bootstrap
+- **認証**: セッションベース認証 + bcrypt
+- **セキュリティ**: Helmet.js, CORS, CSRF保護
+- **API連携**: LINE Messaging API
+- **PDF生成**: Puppeteer
+
+## 📋 必要な環境
+
+- Node.js 14.x 以上
+- npm または yarn
+- SQLite3
+
+## 🚀 セットアップ手順
+
+### 1. リポジトリのクローン
+```bash
+git clone <repository-url>
+cd attendance-system
 ```
 
-### 2. attendance（出退勤記録）
-```sql
-attendance (
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER,
-    attendance_date DATE,
-    clock_in TIME,
-    clock_out TIME,
-    break_start TIME,
-    break_end TIME,
-    total_hours DECIMAL(3,2),
-    is_early_leave BOOLEAN DEFAULT FALSE,
-    early_leave_reason TEXT,
-    approved_by INTEGER,
-    is_time_adjusted BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-)
+### 2. 依存関係のインストール
+```bash
+npm install
 ```
 
-### 3. daily_reports（日報）
-```sql
-daily_reports (
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER,
-    report_date DATE,
-    content TEXT NOT NULL,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    is_read BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-)
+### 3. 環境変数の設定
+`.env` ファイルを作成し、以下の設定を行います：
+```env
+NODE_ENV=development
+SESSION_SECRET=your-secure-session-secret
+PORT=3000
+LINE_CHANNEL_ACCESS_TOKEN=your-line-channel-access-token
+LINE_CHANNEL_SECRET=your-line-channel-secret
 ```
 
-### 4. staff_comments（スタッフコメント）
-```sql
-staff_comments (
-    id INTEGER PRIMARY KEY,
-    daily_report_id INTEGER,
-    staff_id INTEGER,
-    comment TEXT NOT NULL,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    is_editable BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (daily_report_id) REFERENCES daily_reports(id),
-    FOREIGN KEY (staff_id) REFERENCES users(id)
-)
+### 4. データベースの初期化
+```bash
+npm run init-db
 ```
 
-### 5. handover_notes（申し送り事項）
-```sql
-handover_notes (
-    id INTEGER PRIMARY KEY,
-    content TEXT NOT NULL,
-    updated_by INTEGER,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (updated_by) REFERENCES users(id)
-)
+このコマンドで以下が実行されます：
+- SQLiteデータベースの作成
+- 必要なテーブルの作成
+- 初期ユーザーアカウントの作成
+- セキュアなランダムパスワードの生成
+
+### 5. 初期認証情報の確認
+初期化完了後、`database/initial-credentials.txt` ファイルで各ユーザーのパスワードを確認してください。
+
+### 6. アプリケーションの起動
+
+#### 開発モード（自動リロード）
+```bash
+npm run dev
 ```
 
-### 6. time_adjustments（時刻調整履歴）
-```sql
-time_adjustments (
-    id INTEGER PRIMARY KEY,
-    attendance_id INTEGER,
-    original_clock_in TIME,
-    adjusted_clock_in TIME,
-    original_clock_out TIME,
-    adjusted_clock_out TIME,
-    reason TEXT NOT NULL,
-    adjusted_by INTEGER,
-    adjusted_at TIMESTAMP,
-    FOREIGN KEY (attendance_id) REFERENCES attendance(id),
-    FOREIGN KEY (adjusted_by) REFERENCES users(id)
-)
+#### 本番モード
+```bash
+npm start
 ```
 
-### 7. comment_locks（コメント編集ロック）
-```sql
-comment_locks (
-    daily_report_id INTEGER PRIMARY KEY,
-    locked_by INTEGER,
-    locked_at TIMESTAMP,
-    FOREIGN KEY (daily_report_id) REFERENCES daily_reports(id),
-    FOREIGN KEY (locked_by) REFERENCES users(id)
-)
+アプリケーションは `http://localhost:3000` でアクセス可能です。
+
+## 👥 初期ユーザーアカウント
+
+| ユーザー名 | 役割 | 説明 |
+|-----------|------|------|
+| admin | 管理者 | システム全体の管理権限 |
+| staff1 | スタッフ | 利用者管理・日報確認権限 |
+| user1 | 利用者 | 通所サービス利用者 |
+| user2 | 利用者 | 在宅サービス利用者 |
+
+⚠️ **セキュリティ重要**: 初回ログイン後は必ずパスワードを変更し、`initial-credentials.txt` ファイルを削除してください。
+
+## 🏗️ システム構成
+
+### データベース構造
+- `attendance.db`: メインデータベース（ユーザー情報、出勤記録、日報等）
+- `sessions.db`: セッション管理用データベース
+
+### API エンドポイント
+- `/api/auth/*` - 認証関連
+- `/api/user/*` - 利用者機能
+- `/api/staff/*` - スタッフ機能  
+- `/api/admin/*` - 管理者機能
+- `/api/attendance/*` - 出勤管理
+- `/api/handover/*` - 申し送り管理
+- `/api/line/*` - LINE連携
+
+### フロントエンド構成
+```
+public/
+├── js/
+│   ├── modules/
+│   │   ├── user/        # 利用者向けモジュール
+│   │   ├── staff/       # スタッフ向けモジュール
+│   │   ├── admin/       # 管理者向けモジュール
+│   │   └── shared/      # 共通モジュール
+│   └── utils/           # ユーティリティ
+├── css/
+│   ├── modules/         # 役割別スタイル
+│   ├── components/      # コンポーネント別スタイル
+│   └── shared/          # 共通スタイル
+└── images/              # 画像ファイル
 ```
 
-## 権限別機能
+## 🔒 セキュリティ機能
 
-### 利用者（基本機能のみ）
-- ログイン・ログアウト
-- 出退勤記録（15分刻みでraundup）
-- 日報入力（必須項目チェック）
-- 過去の日報・スタッフコメント閲覧（読み取り専用）
-- ログイン時前回出勤のスタッフコメント強制確認機能
+- **認証**: bcryptによるパスワードハッシュ化
+- **セッション管理**: 役割別タイムアウト設定
+- **CSRF保護**: トークンベース
+- **XSS対策**: 入力値のサニタイゼーション
+- **SQLインジェクション対策**: パラメータ化クエリ
+- **セキュリティヘッダー**: Helmet.jsによる包括的保護
+- **ファイル権限**: データベースファイルの適切な権限設定
 
-### 社員
-- 利用者機能 + 以下
-- 休憩時間記録
-- 申し送り事項編集（5分間隔制限・空白不可）
-- 日報へのスタッフコメント（当日のみ編集可）
-- 早退処理承認
-- 利用者の1時間未満退勤時の手動対応
+## 📊 主要な機能詳細
 
-### 社員（OJT中・バイト）
-- 基本は閲覧のみ
-- 申し送り事項・コメント編集権限なし
+### 出勤管理
+- リアルタイム打刻システム
+- 日本標準時（JST）での時刻管理
+- 日跨ぎ勤務対応
+- 休憩時間の詳細記録（在宅サービス）
 
-### 最高権限（管理者）
-- 全機能 + 以下
-- ユーザー登録・権限付与（利用者は通所と在宅を選択する）
-- 利用者・社員の出退勤記録閲覧（月別）
-- 時刻調整機能（備考欄付き）
-- 利用者、社員、最高権限の名簿一覧
-- システム管理機能
+### 日報システム
+- 健康状態チェック
+- 作業内容記録
+- スタッフからのフィードバック機能
+- LINE通知連携
 
-## 主要機能詳細
+### レポート機能
+- 月次出勤カレンダー
+- PDF形式でのレポート出力
+- 管理者向け統計情報
 
-### 1. ログイン・認証
-- ID/パスワード認証
-- 強制ログアウト機能
+## 🔧 メンテナンスコマンド
 
-### 2. 出退勤管理
-- **出勤ボタン**: タイムスタンプで記録
-- **退勤ボタン**: 出勤後のみ有効
-- **1時間未満制御**: エラー表示、早退処理必要
-- **画面アラート**: 出勤中はログアウトボタンは無し、ブラウザ終了時も警告
+### データベースセキュリティ強化
+```bash
+bash scripts/secure-database.sh
+```
 
-### 3. 日報システム
-- **必須入力チェック**: 全項目記入まで完了不可
-- **スタッフコメント連動**: 日報IDで紐付け
-- **コメント強制確認**: ログイン時に未読コメント表示、当日中の再ログインでは表示しない
-- **編集制限**: 利用者は当日のみ、過去分は閲覧のみ
+### 開発用データベースリセット
+```bash
+rm database/*.db
+npm run init-db
+```
 
-### 4. 申し送り事項
-- **常時表示**: スタッフ画面に常に表示
-- **編集制限**: 5分間隔、完全空白上書き不可
-- **バッティング回避**: 排他制御実装
+## 📝 ライセンス
 
-### 5. 通知機能
-- **利用者日報提出通知**: Windows標準音 + ポップアップ
-- **未コメント警告**: スタッフ退勤時チェック
-- **リアルタイム更新**: 5秒間隔でダッシュボード更新
+このプロジェクトは障害者福祉サービス事業所での利用を想定して開発されています。
 
-### 6. 時刻調整機能（管理者のみ）
-- **調整範囲**: 自由
-- **備考欄**: 体調不良の早退など
-- **履歴保存**: 調整した場合は調整者の氏名を備考に
-- **回数制限**: なし
+## 🤝 サポート
 
-### 7. 出退勤記録閲覧機能（管理者のみ）
-- **出勤者一覧**: リアルタイムでの出勤ボタンを押した人物名簿
-- **月別カレンダー**: 1年分のカレンダー→人物クリック→該当人物の該当月のデータを出勤退勤関係なく日付と曜日で縦並びで表示
-- **エクセルへエクスポート**: 利用者さんの工賃計算用
+システムに関するお問い合わせやサポートが必要な場合は、開発チームまでご連絡ください。
 
-## エラーハンドリング・制御
+---
 
-### 利用者向け制御
-1. **出勤ボタン**: ログイン後、出勤ボタンのみ有効
-2. **ブラウザ制御**: 出勤中は基本閉じないように指示、閉じる場合もアラートを出す
-3. **退勤制御**: 出勤していない場合は退勤ボタン無効
-4. **時間制限**: 1時間未満退勤時のエラー表示（退勤ボタンの誤クリック防止）
-5. **出勤時刻例外制御**:09時00分以前の打刻は全て09:00分とする
-6. **退勤時刻例外制御**:15時30分以降の退勤ボタンは全て15時45分とする
-7. **日報必須**: 未記入項目がある場合は完了不可
-8. **ログアウトボタン**: 日報記入完了後にログアウトボタン表示
-9. **出勤退勤チェック**:一度退勤を押すと出勤ボタンは押せないように制御
-
-### 社員向け制御
-1. **休憩管理**: 休憩出入り記録まで退勤不可
-2. **休憩時間管理**: 休憩時間が55分を超えた場合アラート（休憩終了を促す）
-3. **コメント義務**: 当日の日報にスタッフコメント必須、未記入がある場合は退勤ボタンで通知
-4. **編集権限**: 自分のスタッフコメントのみ当日再編集可
-5. **申し送り制御**: 5分間隔・空白全削除不可・リアルタイム排他制御
-
-### システム制御
-1. **セッション管理**: ネットワーク切断時の再ログイン
-2. **データ整合性**: トランザクション管理
-3. **ログ記録**: 全操作のログ保存
-4. **バックアップ**: 自動バックアップ機能
-
-## UI/UX設計方針
-
-### 基本方針
-- **明確な色分け**: 緑（安全）、赤（注意）、青（情報）
-- **視覚的フィードバック**: 操作完了時のアニメーション
-- **エラー防止**: 確認ダイアログの多用
-- **アクセシビリティ**: 色覚に配慮した配色
-
-## 技術的考慮事項
-
-### パフォーマンス
-- SQLite同時接続制限対応
-- インデックス最適化
-- メモリ使用量制限
-
-### セキュリティ
-- パスワードハッシュ化（bcrypt）
-- SQLインジェクション対策
-- セッション管理
-
-### 保守性
-- 設定ファイル分離
-- ログ機能充実
-- モジュール化設計
-
-## 運用開始後の課題
-
-### 確定事項
-- **システム管理者**: 開発者が随時対応
-- **利用人数**: 10-15人程度
-- **バックアップ**: 自動化実装
-- **サポート**: リモート対応
-
-### 検討事項
-- ID/パスワード配布方法
-- 初期導入時の研修計画
-- 障害時の代替手順
-- 将来的な機能拡張
-
-## 納期・工程
-- **開発期間**: 2-3時間（基本機能）
-- **テスト期間**: 実運用でのフィードバック調整
-- **導入**: 段階的移行
-- **保守**: 継続的改善
-
-
-
-
-
-
-
-
+**注意**: 本番環境へのデプロイ前に、セキュリティチェックリストを確認し、適切な設定を行ってください。詳細は `CLAUDE.md` を参照してください。
