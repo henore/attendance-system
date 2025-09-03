@@ -7,6 +7,7 @@ import { formatDate, getDaysInMonth, formatDateTime } from '../../utils/date-tim
 import { AttendanceTable } from './components/attendance-table.js';
 import { ReportDetailModal } from './modals/report-detail-modal.js';
 import { PrintManager } from'./managers/print-manager.js';
+import { preloadHolidays } from '../../utils/holidays.js';
 
 export default class SharedMonthlyReport {
     constructor(app, parentModule) {
@@ -455,6 +456,13 @@ export default class SharedMonthlyReport {
         this.selectedUserId = userId;
         
         try {
+            // 祝日データを事前読み込み
+            try {
+                await preloadHolidays();
+            } catch (error) {
+                console.warn('祝日データ取得失敗:', error);
+            }
+
             // APIエンドポイントを権限によって切り替え
             let response;
             const monthPadded = String(month).padStart(2, '0');
