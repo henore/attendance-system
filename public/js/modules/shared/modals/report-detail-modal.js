@@ -75,14 +75,6 @@ export class ReportDetailModal {
                   <i class="fas fa-share"></i> 保存して画像にする
                 </button>
               ` : ''}
-              ${this.userRole === 'admin' ? `
-                <button type="button" class="btn btn-warning" id="${this.modalId}EditReportBtn" style="display: none;">
-                  <i class="fas fa-edit"></i> 日報を編集
-                </button>
-                <button type="button" class="btn btn-success" id="${this.modalId}SaveReportBtn" style="display: none;">
-                  <i class="fas fa-save"></i> 日報保存
-                </button>
-              ` : ''}
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                 <i class="fas fa-times"></i> 閉じる
               </button>
@@ -115,23 +107,7 @@ export class ReportDetailModal {
       }
     }
     
-    // admin用日報編集ボタン
-    if (this.userRole === 'admin') {
-      const editReportBtn = document.getElementById(`${this.modalId}EditReportBtn`);
-      const saveReportBtn = document.getElementById(`${this.modalId}SaveReportBtn`);
-      
-      if (editReportBtn) {
-        editReportBtn.addEventListener('click', () => {
-          this.toggleReportEdit(true);
-        });
-      }
-      
-      if (saveReportBtn) {
-        saveReportBtn.addEventListener('click', () => {
-          this.saveReportEdit();
-        });
-      }
-    }
+    // 管理者の場合は編集ボタンを削除（直接編集可能）
     
     // モーダル内のイベント委譲
     const modalContent = document.getElementById(`${this.modalId}Content`);
@@ -157,12 +133,22 @@ export class ReportDetailModal {
       }, true);
     }
     
-    // モーダルが閉じられた時の処理
+    // モーダルが閉じられる直前の処理
     const modal = document.getElementById(this.modalId);
     if (modal) {
+      modal.addEventListener('hide.bs.modal', async () => {
+        // adminの場合、モーダルを閉じる前に日報変更を保存
+        if (this.userRole === 'admin' && this.hasReportChanges()) {
+          await this.saveReportChanges();
+        }
+      });
+      
       modal.addEventListener('hidden.bs.modal', () => {
         this.stopCommentCheck();
         this.isEditing = false;
+        if (this.autoSaveTimeout) {
+          clearTimeout(this.autoSaveTimeout);
+        }
       });
     }
   }
@@ -440,9 +426,9 @@ export class ReportDetailModal {
       this.setupCommentArea();
     }
     
-    // admin用日報編集ボタンの設定
+    // admin用自動保存設定
     if (this.userRole === 'admin') {
-      this.setupReportEditArea();
+      this.setupAutoSave();
     }
   }
 
@@ -502,7 +488,15 @@ export class ReportDetailModal {
         <!-- 作業内容 -->
         <div class="mb-3">
           <label class="past-form-label"><i class="fas fa-tasks"></i> 作業内容</label>
-          <div class="text-content">${report.work_content || ''}</div>
+          ${this.userRole === 'admin' ? `
+            <textarea 
+              class="form-control admin-editable" 
+              id="editWorkContent" 
+              rows="3" 
+              maxlength="500">${report.work_content || ''}</textarea>
+          ` : `
+            <div class="text-content">${report.work_content || ''}</div>
+          `}
         </div>
 
         <!-- 作業場所・PC番号・施設外就労先 -->
@@ -536,16 +530,43 @@ export class ReportDetailModal {
         <!-- 健康状態 -->
         <div class="row mb-3">
           <div class="col-3">
-            <label class="past-form-label"><i class="fas fa-thermometer-half"></i> 体温</label>
-            <div class="past-form-value">${report.temperature}℃</div>
+            <label class="${this.userRole === 'admin' ? 'form-label' : 'past-form-label'}"><i class="fas fa-thermometer-half"></i> 体温</label>
+            ${this.userRole === 'admin' ? `
+              <input 
+                type="number" 
+                class="form-control admin-editable" 
+                id="editTemperature" 
+                value="${report.temperature || ''}"
+                min="35" 
+                max="42" 
+                step="0.1">
+            ` : `
+              <div class="past-form-value">${report.temperature}℃</div>
+            `}
           </div>
           <div class="col-3">
-            <label class="past-form-label"><i class="fas fa-utensils"></i> 食欲</label>
-            <div class="past-form-value">${this.getAppetiteLabel(report.appetite)}</div>
+            <label class="${this.userRole === 'admin' ? 'form-label' : 'past-form-label'}"><i class="fas fa-utensils"></i> 食欲</label>
+            ${this.userRole === 'admin' ? `
+              <select class="form-control admin-editable" id="editAppetite">
+                <option value="good" ${report.appetite === 'good' ? 'selected' : ''}>良好</option>
+                <option value="none" ${report.appetite === 'none' ? 'selected' : ''}>なし</option>
+              </select>
+            ` : `
+              <div class="past-form-value">${this.getAppetiteLabel(report.appetite)}</div>
+            `}
           </div>
           <div class="col-3">
-            <label class="past-form-label"><i class="fas fa-pills"></i> 頓服服用</label>
-            <div class="past-form-value">${report.medication_time ? report.medication_time + '時頃' : 'なし'}</div>
+            <label class="${this.userRole === 'admin' ? 'form-label' : 'past-form-label'}"><i class="fas fa-pills"></i> 頓服服用</label>
+            ${this.userRole === 'admin' ? `
+              <select class="form-control admin-editable" id="editMedicationTime">
+                <option value="">なし</option>
+                ${Array.from({length: 24}, (_, i) => i + 1).map(hour => 
+                  `<option value="${hour}" ${report.medication_time === hour ? 'selected' : ''}>${hour}時頃</option>`
+                ).join('')}
+              </select>
+            ` : `
+              <div class="past-form-value">${report.medication_time ? report.medication_time + '時頃' : 'なし'}</div>
+            `}
           </div>
           <div class="col-3">
             <label class="past-form-label"><i class="fas fa-bed"></i> 睡眠時間</label>
@@ -554,42 +575,78 @@ export class ReportDetailModal {
         </div>
 
         <!-- 睡眠情報（詳細） -->
-        ${report.bedtime || report.wakeup_time ? `
-          <div class="row mb-3">
-            <div class="col-4">
-              <label class="past-form-label"><i class="fas fa-moon"></i> 就寝時間</label>
+        <div class="row mb-3">
+          <div class="col-4">
+            <label class="${this.userRole === 'admin' ? 'form-label' : 'past-form-label'}"><i class="fas fa-moon"></i> 就寝時間</label>
+            ${this.userRole === 'admin' ? `
+              <input 
+                type="time" 
+                class="form-control admin-editable" 
+                id="editBedtime" 
+                value="${report.bedtime || ''}">
+            ` : `
               <div class="past-form-value">${report.bedtime || '-'}</div>
-            </div>
-            <div class="col-4">
-              <label class="past-form-label"><i class="fas fa-sun"></i> 起床時間</label>
-              <div class="past-form-value">${report.wakeup_time || '-'}</div>
-            </div>
-            <div class="col-4">
-              <label class="past-form-label"><i class="fas fa-bed"></i> 睡眠状態</label>
-              <div class="past-form-value">${this.getSleepQualityLabel(report.sleep_quality)}</div>
-            </div>
+            `}
           </div>
-        ` : ''}
+          <div class="col-4">
+            <label class="${this.userRole === 'admin' ? 'form-label' : 'past-form-label'}"><i class="fas fa-sun"></i> 起床時間</label>
+            ${this.userRole === 'admin' ? `
+              <input 
+                type="time" 
+                class="form-control admin-editable" 
+                id="editWakeupTime" 
+                value="${report.wakeup_time || ''}">
+            ` : `
+              <div class="past-form-value">${report.wakeup_time || '-'}</div>
+            `}
+          </div>
+          <div class="col-4">
+            <label class="${this.userRole === 'admin' ? 'form-label' : 'past-form-label'}"><i class="fas fa-bed"></i> 睡眠状態</label>
+            ${this.userRole === 'admin' ? `
+              <select class="form-control admin-editable" id="editSleepQuality">
+                <option value="good" ${report.sleep_quality === 'good' ? 'selected' : ''}>良好</option>
+                <option value="poor" ${report.sleep_quality === 'poor' ? 'selected' : ''}>不良</option>
+                <option value="bad" ${report.sleep_quality === 'bad' ? 'selected' : ''}>悪い</option>
+              </select>
+            ` : `
+              <div class="past-form-value">${this.getSleepQualityLabel(report.sleep_quality)}</div>
+            `}
+          </div>
+        </div>
 
         <!-- 振り返り -->
         <div class="mb-3">
-          <label class="past-form-label"><i class="fas fa-lightbulb"></i> 振り返り・感想</label>
-          <div class="text-content">${report.reflection || ''}</div>
+          <label class="${this.userRole === 'admin' ? 'form-label' : 'past-form-label'}"><i class="fas fa-lightbulb"></i> 振り返り・感想</label>
+          ${this.userRole === 'admin' ? `
+            <textarea 
+              class="form-control admin-editable" 
+              id="editReflection" 
+              rows="3"
+              maxlength="500">${report.reflection || ''}</textarea>
+          ` : `
+            <div class="text-content">${report.reflection || ''}</div>
+          `}
         </div>
 
         <!-- 面談希望 -->
-        ${report.interview_request ? `
-          <div class="mb-3">
-            <label class="past-form-label"><i class="fas fa-comments"></i> 面談希望</label>
-            <div class="past-form-value text-info">${this.getInterviewRequestLabel(report.interview_request)}</div>
-          </div>
-        ` : ''}
+        <div class="mb-3">
+          <label class="${this.userRole === 'admin' ? 'form-label' : 'past-form-label'}"><i class="fas fa-comments"></i> 面談希望</label>
+          ${this.userRole === 'admin' ? `
+            <select class="form-control admin-editable" id="editInterviewRequest">
+              <option value="">なし</option>
+              <option value="consultation" ${report.interview_request === 'consultation' ? 'selected' : ''}>相談がある</option>
+              <option value="interview" ${report.interview_request === 'interview' ? 'selected' : ''}>面談希望</option>
+            </select>
+          ` : `
+            ${report.interview_request ? `
+              <div class="past-form-value text-info">${this.getInterviewRequestLabel(report.interview_request)}</div>
+            ` : ''}
+          `}
+        </div>
       </div>
 
       <hr>
 
-      <!-- 日報編集エリア（admin のみ） -->
-      ${this.userRole === 'admin' ? this.generateReportEditSection() : ''}
 
       <!-- スタッフコメントエリア -->
       ${this.generateCommentSection(comment)}
@@ -755,6 +812,11 @@ export class ReportDetailModal {
       if (!comment) {
         this.app.showNotification('コメントを入力してください', 'warning');
         return;
+      }
+      
+      // adminの場合は日報変更も同時に保存
+      if (this.userRole === 'admin') {
+        await this.saveReportChanges();
       }
       
       // currentDataの存在チェック
@@ -974,192 +1036,92 @@ export class ReportDetailModal {
   }
 
   /**
-   * 日報編集セクション生成（admin用）
+   * 自動保存設定（admin用）
    */
-  generateReportEditSection() {
-    const { report } = this.currentData;
-    
-    return `
-      <div class="report-edit-section bg-light p-3 mb-3 border rounded" style="display: none;">
-        <h6><i class="fas fa-edit text-warning"></i> 日報編集（管理者専用）</h6>
-        
-        <!-- 作業内容 -->
-        <div class="mb-3">
-          <label class="form-label">作業内容</label>
-          <textarea 
-            class="form-control" 
-            id="editWorkContent" 
-            rows="3"
-            maxlength="500">${report.work_content || ''}</textarea>
-        </div>
-        
-        <!-- 作業場所・PC番号・施設外就労先 -->
-        <div class="row mb-3">
-          <div class="col-4">
-            <label class="form-label">作業場所</label>
-            <select class="form-control" id="editWorkLocation">
-              <option value="">選択してください</option>
-              <option value="office" ${report.work_location === 'office' ? 'selected' : ''}>通所</option>
-              <option value="home" ${report.work_location === 'home' ? 'selected' : ''}>在宅</option>
-            </select>
-          </div>
-          <div class="col-4">
-            <label class="form-label">PC番号</label>
-            <select class="form-control" id="editPcNumber">
-              <option value="">選択してください</option>
-              ${Array.from({length: 20}, (_, i) => i + 1).map(num => 
-                `<option value="${num}" ${report.pc_number === num.toString() ? 'selected' : ''}>${num}</option>`
-              ).join('')}
-              ${['A', 'B', 'C', 'D'].map(letter => 
-                `<option value="${letter}" ${report.pc_number === letter ? 'selected' : ''}>${letter}</option>`
-              ).join('')}
-            </select>
-          </div>
-          <div class="col-4">
-            <label class="form-label">施設外就労先</label>
-            <input 
-              type="text" 
-              class="form-control" 
-              id="editExternalWorkLocation" 
-              value="${report.external_work_location || ''}"
-              maxlength="100">
-          </div>
-        </div>
-        
-        <!-- 体温・食欲・頓服・睡眠状態 -->
-        <div class="row mb-3">
-          <div class="col-3">
-            <label class="form-label">体温（℃）</label>
-            <input 
-              type="number" 
-              class="form-control" 
-              id="editTemperature" 
-              value="${report.temperature || ''}"
-              min="35" 
-              max="42" 
-              step="0.1">
-          </div>
-          <div class="col-3">
-            <label class="form-label">食欲</label>
-            <select class="form-control" id="editAppetite">
-              <option value="good" ${report.appetite === 'good' ? 'selected' : ''}>良好</option>
-              <option value="none" ${report.appetite === 'none' ? 'selected' : ''}>なし</option>
-            </select>
-          </div>
-          <div class="col-3">
-            <label class="form-label">頓服服用（時頃）</label>
-            <select class="form-control" id="editMedicationTime">
-              <option value="">なし</option>
-              ${Array.from({length: 24}, (_, i) => i + 1).map(hour => 
-                `<option value="${hour}" ${report.medication_time === hour ? 'selected' : ''}>${hour}時頃</option>`
-              ).join('')}
-            </select>
-          </div>
-          <div class="col-3">
-            <label class="form-label">睡眠状態</label>
-            <select class="form-control" id="editSleepQuality">
-              <option value="good" ${report.sleep_quality === 'good' ? 'selected' : ''}>良好</option>
-              <option value="poor" ${report.sleep_quality === 'poor' ? 'selected' : ''}>不良</option>
-              <option value="bad" ${report.sleep_quality === 'bad' ? 'selected' : ''}>悪い</option>
-            </select>
-          </div>
-        </div>
-        
-        <!-- 就寝・起床時間 -->
-        <div class="row mb-3">
-          <div class="col-6">
-            <label class="form-label">就寝時間</label>
-            <input 
-              type="time" 
-              class="form-control" 
-              id="editBedtime" 
-              value="${report.bedtime || ''}">
-          </div>
-          <div class="col-6">
-            <label class="form-label">起床時間</label>
-            <input 
-              type="time" 
-              class="form-control" 
-              id="editWakeupTime" 
-              value="${report.wakeup_time || ''}">
-          </div>
-        </div>
-        
-        <!-- 振り返り -->
-        <div class="mb-3">
-          <label class="form-label">振り返り・感想</label>
-          <textarea 
-            class="form-control" 
-            id="editReflection" 
-            rows="3"
-            maxlength="500">${report.reflection || ''}</textarea>
-        </div>
-        
-        <!-- 面談希望 -->
-        <div class="mb-3">
-          <label class="form-label">面談希望</label>
-          <select class="form-control" id="editInterviewRequest">
-            <option value="">なし</option>
-            <option value="consultation" ${report.interview_request === 'consultation' ? 'selected' : ''}>相談がある</option>
-            <option value="interview" ${report.interview_request === 'interview' ? 'selected' : ''}>面談希望</option>
-          </select>
-        </div>
-      </div>
-    `;
+  setupAutoSave() {
+    // 編集可能フィールドに変更イベントリスナーを追加
+    const editableFields = document.querySelectorAll('.admin-editable');
+    editableFields.forEach(field => {
+      field.addEventListener('change', () => {
+        this.saveReportChanges();
+      });
+      
+      // textareaの場合はinputイベントもリスン
+      if (field.tagName === 'TEXTAREA') {
+        field.addEventListener('input', () => {
+          clearTimeout(this.autoSaveTimeout);
+          this.autoSaveTimeout = setTimeout(() => {
+            this.saveReportChanges();
+          }, 1000); // 1秒遅延で保存
+        });
+      }
+    });
   }
 
   /**
-   * 日報編集エリアの設定（admin用）
+   * 日報に変更があるかチェック（admin用）
    */
-  setupReportEditArea() {
-    const editBtn = document.getElementById(`${this.modalId}EditReportBtn`);
-    const saveBtn = document.getElementById(`${this.modalId}SaveReportBtn`);
+  hasReportChanges() {
+    if (!this.currentData || this.userRole !== 'admin') return false;
     
-    if (editBtn && saveBtn) {
-      editBtn.style.display = 'inline-block';
-    }
+    const currentReport = this.currentData.report;
+    const formData = this.getReportFormData();
+    
+    return (
+      formData.workContent !== (currentReport.work_content || '') ||
+      formData.externalWorkLocation !== (currentReport.external_work_location || '') ||
+      formData.workLocation !== (currentReport.work_location || '') ||
+      formData.pcNumber !== (currentReport.pc_number || null) ||
+      formData.temperature !== (currentReport.temperature || null) ||
+      formData.appetite !== (currentReport.appetite || 'good') ||
+      formData.medicationTime !== (currentReport.medication_time || null) ||
+      formData.bedtime !== (currentReport.bedtime || null) ||
+      formData.wakeupTime !== (currentReport.wakeup_time || null) ||
+      formData.sleepQuality !== (currentReport.sleep_quality || 'good') ||
+      formData.reflection !== (currentReport.reflection || '') ||
+      formData.interviewRequest !== (currentReport.interview_request || null)
+    );
+  }
+  
+  /**
+   * フォームデータを収集（admin用）
+   */
+  getReportFormData() {
+    const workContentEl = document.getElementById('editWorkContent');
+    const workLocationEl = document.getElementById('editWorkLocation');
+    const pcNumberEl = document.getElementById('editPcNumber');
+    const externalWorkLocationEl = document.getElementById('editExternalWorkLocation');
+    const temperatureEl = document.getElementById('editTemperature');
+    const appetiteEl = document.getElementById('editAppetite');
+    const medicationTimeEl = document.getElementById('editMedicationTime');
+    const bedtimeEl = document.getElementById('editBedtime');
+    const wakeupTimeEl = document.getElementById('editWakeupTime');
+    const sleepQualityEl = document.getElementById('editSleepQuality');
+    const reflectionEl = document.getElementById('editReflection');
+    const interviewRequestEl = document.getElementById('editInterviewRequest');
+    
+    return {
+      workContent: workContentEl?.value.trim() || '',
+      workLocation: workLocationEl?.value || '',
+      pcNumber: pcNumberEl?.value ? parseInt(pcNumberEl.value) : null,
+      externalWorkLocation: externalWorkLocationEl?.value.trim() || '',
+      temperature: temperatureEl?.value ? parseFloat(temperatureEl.value) : null,
+      appetite: appetiteEl?.value || 'good',
+      medicationTime: medicationTimeEl?.value ? parseInt(medicationTimeEl.value) : null,
+      bedtime: bedtimeEl?.value || null,
+      wakeupTime: wakeupTimeEl?.value || null,
+      sleepQuality: sleepQualityEl?.value || 'good',
+      reflection: reflectionEl?.value.trim() || '',
+      interviewRequest: interviewRequestEl?.value || null
+    };
   }
 
   /**
-   * 日報編集モードの切り替え（admin用）
+   * 日報変更の保存（admin用）
    */
-  toggleReportEdit(enable) {
-    const editSection = document.querySelector('.report-edit-section');
-    const editBtn = document.getElementById(`${this.modalId}EditReportBtn`);
-    const saveBtn = document.getElementById(`${this.modalId}SaveReportBtn`);
-    
-    if (editSection) {
-      editSection.style.display = enable ? 'block' : 'none';
-    }
-    
-    if (editBtn) {
-      editBtn.style.display = enable ? 'none' : 'inline-block';
-    }
-    
-    if (saveBtn) {
-      saveBtn.style.display = enable ? 'inline-block' : 'none';
-    }
-  }
-
-  /**
-   * 日報編集内容の保存（admin用）
-   */
-  async saveReportEdit() {
+  async saveReportChanges() {
     try {
-      const formData = {
-        workContent: document.getElementById('editWorkContent').value.trim(),
-        workLocation: document.getElementById('editWorkLocation').value,
-        pcNumber: document.getElementById('editPcNumber').value,
-        externalWorkLocation: document.getElementById('editExternalWorkLocation').value.trim(),
-        temperature: parseFloat(document.getElementById('editTemperature').value) || null,
-        appetite: document.getElementById('editAppetite').value,
-        medicationTime: parseInt(document.getElementById('editMedicationTime').value) || null,
-        bedtime: document.getElementById('editBedtime').value || null,
-        wakeupTime: document.getElementById('editWakeupTime').value || null,
-        sleepQuality: document.getElementById('editSleepQuality').value,
-        reflection: document.getElementById('editReflection').value.trim(),
-        interviewRequest: document.getElementById('editInterviewRequest').value || null
-      };
+      const formData = this.getReportFormData();
       
       if (!formData.workContent) {
         this.app.showNotification('作業内容は必須です', 'warning');
@@ -1186,8 +1148,8 @@ export class ReportDetailModal {
         // currentDataを更新
         this.currentData.report = { ...this.currentData.report, ...formData };
         
-        // 編集モードを終了して表示を更新
-        this.toggleReportEdit(false);
+        // currentDataを更新して表示を更新
+        Object.assign(this.currentData.report, formData);
         this.updateModalContent();
         
         // 親モジュールに通知
