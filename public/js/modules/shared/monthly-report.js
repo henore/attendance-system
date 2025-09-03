@@ -289,6 +289,18 @@ export default class SharedMonthlyReport {
                 this.reportDetailModal.show(userId, userName, date);
             }
             
+            // 月別出勤簿の日の列クリック
+            if (e.target.closest('.monthly-day-cell')) {
+                const cell = e.target.closest('.monthly-day-cell');
+                const userId = cell.getAttribute('data-user-id');
+                const userName = cell.getAttribute('data-user-name');
+                const date = cell.getAttribute('data-date');
+                
+                if (userId && date) {
+                    this.reportDetailModal.show(userId, userName, date);
+                }
+            }
+            
             // 編集ボタン（管理者のみ）
             if (this.canEdit && e.target.closest('.btn-edit-attendance')) {
                 const btn = e.target.closest('.btn-edit-attendance');

@@ -72,7 +72,6 @@ export class AttendanceTable {
             <th width="15%">休憩</th>
             <th width="8%">実働</th>
             <th width="8%">状態</th>
-            <th width="15%">日報・コメント</th>
             ${showOperations ? '<th width="24%">操作</th>' : ''}
           </tr>
         </thead>
@@ -156,28 +155,28 @@ export class AttendanceTable {
     const statusBadge = record.clock_in ? 
       this.getStatusBadge(record.status || 'normal') : '-';
     
-    // 日報・コメント状況
-    const reportStatus = this.getReportCommentStatus(record);
-    
-    // 操作ボタン
+    // 操作ボタン（日報マークを除去）
     const operations = showOperations ? 
-      this.generateOperationButtons(record, 'monthly', record.date) : '';
+      this.generateMonthlyOperationButtons(record, 'monthly', record.date) : '';
 
     // 行クラス（日曜・土曜の色付け）
     let rowClass = '';
     if (record.dayOfWeek === 0) rowClass = 'table-danger';
     else if (record.dayOfWeek === 6) rowClass = 'table-info';
 
+    // 日の列をクリック可能にするためのdata属性を追加
+    const dayClickAttrs = record.user_role === 'user' && record.report_id ? 
+      `data-user-id="${record.user_id}" data-user-name="${record.user_name}" data-date="${record.date}" style="cursor: pointer;"` : '';
+
     return `
       <tr class="${rowClass}">
-        <td class="text-center">${record.day}</td>
+        <td class="text-center monthly-day-cell" ${dayClickAttrs}>${record.day}</td>
         <td class="text-center">${record.dayName}</td>
         <td class="text-center">${record.clock_in || '-'}</td>
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
         <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
         <td class="text-center">${statusBadge}</td>
-        <td class="text-center">${reportStatus}</td>
         ${showOperations ? `<td class="text-center">${operations}</td>` : ''}
       </tr>
     `;
@@ -307,6 +306,53 @@ export class AttendanceTable {
         </button>
       `);
     }
+    
+    // 編集ボタン（管理者のみ）
+    if (this.userRole === 'admin') {
+      const editData = {
+        'data-record-id': record.id || '',
+        'data-user-id': record.user_id,
+        'data-user-name': record.user_name,
+        'data-user-role': record.user_role,
+        'data-date': date,
+        'data-clock-in': record.clock_in || '',
+        'data-clock-out': record.clock_out || '',
+        'data-status': record.status || 'normal'
+      };
+      
+      // 休憩データの追加
+      if (record.user_role === 'user') {
+        editData['data-break-start'] = record.break_start_time || '';
+        editData['data-break-end'] = record.break_end_time || '';
+      } else {
+        editData['data-break-start'] = record.break_start || '';
+        editData['data-break-end'] = record.break_end || '';
+      }
+      
+      const editAttrs = Object.entries(editData)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+      
+      buttons.push(`
+        <button class="btn btn-sm btn-outline-warning btn-edit-attendance" 
+                ${editAttrs}
+                title="編集">
+          <i class="fas fa-edit"></i>
+        </button>
+      `);
+    }
+    
+    return buttons.length > 0 ? 
+      `<div class="btn-group" role="group">${buttons.join('')}</div>` : 
+      '-';
+  }
+
+  /**
+   * 月別出勤簿用の操作ボタン生成（日報マークなし）
+   */
+  generateMonthlyOperationButtons(record, context, currentDate) {
+    const buttons = [];
+    const date = currentDate || record.date;
     
     // 編集ボタン（管理者のみ）
     if (this.userRole === 'admin') {
