@@ -593,16 +593,28 @@ export default class TrialVisitsManager {
             this.currentModalId = modalId;
             
             // 専用モーダルにコンテンツを設定して表示
+            const modalElement = document.getElementById('trialVisitsModal');
             const modalTitle = document.getElementById('trialVisitsModalLabel');
             const modalBody = document.getElementById('trialVisitsModalBody');
             
-            if (modalTitle && modalBody) {
+            console.log('[モーダル確認]', {
+                modalElement: !!modalElement,
+                modalTitle: !!modalTitle,
+                modalBody: !!modalBody,
+                modalManagerHasModal: modalManager.modals.has('trialVisitsModal')
+            });
+            
+            if (modalElement && modalTitle && modalBody) {
                 modalTitle.innerHTML = `<i class="fas fa-users"></i> ${dateStr}の体験入所予定`;
                 modalBody.innerHTML = content;
                 
                 modalManager.show('trialVisitsModal');
             } else {
-                console.error('体験入所モーダル要素が見つかりません');
+                console.error('体験入所モーダル要素が見つかりません:', {
+                    modalElement: !!modalElement,
+                    modalTitle: !!modalTitle,
+                    modalBody: !!modalBody
+                });
                 this.app.showNotification('モーダルの表示に失敗しました', 'danger');
             }
             
