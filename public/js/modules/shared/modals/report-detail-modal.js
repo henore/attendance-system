@@ -501,30 +501,69 @@ export class ReportDetailModal {
 
         <!-- 作業場所・PC番号・施設外就労先 -->
         <div class="row mb-3">
-          ${report.external_work_location ? `
-            <div class="col-6">
-              <label class="past-form-label">
+          ${this.userRole === 'admin' ? `
+            <!-- Admin編集モード -->
+            <div class="col-4">
+              <label class="form-label">
                 <i class="fas fa-building text-info"></i> 施設外就労先
               </label>
-              <div class="past-form-value text-info">${report.external_work_location}</div>
+              <input 
+                type="text" 
+                class="form-control admin-editable" 
+                id="editExternalWorkLocation" 
+                value="${report.external_work_location || ''}"
+                maxlength="100">
             </div>
-          ` : ''}
-          ${report.work_location ? `
-            <div class="col-3">
-              <label class="past-form-label">
+            <div class="col-4">
+              <label class="form-label">
                 <i class="fas fa-map-marker-alt text-primary"></i> 作業場所
               </label>
-              <div class="past-form-value text-primary">${this.getWorkLocationLabel(report.work_location)}</div>
+              <select class="form-control admin-editable" id="editWorkLocation">
+                <option value="">-</option>
+                <option value="office" ${report.work_location === 'office' ? 'selected' : ''}>事務所</option>
+                <option value="workshop" ${report.work_location === 'workshop' ? 'selected' : ''}>作業室</option>
+                <option value="meeting_room" ${report.work_location === 'meeting_room' ? 'selected' : ''}>会議室</option>
+                <option value="computer_room" ${report.work_location === 'computer_room' ? 'selected' : ''}>コンピューター室</option>
+              </select>
             </div>
-          ` : ''}
-          ${report.pc_number ? `
-            <div class="col-3">
-              <label class="past-form-label">
+            <div class="col-4">
+              <label class="form-label">
                 <i class="fas fa-desktop text-success"></i> PC番号
               </label>
-              <div class="past-form-value text-success">${report.pc_number}</div>
+              <input 
+                type="text" 
+                class="form-control admin-editable" 
+                id="editPcNumber" 
+                value="${report.pc_number || ''}"
+                maxlength="10">
             </div>
-          ` : ''}
+          ` : `
+            <!-- 通常表示モード -->
+            ${report.external_work_location ? `
+              <div class="col-6">
+                <label class="past-form-label">
+                  <i class="fas fa-building text-info"></i> 施設外就労先
+                </label>
+                <div class="past-form-value text-info">${report.external_work_location}</div>
+              </div>
+            ` : ''}
+            ${report.work_location ? `
+              <div class="col-3">
+                <label class="past-form-label">
+                  <i class="fas fa-map-marker-alt text-primary"></i> 作業場所
+                </label>
+                <div class="past-form-value text-primary">${this.getWorkLocationLabel(report.work_location)}</div>
+              </div>
+            ` : ''}
+            ${report.pc_number ? `
+              <div class="col-3">
+                <label class="past-form-label">
+                  <i class="fas fa-desktop text-success"></i> PC番号
+                </label>
+                <div class="past-form-value text-success">${report.pc_number}</div>
+              </div>
+            ` : ''}
+          `}
         </div>
 
         <!-- 健康状態 -->
@@ -1103,7 +1142,7 @@ export class ReportDetailModal {
     return {
       workContent: workContentEl?.value.trim() || '',
       workLocation: workLocationEl?.value || '',
-      pcNumber: pcNumberEl?.value ? parseInt(pcNumberEl.value) : null,
+      pcNumber: pcNumberEl?.value ? pcNumberEl.value : null,
       externalWorkLocation: externalWorkLocationEl?.value.trim() || '',
       temperature: temperatureEl?.value ? parseFloat(temperatureEl.value) : null,
       appetite: appetiteEl?.value || 'good',
