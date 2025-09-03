@@ -517,9 +517,23 @@ export default class TrialVisitsManager {
 
     // 体験入所予定詳細モーダル表示
     async showTrialVisitsModal(date) {
+        console.log('モーダル表示開始:', date);
         try {
             const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
             const response = await this.app.apiCall(endpoints.TRIAL_VISITS_BY_DATE(date));
+            
+            console.log('API応答:', response);
+            
+            // モーダル要素の存在確認
+            const modalElement = document.getElementById('trialVisitsModal');
+            const modalDateTitle = document.getElementById('modalDateTitle');
+            const modalList = document.getElementById('modalTrialVisitsList');
+            
+            if (!modalElement || !modalDateTitle || !modalList) {
+                console.error('モーダル要素が見つかりません:', { modalElement, modalDateTitle, modalList });
+                this.app.showNotification('モーダル要素が見つかりません', 'danger');
+                return;
+            }
             
             // モーダルタイトル設定
             const dateObj = new Date(date + 'T00:00:00');
@@ -530,19 +544,20 @@ export default class TrialVisitsManager {
                 weekday: 'long'
             });
             
-            const modalDateTitle = document.getElementById('modalDateTitle');
             modalDateTitle.textContent = `${dateStr} の体験入所予定`;
             modalDateTitle.dataset.date = date;
             
             // 予定一覧表示（編集機能付き）
-            const modalList = document.getElementById('modalTrialVisitsList');
             modalList.innerHTML = this.renderTrialVisitsListWithEdit(response.visits || []);
             
             // モーダル表示
-            const modal = new bootstrap.Modal(document.getElementById('trialVisitsModal'));
+            const modal = new bootstrap.Modal(modalElement);
+            console.log('モーダルshow前');
             modal.show();
+            console.log('モーダルshow後');
             
         } catch (error) {
+            console.error('モーダル表示エラー:', error);
             this.app.showNotification('データの読み込みに失敗しました', 'danger');
         }
     }
