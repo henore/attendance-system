@@ -140,6 +140,9 @@ export class ReportDetailModal {
       modal.addEventListener('hidden.bs.modal', () => {
         this.stopCommentCheck();
         this.isEditing = false;
+        // モーダルが閉じられたらcurrentDataをリセット
+        console.log('🗑️ [モーダルクリーンアップ] currentDataをリセット');
+        this.currentData = null;
       });
     }
   }
