@@ -50,6 +50,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             const {
                 workContent,
                 externalWorkLocation,  // 追加
+                workLocation,
+                pcNumber,
                 temperature,
                 appetite,
                 medicationTime,
@@ -79,10 +81,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 });
             }
             
-            // 日報登録または更新（施設外就労先対応版）
+            // 日報登録または更新（作業場所・PC番号対応版）
             const sqlParams = [
-                userId, today, workContent, externalWorkLocation || null, temperature, appetite,
-                medicationTime || null, bedtime || null, wakeupTime || null, 
+                userId, today, workContent, externalWorkLocation || null, workLocation || null, pcNumber || null,
+                temperature, appetite, medicationTime || null, bedtime || null, wakeupTime || null, 
                 sleepQuality, reflection || '', interviewRequest || null
             ];
             
@@ -91,10 +93,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             
             await dbRun(`
                 INSERT OR REPLACE INTO daily_reports (
-                    user_id, date, work_content, external_work_location, temperature, appetite,
-                    medication_time, bedtime, wakeup_time, sleep_quality,
+                    user_id, date, work_content, external_work_location, work_location, pc_number,
+                    temperature, appetite, medication_time, bedtime, wakeup_time, sleep_quality,
                     reflection, interview_request
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, sqlParams);
             
             // 出勤記録の日報フラグ更新
