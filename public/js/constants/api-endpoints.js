@@ -23,10 +23,6 @@ export const API_ENDPOINTS = {
     UPDATE: '/api/handover'
   },
 
-  // LINE連携（api-endpoints.jsに追加）
-  LINE: {
-    GENERATE_IMAGE: '/api/line/generate-report-image',
-  },
   
   // 利用者用
   USER: {
