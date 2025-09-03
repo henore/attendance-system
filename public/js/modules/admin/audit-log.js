@@ -2,6 +2,7 @@
 // 管理者監査ログ機能
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
+import { formatDateTime } from '../../utils/date-time.js';
 
 export default class AdminAuditLog {
     constructor(app, parentModule) {
@@ -383,7 +384,7 @@ export default class AdminAuditLog {
 
         this.currentLogs.forEach(log => {
             const actionType = this.getActionTypeDisplayName(log.action_type);
-            const timestamp = new Date(log.created_at).toLocaleString('ja-JP');
+            const timestamp = formatDateTime(log.created_at);
             const targetInfo = this.getTargetInfo(log);
             const details = this.getLogDetails(log);
             
@@ -717,7 +718,7 @@ export default class AdminAuditLog {
         this.currentLogs.forEach(log => {
             const row = [
                 log.id,
-                `"${new Date(log.created_at).toLocaleString('ja-JP')}"`,
+                `"${formatDateTime(log.created_at)}"`,
                 `"${log.admin_name}"`,
                 log.admin_id,
                 `"${this.getActionTypeDisplayName(log.action_type)}"`,

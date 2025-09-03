@@ -3,6 +3,7 @@
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from './modal-manager.js';
+import { getCurrentDate, getCurrentTime } from '../../utils/date-time.js';
 
 export default class TrialVisitsManager {
     constructor(app) {
@@ -276,7 +277,7 @@ export default class TrialVisitsManager {
                         <span class="text-muted fs-5">${visit.visit_time}</span>
                     </div>
                 </div>
-                ${showDelete ? `
+                ${showDelete && this.userRole === 'admin' ? `
                     <button class="btn btn-outline-danger btn-sm delete-visit-btn" data-visit-id="${visit.id}" data-visit-name="${visit.name}">
                         <i class="fas fa-trash"></i> 削除
                     </button>
@@ -359,11 +360,13 @@ export default class TrialVisitsManager {
                             </div>
                         </div>
                     </div>
-                    <div>
-                        <button class="btn btn-outline-danger btn-sm delete-visit-btn" data-visit-id="${visit.id}" data-visit-name="${visit.name}">
-                            <i class="fas fa-trash"></i> 削除
-                        </button>
-                    </div>
+                    ${this.userRole === 'admin' ? `
+                        <div>
+                            <button class="btn btn-outline-danger btn-sm delete-visit-btn" data-visit-id="${visit.id}" data-visit-name="${visit.name}">
+                                <i class="fas fa-trash"></i> 削除
+                            </button>
+                        </div>
+                    ` : ''}
                 </div>
             `;
         });

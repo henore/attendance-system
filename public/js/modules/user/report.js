@@ -162,7 +162,7 @@ export class UserReportHandler {
           <div class="col-md-4 mb-3">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="externalWorkLocation" 
-                     ${report.external_work_location ? 'checked' : ''}>
+                     ${report.external_work_location ? 'checked' : ''} required>
               <label class="form-check-label" for="externalWorkLocation">
                 <i class="fas fa-building"></i> ${EXTERNAL_WORK_LOCATION}
               </label>
@@ -329,6 +329,11 @@ export class UserReportHandler {
     
     // 出勤情報の検証
     if (!this.validateAttendanceForReport()) {
+      return;
+    }
+
+    // フォームデータバリデーション
+    if (!this.validateFormData()) {
       return;
     }
 
