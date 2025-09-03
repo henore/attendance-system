@@ -591,17 +591,14 @@ export default class TrialVisitsManager {
             const modalId = `trialVisitsModal_${date.replace(/-/g, '_')}`;
             this.currentModalId = modalId;
             
-            // modalManager使用
-            modalManager.create({
-                id: modalId,
-                title: `<i class="fas fa-users"></i> ${dateStr}の体験入所予定`,
-                content: content,
-                size: 'modal-lg',
-                headerClass: 'bg-info text-white',
-                saveButton: false
-            });
+            // 汎用モーダルにコンテンツを設定して表示
+            const modalTitle = document.getElementById('genericModalLabel');
+            const modalBody = document.getElementById('genericModalBody');
             
-            modalManager.show(modalId);
+            modalTitle.innerHTML = `<i class="fas fa-users"></i> ${dateStr}の体験入所予定`;
+            modalBody.innerHTML = content;
+            
+            modalManager.show('genericModal');
             
         } catch (error) {
             console.error('モーダル表示エラー:', error);

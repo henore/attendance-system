@@ -141,6 +141,12 @@ export default class AdminModule extends BaseModule {
             }
         });
 
+        // 体験入所管理セクションの明示的非表示
+        const trialSection = document.getElementById('trialVisits');
+        if (trialSection) {
+            trialSection.style.display = 'none';
+        }
+
         // 新しいビューを表示
         if (viewName === 'attendanceManagement') {
             await this.attendanceManagement?.show();
@@ -183,8 +189,8 @@ export default class AdminModule extends BaseModule {
             window.trialVisitsManager = this.trialVisitsManager;
         }
         
-        // セクション作成
-        const adminDashboard = document.querySelector('.admin-dashboard');
+        // セクション作成（#adminContentArea内に作成）
+        const contentArea = document.getElementById('adminContentArea');
         let trialSection = document.getElementById('trialVisits');
         
         if (!trialSection) {
@@ -192,7 +198,7 @@ export default class AdminModule extends BaseModule {
             trialSection.id = 'trialVisits';
             trialSection.className = 'admin-section mb-4';
             trialSection.style.display = 'none';
-            adminDashboard.appendChild(trialSection);
+            contentArea.appendChild(trialSection);
         }
         
         // 体験入所管理画面を表示
