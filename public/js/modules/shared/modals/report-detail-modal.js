@@ -411,6 +411,11 @@ export class ReportDetailModal {
    * モーダルコンテンツを更新
    */
   updateModalContent() {
+    if (!this.currentData) {
+      console.error('[updateModalContent] currentDataが未設定');
+      return;
+    }
+    
     const { userName, date, user, attendance, report, comment, breakRecord } = this.currentData;
     
     // タイトル更新
