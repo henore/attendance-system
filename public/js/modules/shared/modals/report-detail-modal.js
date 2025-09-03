@@ -1161,7 +1161,16 @@ export class ReportDetailModal {
         return;
       }
       
-      const response = await this.app.apiCall(`/api/admin/report/${this.currentData.userId}/${this.currentData.date}`, {
+      if (!this.currentData) {
+        console.error('[日報編集] currentDataが未設定');
+        this.app.showNotification('データが見つかりません', 'danger');
+        return;
+      }
+      
+      console.log('[日報編集] currentData確認:', this.currentData);
+      
+      const userId = this.currentData.userId || this.currentData.user?.id;
+      const response = await this.app.apiCall(`/api/admin/report/${userId}/${this.currentData.date}`, {
         method: 'PUT',
         body: JSON.stringify(formData)
       });
