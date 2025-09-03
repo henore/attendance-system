@@ -105,7 +105,6 @@ export default class TrialVisitsManager {
                         <div class="modal-body" id="trialVisitsModalBody">
                             <!-- 予定一覧がここに表示される -->
                         </div>
-                        </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
                         </div>
