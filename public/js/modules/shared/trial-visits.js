@@ -2,6 +2,7 @@
 // 体験入所管理共通モジュール
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
+import { modalManager } from './modal-manager.js';
 
 export default class TrialVisitsManager {
     constructor(app) {
@@ -11,6 +12,7 @@ export default class TrialVisitsManager {
         this.notificationInterval = null;
         this.trialVisitsData = new Map(); // カレンダー用データキャッシュ
         this.userRole = app.currentUser.role; // ロールを保存
+        this.currentModalId = null;
     }
 
     // メイン画面描画
@@ -321,6 +323,53 @@ export default class TrialVisitsManager {
         `).join('');
     }
 
+    // モーダル用コンテンツ生成
+    generateTrialVisitsModalContent(visits) {
+        if (!visits || visits.length === 0) {
+            return `
+                <div class="text-center text-muted p-4">
+                    <i class="fas fa-calendar-times fa-3x mb-3"></i>
+                    <h5>この日の体験入所予定はありません</h5>
+                </div>
+            `;
+        }
+
+        let html = '<div class="trial-visits-modal-content">';
+        
+        visits.forEach((visit, index) => {
+            html += `
+                <div class="d-flex justify-content-between align-items-center py-3 ${index < visits.length - 1 ? 'border-bottom' : ''}">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-user-friends text-info me-2"></i>
+                            <span class="fw-bold h5 mb-0">${visit.name}</span>
+                        </div>
+                        <div class="d-flex gap-3">
+                            <div>
+                                <label class="form-label form-label-sm">日付</label>
+                                <input type="date" class="form-control form-control-sm update-visit-date" value="${visit.visit_date}" 
+                                       data-visit-id="${visit.id}">
+                            </div>
+                            <div>
+                                <label class="form-label form-label-sm">時刻</label>
+                                <input type="time" class="form-control form-control-sm update-visit-time" value="${visit.visit_time}" 
+                                       data-visit-id="${visit.id}">
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-danger btn-sm delete-visit-btn" data-visit-id="${visit.id}" data-visit-name="${visit.name}">
+                            <i class="fas fa-trash"></i> 削除
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        return html;
+    }
+
     // 日付更新処理
     async updateVisitDate(id, newDate) {
         try {
@@ -515,27 +564,18 @@ export default class TrialVisitsManager {
         await this.showTrialVisitsModal(date);
     }
 
-    // 体験入所予定詳細モーダル表示
+    // 体験入所予定詳細モーダル表示（既存modalManagerを使用）
     async showTrialVisitsModal(date) {
-        console.log('モーダル表示開始:', date);
         try {
+            // 既存モーダルがあれば破棄
+            if (this.currentModalId) {
+                modalManager.destroy(this.currentModalId);
+            }
+            
             const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
             const response = await this.app.apiCall(endpoints.TRIAL_VISITS_BY_DATE(date));
             
-            console.log('API応答:', response);
-            
-            // モーダル要素の存在確認
-            const modalElement = document.getElementById('trialVisitsModal');
-            const modalDateTitle = document.getElementById('modalDateTitle');
-            const modalList = document.getElementById('modalTrialVisitsList');
-            
-            if (!modalElement || !modalDateTitle || !modalList) {
-                console.error('モーダル要素が見つかりません:', { modalElement, modalDateTitle, modalList });
-                this.app.showNotification('モーダル要素が見つかりません', 'danger');
-                return;
-            }
-            
-            // モーダルタイトル設定
+            // 日付フォーマット
             const dateObj = new Date(date + 'T00:00:00');
             const dateStr = dateObj.toLocaleDateString('ja-JP', {
                 year: 'numeric',
@@ -544,17 +584,24 @@ export default class TrialVisitsManager {
                 weekday: 'long'
             });
             
-            modalDateTitle.textContent = `${dateStr} の体験入所予定`;
-            modalDateTitle.dataset.date = date;
+            // モーダルコンテンツ生成
+            const content = this.generateTrialVisitsModalContent(response.visits || []);
             
-            // 予定一覧表示（編集機能付き）
-            modalList.innerHTML = this.renderTrialVisitsListWithEdit(response.visits || []);
+            // モーダルID生成
+            const modalId = `trialVisitsModal_${date.replace(/-/g, '_')}`;
+            this.currentModalId = modalId;
             
-            // モーダル表示
-            const modal = new bootstrap.Modal(modalElement);
-            console.log('モーダルshow前');
-            modal.show();
-            console.log('モーダルshow後');
+            // modalManager使用
+            modalManager.create({
+                id: modalId,
+                title: `<i class="fas fa-users"></i> ${dateStr}の体験入所予定`,
+                content: content,
+                size: 'modal-lg',
+                headerClass: 'bg-info text-white',
+                saveButton: false
+            });
+            
+            modalManager.show(modalId);
             
         } catch (error) {
             console.error('モーダル表示エラー:', error);
@@ -625,6 +672,12 @@ export default class TrialVisitsManager {
 
     // 破棄処理
     destroy() {
+        // 既存モーダルがあれば破棄
+        if (this.currentModalId) {
+            modalManager.destroy(this.currentModalId);
+            this.currentModalId = null;
+        }
+        
         if (this.notificationInterval) {
             clearInterval(this.notificationInterval);
             this.notificationInterval = null;

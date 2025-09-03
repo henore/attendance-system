@@ -159,7 +159,7 @@ export class UserReportHandler {
         </div>
         
         <div class="row">
-          <div class="col-md-12 mb-3">
+          <div class="col-md-4 mb-3">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="externalWorkLocation" 
                      ${report.external_work_location ? 'checked' : ''}>
@@ -167,6 +167,30 @@ export class UserReportHandler {
                 <i class="fas fa-building"></i> ${EXTERNAL_WORK_LOCATION}
               </label>
             </div>
+          </div>
+          <div class="col-md-4 mb-3">
+            <label for="workLocation" class="form-label">
+              <i class="fas fa-map-marker-alt"></i> 作業場所
+            </label>
+            <select class="form-control" id="workLocation" required>
+              <option value="">選択してください</option>
+              <option value="office" ${report.work_location === 'office' ? 'selected' : ''}>通所</option>
+              <option value="home" ${report.work_location === 'home' ? 'selected' : ''}>在宅</option>
+            </select>
+          </div>
+          <div class="col-md-4 mb-3">
+            <label for="pcNumber" class="form-label">
+              <i class="fas fa-desktop"></i> PC番号
+            </label>
+            <select class="form-control" id="pcNumber" required>
+              <option value="">選択してください</option>
+              ${Array.from({length: 20}, (_, i) => i + 1).map(num => 
+                `<option value="${num}" ${report.pc_number == num ? 'selected' : ''}>${num}</option>`
+              ).join('')}
+              ${['A', 'B', 'C', 'D'].map(letter => 
+                `<option value="${letter}" ${report.pc_number === letter ? 'selected' : ''}>${letter}</option>`
+              ).join('')}
+            </select>
           </div>
         </div>
         
@@ -385,6 +409,8 @@ export class UserReportHandler {
     const formData = {
       workContent: document.getElementById('workContent').value,
       externalWorkLocation: isChecked ? EXTERNAL_WORK_LOCATION : null,
+      workLocation: document.getElementById('workLocation').value,
+      pcNumber: document.getElementById('pcNumber').value,
       temperature: parseFloat(document.getElementById('temperature').value),
       appetite: document.getElementById('appetite').value,
       medicationTime: document.getElementById('medicationTime').value ? parseInt(document.getElementById('medicationTime').value) : null,
