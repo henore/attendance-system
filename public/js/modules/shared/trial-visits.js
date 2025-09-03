@@ -4,6 +4,7 @@
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from './modal-manager.js';
 import { getCurrentDate, getCurrentTime } from '../../utils/date-time.js';
+import { isJapaneseHoliday } from '../../utils/holidays.js';
 
 export default class TrialVisitsManager {
     constructor(app) {
@@ -513,8 +514,8 @@ export default class TrialVisitsManager {
             if (!isCurrentMonth) classes.push('other-month');
             if (isToday) classes.push('today');
             
-            // 土日の色分け
-            if (dayOfWeek === 0) classes.push('sunday');
+            // 土日・祝日の色分け
+            if (dayOfWeek === 0 || isJapaneseHoliday(current)) classes.push('sunday');
             if (dayOfWeek === 6) classes.push('saturday');
             
             // 体験入所予定がある場合
@@ -551,17 +552,40 @@ export default class TrialVisitsManager {
         return `${year}-${month}-${day}`;
     }
 
-    // 月ナビゲーション
+    // 月ナビゲーション（1年制限付き）
     navigateMonth(direction) {
-        this.currentMonth += direction;
-        if (this.currentMonth > 12) {
-            this.currentMonth = 1;
-            this.currentYear++;
-        } else if (this.currentMonth < 1) {
-            this.currentMonth = 12;
-            this.currentYear--;
+        const newMonth = this.currentMonth + direction;
+        let newYear = this.currentYear;
+        let targetMonth = newMonth;
+        
+        if (newMonth > 12) {
+            targetMonth = 1;
+            newYear++;
+        } else if (newMonth < 1) {
+            targetMonth = 12;
+            newYear--;
         }
-        this.loadCalendar();
+        
+        // 1年間制限チェック
+        const newDate = new Date(newYear, targetMonth - 1, 1);
+        if (this.isWithinOneYear(newDate)) {
+            this.currentMonth = targetMonth;
+            this.currentYear = newYear;
+            this.loadCalendar();
+        }
+    }
+
+    /**
+     * 1年間の範囲内かチェック
+     * @param {Date} date 
+     * @returns {boolean}
+     */
+    isWithinOneYear(date) {
+        const now = new Date();
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(now.getFullYear() - 1);
+        
+        return date >= oneYearAgo && date <= now;
     }
 
     // 日付クリック処理

@@ -4,6 +4,7 @@
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { formatDate, getDaysInMonth } from '../../utils/date-time.js';
 import { modalManager } from '../shared/modal-manager.js';
+import { isJapaneseHoliday } from '../../utils/holidays.js';
 
 export class UserAttendanceCalendar {
   constructor(apiCall, showNotification) {
@@ -62,17 +63,42 @@ export class UserAttendanceCalendar {
 
     if (prevBtn) {
       prevBtn.addEventListener('click', () => {
-        this.currentDate.setMonth(this.currentDate.getMonth() - 1);
-        this.updateCalendar();
+        const newDate = new Date(this.currentDate);
+        newDate.setMonth(newDate.getMonth() - 1);
+        
+        // 1年間制限チェック
+        if (this.isWithinOneYear(newDate)) {
+          this.currentDate = newDate;
+          this.updateCalendar();
+        }
       });
     }
 
     if (nextBtn) {
       nextBtn.addEventListener('click', () => {
-        this.currentDate.setMonth(this.currentDate.getMonth() + 1);
-        this.updateCalendar();
+        const newDate = new Date(this.currentDate);
+        newDate.setMonth(newDate.getMonth() + 1);
+        
+        // 1年間制限チェック
+        if (this.isWithinOneYear(newDate)) {
+          this.currentDate = newDate;
+          this.updateCalendar();
+        }
       });
     }
+  }
+
+  /**
+   * 1年間の範囲内かチェック
+   * @param {Date} date 
+   * @returns {boolean}
+   */
+  isWithinOneYear(date) {
+    const now = new Date();
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(now.getFullYear() - 1);
+    
+    return date >= oneYearAgo && date <= now;
   }
 
   /**
@@ -153,8 +179,8 @@ export class UserAttendanceCalendar {
       if (!isCurrentMonth) classes.push('other-month');
       if (isToday) classes.push('today');
       
-      // 土日の色分け
-      if (dayOfWeek === 0) classes.push('sunday');
+      // 土日・祝日の色分け
+      if (dayOfWeek === 0 || isJapaneseHoliday(current)) classes.push('sunday');
       if (dayOfWeek === 6) classes.push('saturday');
       
       // 出勤状況による色分け（修正版）

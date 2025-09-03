@@ -2,6 +2,7 @@
 // 出勤記録テーブル表示の一元管理コンポーネント（修正版）
 
 import { calculateWorkHours ,getJapaneseDayOfWeek} from '../../../utils/date-time.js';
+import { isJapaneseHoliday } from '../../../utils/holidays.js';
 
 export class AttendanceTable {
   constructor(parentModule) {
@@ -151,17 +152,20 @@ export class AttendanceTable {
     // 実働時間計算
     const netHours = this.calculateWorkDurationDay(record);
 
-    // ステータス表示
-    const statusBadge = record.clock_in ? 
-      this.getStatusBadge(record.status || 'normal') : '-';
+    // ステータス表示（利用者は非表示、スタッフ・管理者は表示）
+    let statusBadge = '-';
+    if (record.user_role !== 'user' && record.clock_in) {
+      statusBadge = this.getStatusBadge(record.status || 'normal');
+    }
     
     // 操作ボタン（日報マークを除去）
     const operations = showOperations ? 
       this.generateMonthlyOperationButtons(record, 'monthly', record.date) : '';
 
-    // 行クラス（日曜・土曜の色付け）
+    // 行クラス（日曜・土曜・祝日の色付け）
     let rowClass = '';
-    if (record.dayOfWeek === 0) rowClass = 'table-danger';
+    const recordDate = new Date(record.date + 'T00:00:00');
+    if (record.dayOfWeek === 0 || isJapaneseHoliday(recordDate)) rowClass = 'table-danger';
     else if (record.dayOfWeek === 6) rowClass = 'table-info';
 
     // 日の列をクリック可能にするためのdata属性を追加
