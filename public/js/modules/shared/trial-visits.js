@@ -488,10 +488,7 @@ export default class TrialVisitsManager {
 
     // 非表示処理
     hide() {
-        const trialVisitsContent = document.getElementById('staffContentArea');
-        if (trialVisitsContent) {
-            trialVisitsContent.style.display = 'none';
-        }
+        // 空の実装（セクション管理は親モジュールで行う）
     }
 
     // 破棄処理

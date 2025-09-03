@@ -177,16 +177,27 @@ export default class AdminModule extends BaseModule {
 
     // 体験入所管理画面表示
     async showTrialVisits() {
-        const contentArea = document.getElementById('adminContentArea');
-        
         if (!this.trialVisitsManager) {
             this.trialVisitsManager = new TrialVisitsManager(this.app);
             // グローバルに公開（削除処理等で使用）
             window.trialVisitsManager = this.trialVisitsManager;
         }
         
+        // セクション作成
+        const adminDashboard = document.querySelector('.admin-dashboard');
+        let trialSection = document.getElementById('trialVisits');
+        
+        if (!trialSection) {
+            trialSection = document.createElement('div');
+            trialSection.id = 'trialVisits';
+            trialSection.className = 'admin-section mb-4';
+            trialSection.style.display = 'none';
+            adminDashboard.appendChild(trialSection);
+        }
+        
         // 体験入所管理画面を表示
-        contentArea.innerHTML = this.trialVisitsManager.render();
+        trialSection.innerHTML = this.trialVisitsManager.render();
+        trialSection.style.display = 'block';
         
         // 初期化
         await this.trialVisitsManager.init();
