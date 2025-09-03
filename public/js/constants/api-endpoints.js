@@ -83,5 +83,15 @@ export const API_ENDPOINTS = {
     ATTENDANCE_DELETE: (recordId) => `/api/admin/attendance/${recordId}`,//出勤記録削除用
     BREAK_STATUS: (userId, date) => 
         `/api/admin/user/${userId}/break/status/${date}` // 追加
+  },
+
+  // 体験入所管理（新規）
+  TRIAL_VISITS: {
+    TODAY: '/api/trial-visits/today',
+    BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,
+    CREATE: '/api/trial-visits/create',
+    DELETE: (id) => `/api/trial-visits/${id}`,
+    MONTHLY: (year, month) => `/api/trial-visits/monthly/${year}/${month}`,
+    NOTIFICATION_CHECK: '/api/trial-visits/notification-check'
   }
 };

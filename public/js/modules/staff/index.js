@@ -6,6 +6,7 @@ import { StaffAttendanceBook } from './calendar.js';
 import SharedMonthlyReport from '../shared/monthly-report.js';
 import { StaffReportNotification } from './report-notification.js';
 import SharedHandover from '../shared/handover.js';
+import TrialVisitsManager from '../shared/trial-visits.js';
 import { getCurrentDate, formatDateTime } from '../../utils/date-time.js';
 
 export default class StaffModule extends BaseModule {
@@ -24,6 +25,7 @@ export default class StaffModule extends BaseModule {
     this.attendanceManagement = null;
     this.handoverSection = null;
     this.monthlyReport = null;
+    this.trialVisitsManager = null;
     
     // スタッフ専用モジュール
     this.attendanceBook = new StaffAttendanceBook(
@@ -67,6 +69,9 @@ export default class StaffModule extends BaseModule {
             </button>
             <button class="btn btn-outline-primary staff-menu-btn" data-target="attendanceManagementSection">
               <i class="fas fa-users"></i> 利用者出勤状況
+            </button>
+            <button class="btn btn-outline-primary staff-menu-btn" data-target="trialVisits">
+              <i class="fas fa-user-friends"></i> 体験入所管理
             </button>
             <button class="btn btn-outline-primary staff-menu-btn" data-target="handoverSection">
               <i class="fas fa-exchange-alt"></i> 申し送り
@@ -231,6 +236,7 @@ export default class StaffModule extends BaseModule {
     if (this.attendanceManagement) this.attendanceManagement.hide();
     if (this.handoverSection) this.handoverSection.hide();
     if (this.monthlyReport) this.monthlyReport.hide();
+    if (this.trialVisitsManager) this.trialVisitsManager.hide();
     
     // 指定されたセクションのみ表示
     const targetSection = document.getElementById(sectionId);
@@ -247,6 +253,9 @@ export default class StaffModule extends BaseModule {
           if (this.attendanceManagement) {
             await this.attendanceManagement.show();
           }
+          break;
+        case 'trialVisits':
+          await this.showTrialVisits();
           break;
         case 'handoverSection':
           if (this.handoverSection) {
@@ -266,6 +275,23 @@ export default class StaffModule extends BaseModule {
       console.error(`セクション切り替えエラー (${sectionId}):`, error);
       this.showNotification('画面の切り替えに失敗しました', 'danger');
     }
+  }
+
+  // 体験入所管理画面表示
+  async showTrialVisits() {
+    const contentArea = document.getElementById('staffContentArea');
+    
+    if (!this.trialVisitsManager) {
+      this.trialVisitsManager = new TrialVisitsManager(this.app);
+      // グローバルに公開（削除処理等で使用）
+      window.trialVisitsManager = this.trialVisitsManager;
+    }
+    
+    // 体験入所管理画面を表示
+    contentArea.innerHTML = this.trialVisitsManager.render();
+    
+    // 初期化
+    await this.trialVisitsManager.init();
   }
 
   /**
@@ -403,6 +429,12 @@ callApi(endpoint, options = {}) {
     
     if (this.handoverSection) {
       this.handoverSection.destroy();
+    }
+    
+    if (this.trialVisitsManager) {
+      this.trialVisitsManager.destroy();
+      this.trialVisitsManager = null;
+      window.trialVisitsManager = null;
     }
     
     if (this.monthlyReport) {

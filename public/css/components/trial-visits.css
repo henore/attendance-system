@@ -1,0 +1,120 @@
+/* public/css/components/trial-visits.css */
+/* 体験入所管理専用スタイル */
+
+.trial-visits-calendar {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.calendar-table {
+    font-size: 0.9rem;
+}
+
+.calendar-table th {
+    text-align: center;
+    padding: 8px;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.calendar-day {
+    height: 80px;
+    min-width: 80px;
+    vertical-align: top;
+    padding: 4px;
+    cursor: pointer;
+    position: relative;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+}
+
+.calendar-day:hover {
+    background-color: #f8f9fa;
+}
+
+.calendar-empty {
+    background-color: #f8f9fa;
+    height: 80px;
+    min-width: 80px;
+}
+
+.calendar-date-number {
+    font-weight: 500;
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+
+.calendar-today {
+    background-color: #fff3cd !important;
+    border-color: #ffc107 !important;
+}
+
+.calendar-today .calendar-date-number {
+    color: #856404;
+    font-weight: 700;
+}
+
+.calendar-has-trials {
+    background-color: #d1ecf1 !important;
+    border-color: #17a2b8 !important;
+}
+
+.calendar-has-trials:hover {
+    background-color: #b8daff !important;
+}
+
+.trial-visit-indicator {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background-color: #17a2b8;
+    color: white;
+    font-size: 0.7rem;
+    padding: 1px 4px;
+    border-radius: 8px;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.calendar-has-trials.calendar-today .trial-visit-indicator {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .calendar-day {
+        height: 60px;
+        min-width: 60px;
+        font-size: 0.8rem;
+    }
+    
+    .calendar-date-number {
+        font-size: 0.9rem;
+    }
+    
+    .trial-visit-indicator {
+        font-size: 0.6rem;
+        padding: 1px 3px;
+    }
+}
+
+/* モーダル内の予定リスト */
+#modalTrialVisitsList .border-bottom:last-child {
+    border-bottom: none !important;
+}
+
+/* 体験入所予定一覧のスタイル */
+#todayTrialVisits .border-bottom:last-child {
+    border-bottom: none !important;
+}
+
+/* アニメーション効果 */
+.calendar-day {
+    transition: all 0.2s ease-in-out;
+}
+
+.calendar-day:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}

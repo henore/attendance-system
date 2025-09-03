@@ -10,6 +10,7 @@
 /* コンポーネントスタイル読み込み */
 @import url('./components/form.css');
 @import url('./components/calendar.css');
+@import url('./components/trial-visits.css');
 
 /* モジュール別スタイル読み込み */
 @import url('./modules/user.css');

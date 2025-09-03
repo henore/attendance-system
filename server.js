@@ -143,6 +143,7 @@ const staffRouter = require('./routes/staff')(dbGet, dbAll, dbRun, requireAuth, 
 const adminRouter = require('./routes/admin')(dbGet, dbAll, dbRun, requireAuth, requireRole);
 const attendanceRouter = require('./routes/attendance')(dbGet, dbAll, dbRun, requireAuth);
 const handoverRouter = require('./routes/handover')(dbGet, dbAll, dbRun, requireAuth);
+const trialVisitsRouter = require('./routes/trial-visits')(dbGet, dbAll, dbRun, requireAuth, requireRole);
 const lineRouter = require('./routes/line');
 
 // 認証チェック用エンドポイント（認証前でもアクセス可能）
@@ -168,6 +169,7 @@ app.use('/api/staff', requireAuth, requireRole(['staff', 'admin']), staffRouter)
 app.use('/api/admin', requireAuth, requireRole(['admin']), adminRouter);
 app.use('/api/attendance', requireAuth, attendanceRouter);
 app.use('/api/handover', requireAuth, handoverRouter);
+app.use('/api/trial-visits', requireAuth, requireRole(['staff', 'admin']), trialVisitsRouter);
 app.use('/api/line', requireAuth, lineRouter); 
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 

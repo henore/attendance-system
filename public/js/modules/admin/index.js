@@ -6,6 +6,7 @@ import AdminUserManagement from './user-management.js';
 import SharedMonthlyReport from '../shared/monthly-report.js';
 import SharedHandover from '../shared/handover.js';
 import AdminAuditLog from './audit-log.js';
+import TrialVisitsManager from '../shared/trial-visits.js';
 
 // グローバルに modalManager を公開（一時的な対処）
 window.modalManager = modalManager;
@@ -30,6 +31,8 @@ export default class AdminModule extends BaseModule {
         this.attendanceManagement = null; // 遅延初期化
         // 申し送りモジュール
         this.handoverSection = null; // 遅延初期化
+        // 体験入所管理モジュール
+        this.trialVisitsManager = null; // 遅延初期化
     }
 
     async init() {
@@ -57,6 +60,9 @@ export default class AdminModule extends BaseModule {
                         </button>
                         <button class="btn btn-outline-primary admin-menu-btn" data-target="userManagement">
                             <i class="fas fa-users-cog"></i> ユーザー管理
+                        </button>
+                        <button class="btn btn-outline-primary admin-menu-btn" data-target="trialVisits">
+                            <i class="fas fa-user-friends"></i> 体験入所管理
                         </button>
                         <button class="btn btn-outline-primary admin-menu-btn" data-target="handoverSection">
                             <i class="fas fa-exchange-alt"></i> 申し送り
@@ -128,6 +134,7 @@ export default class AdminModule extends BaseModule {
         this.attendanceManagement?.hide();
         this.handoverSection?.hide();
         this.monthlyReport?.hide();
+        this.trialVisitsManager?.hide();
         Object.values(this.subModules).forEach(module => {
             if (module.hide) {
                 module.hide();
@@ -137,6 +144,8 @@ export default class AdminModule extends BaseModule {
         // 新しいビューを表示
         if (viewName === 'attendanceManagement') {
             await this.attendanceManagement?.show();
+        } else if (viewName === 'trialVisits') {
+            await this.showTrialVisits();
         } else if (viewName === 'handoverSection') {
             await this.handoverSection?.show();
         } else if (viewName === 'monthlyReport') {
@@ -164,6 +173,23 @@ export default class AdminModule extends BaseModule {
 
     async callApi(endpoint, options = {}) {
         return await this.apiCall(endpoint, options);
+    }
+
+    // 体験入所管理画面表示
+    async showTrialVisits() {
+        const contentArea = document.getElementById('adminContentArea');
+        
+        if (!this.trialVisitsManager) {
+            this.trialVisitsManager = new TrialVisitsManager(this.app);
+            // グローバルに公開（削除処理等で使用）
+            window.trialVisitsManager = this.trialVisitsManager;
+        }
+        
+        // 体験入所管理画面を表示
+        contentArea.innerHTML = this.trialVisitsManager.render();
+        
+        // 初期化
+        await this.trialVisitsManager.init();
     }
 
     showNotification(message, type = 'info') {
@@ -239,6 +265,13 @@ export default class AdminModule extends BaseModule {
     }
 
     destroy() {
+        // 体験入所管理モジュールのクリーンアップ
+        if (this.trialVisitsManager) {
+            this.trialVisitsManager.destroy();
+            this.trialVisitsManager = null;
+            window.trialVisitsManager = null;
+        }
+
         // 各サブモジュールをクリーンアップ
         Object.values(this.subModules).forEach(module => {
             if (module.destroy) {
