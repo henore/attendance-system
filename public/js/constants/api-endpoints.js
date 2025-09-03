@@ -23,6 +23,10 @@ export const API_ENDPOINTS = {
     UPDATE: '/api/handover'
   },
 
+  // LINE連携
+  LINE: {
+    GENERATE_IMAGE: '/api/line/generate-report-image',
+  },
   
   // 利用者用
   USER: {
@@ -56,7 +60,14 @@ export const API_ENDPOINTS = {
     USER_STATUS: (userId) => `/api/staff/users/${userId}/status`,
     REPORT: (userId, date) => `/api/staff/reports/${userId}/${date}`,
     MONTHLY_ATTENDANCE: (year, month, userId) => 
-        `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`
+        `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`,
+    // 体験入所管理
+    TRIAL_VISITS_TODAY: '/api/trial-visits/today',
+    TRIAL_VISITS_BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,
+    TRIAL_VISITS_CREATE: '/api/trial-visits/create',
+    TRIAL_VISITS_DELETE: (id) => `/api/trial-visits/${id}`,
+    TRIAL_VISITS_MONTHLY: (year, month) => `/api/trial-visits/monthly/${year}/${month}`,
+    TRIAL_VISITS_NOTIFICATION_CHECK: '/api/trial-visits/notification-check'
   },
   
   // 管理者用
@@ -78,16 +89,13 @@ export const API_ENDPOINTS = {
     REGISTER: '/api/admin/register', // 追加
     ATTENDANCE_DELETE: (recordId) => `/api/admin/attendance/${recordId}`,//出勤記録削除用
     BREAK_STATUS: (userId, date) => 
-        `/api/admin/user/${userId}/break/status/${date}` // 追加
-  },
-
-  // 体験入所管理（新規）
-  TRIAL_VISITS: {
-    TODAY: '/api/trial-visits/today',
-    BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,
-    CREATE: '/api/trial-visits/create',
-    DELETE: (id) => `/api/trial-visits/${id}`,
-    MONTHLY: (year, month) => `/api/trial-visits/monthly/${year}/${month}`,
-    NOTIFICATION_CHECK: '/api/trial-visits/notification-check'
+        `/api/admin/user/${userId}/break/status/${date}`, // 追加
+    // 体験入所管理
+    TRIAL_VISITS_TODAY: '/api/trial-visits/today',
+    TRIAL_VISITS_BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,
+    TRIAL_VISITS_CREATE: '/api/trial-visits/create',
+    TRIAL_VISITS_DELETE: (id) => `/api/trial-visits/${id}`,
+    TRIAL_VISITS_MONTHLY: (year, month) => `/api/trial-visits/monthly/${year}/${month}`,
+    TRIAL_VISITS_NOTIFICATION_CHECK: '/api/trial-visits/notification-check'
   }
 };

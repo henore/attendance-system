@@ -10,6 +10,7 @@ export default class TrialVisitsManager {
         this.currentYear = new Date().getFullYear();
         this.notificationInterval = null;
         this.trialVisitsData = new Map(); // カレンダー用データキャッシュ
+        this.userRole = app.currentUser.role; // ロールを保存
     }
 
     // メイン画面描画
@@ -162,7 +163,8 @@ export default class TrialVisitsManager {
         }
 
         try {
-            const response = await this.app.apiCall(API_ENDPOINTS.TRIAL_VISITS.CREATE, {
+            const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
+            const response = await this.app.apiCall(endpoints.TRIAL_VISITS_CREATE, {
                 method: 'POST',
                 body: JSON.stringify({
                     name: name,
@@ -193,7 +195,8 @@ export default class TrialVisitsManager {
     // 当日の体験入所予定読み込み
     async loadTodayTrialVisits() {
         try {
-            const response = await this.app.apiCall(API_ENDPOINTS.TRIAL_VISITS.TODAY);
+            const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
+            const response = await this.app.apiCall(endpoints.TRIAL_VISITS_TODAY);
             const container = document.getElementById('todayTrialVisits');
             
             if (response.visits && response.visits.length > 0) {
@@ -248,7 +251,8 @@ export default class TrialVisitsManager {
         if (!confirmed) return;
 
         try {
-            const response = await this.app.apiCall(API_ENDPOINTS.TRIAL_VISITS.DELETE(id), {
+            const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
+            const response = await this.app.apiCall(endpoints.TRIAL_VISITS_DELETE(id), {
                 method: 'DELETE'
             });
 
@@ -276,8 +280,9 @@ export default class TrialVisitsManager {
     async loadCalendar() {
         try {
             // 月別体験入所予定データ取得
+            const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
             const response = await this.app.apiCall(
-                API_ENDPOINTS.TRIAL_VISITS.MONTHLY(this.currentYear, this.currentMonth)
+                endpoints.TRIAL_VISITS_MONTHLY(this.currentYear, this.currentMonth)
             );
             
             // データをMapに保存
@@ -380,7 +385,8 @@ export default class TrialVisitsManager {
     // 体験入所予定詳細モーダル表示
     async showTrialVisitsModal(date) {
         try {
-            const response = await this.app.apiCall(API_ENDPOINTS.TRIAL_VISITS.BY_DATE(date));
+            const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
+            const response = await this.app.apiCall(endpoints.TRIAL_VISITS_BY_DATE(date));
             
             // モーダルタイトル設定
             const dateObj = new Date(date + 'T00:00:00');
@@ -427,7 +433,8 @@ export default class TrialVisitsManager {
     // 体験入所通知チェック
     async checkTrialVisitNotifications() {
         try {
-            const response = await this.app.apiCall(API_ENDPOINTS.TRIAL_VISITS.NOTIFICATION_CHECK);
+            const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
+            const response = await this.app.apiCall(endpoints.TRIAL_VISITS_NOTIFICATION_CHECK);
             
             if (response.upcomingVisits && response.upcomingVisits.length > 0) {
                 response.upcomingVisits.forEach(visit => {
