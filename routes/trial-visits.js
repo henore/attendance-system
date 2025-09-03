@@ -133,24 +133,11 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // 体験入所通知チェック（内部API）
     router.get('/notification-check', async (req, res) => {
         try {
-            const now = new Date();
-            const currentDate = getCurrentDate();
-            const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
-            const targetTime = oneHourLater.toLocaleTimeString('en-GB', { 
-                hour12: false, 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            });
-
-            const upcomingVisits = await dbAll(`
-                SELECT * FROM trial_visits 
-                WHERE visit_date = ? AND visit_time = ? AND is_visible = 1
-            `, [currentDate, targetTime]);
-
+            // 簡単な空レスポンスを返す（一時的）
             res.json({ 
                 success: true, 
-                upcomingVisits,
-                checkTime: now.toISOString()
+                upcomingVisits: [],
+                checkTime: new Date().toISOString()
             });
         } catch (error) {
             console.error('体験入所通知チェックエラー:', error);
