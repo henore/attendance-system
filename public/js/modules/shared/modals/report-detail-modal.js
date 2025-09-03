@@ -519,23 +519,24 @@ export class ReportDetailModal {
                 <i class="fas fa-map-marker-alt text-primary"></i> 作業場所
               </label>
               <select class="form-control admin-editable" id="editWorkLocation">
-                <option value="">-</option>
-                <option value="office" ${report.work_location === 'office' ? 'selected' : ''}>事務所</option>
-                <option value="workshop" ${report.work_location === 'workshop' ? 'selected' : ''}>作業室</option>
-                <option value="meeting_room" ${report.work_location === 'meeting_room' ? 'selected' : ''}>会議室</option>
-                <option value="computer_room" ${report.work_location === 'computer_room' ? 'selected' : ''}>コンピューター室</option>
+                <option value="">選択してください</option>
+                <option value="office" ${report.work_location === 'office' ? 'selected' : ''}>通所</option>
+                <option value="home" ${report.work_location === 'home' ? 'selected' : ''}>在宅</option>
               </select>
             </div>
             <div class="col-4">
               <label class="form-label">
                 <i class="fas fa-desktop text-success"></i> PC番号
               </label>
-              <input 
-                type="text" 
-                class="form-control admin-editable" 
-                id="editPcNumber" 
-                value="${report.pc_number || ''}"
-                maxlength="10">
+              <select class="form-control admin-editable" id="editPcNumber">
+                <option value="">選択してください</option>
+                ${Array.from({length: 20}, (_, i) => i + 1).map(num => 
+                  `<option value="${num}" ${report.pc_number == num ? 'selected' : ''}>${num}</option>`
+                ).join('')}
+                ${['A', 'B', 'C', 'D'].map(letter => 
+                  `<option value="${letter}" ${report.pc_number === letter ? 'selected' : ''}>${letter}</option>`
+                ).join('')}
+              </select>
             </div>
           ` : `
             <!-- 通常表示モード -->
@@ -1142,7 +1143,7 @@ export class ReportDetailModal {
     return {
       workContent: workContentEl?.value.trim() || '',
       workLocation: workLocationEl?.value || '',
-      pcNumber: pcNumberEl?.value ? pcNumberEl.value : null,
+      pcNumber: pcNumberEl?.value || null,
       externalWorkLocation: externalWorkLocationEl?.value.trim() || '',
       temperature: temperatureEl?.value ? parseFloat(temperatureEl.value) : null,
       appetite: appetiteEl?.value || 'good',
