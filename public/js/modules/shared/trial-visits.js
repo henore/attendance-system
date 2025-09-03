@@ -97,15 +97,14 @@ export default class TrialVisitsManager {
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-info text-white">
-                            <h5 class="modal-title">
-                                <i class="fas fa-calendar-day"></i> <span id="modalDateTitle">体験入所予定</span>
+                            <h5 class="modal-title" id="trialVisitsModalLabel">
+                                <i class="fas fa-calendar-day"></i> 体験入所予定
                             </h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="modal-body">
-                            <div id="modalTrialVisitsList">
-                                <!-- 予定一覧がここに表示される -->
-                            </div>
+                        <div class="modal-body" id="trialVisitsModalBody">
+                            <!-- 予定一覧がここに表示される -->
+                        </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
@@ -131,6 +130,9 @@ export default class TrialVisitsManager {
         // 現在日付を初期値として設定
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('visitDate').value = today;
+        
+        // モーダル初期化
+        modalManager.register('trialVisitsModal');
     }
 
     // イベントリスナー設定
@@ -591,14 +593,19 @@ export default class TrialVisitsManager {
             const modalId = `trialVisitsModal_${date.replace(/-/g, '_')}`;
             this.currentModalId = modalId;
             
-            // 汎用モーダルにコンテンツを設定して表示
-            const modalTitle = document.getElementById('genericModalLabel');
-            const modalBody = document.getElementById('genericModalBody');
+            // 専用モーダルにコンテンツを設定して表示
+            const modalTitle = document.getElementById('trialVisitsModalLabel');
+            const modalBody = document.getElementById('trialVisitsModalBody');
             
-            modalTitle.innerHTML = `<i class="fas fa-users"></i> ${dateStr}の体験入所予定`;
-            modalBody.innerHTML = content;
-            
-            modalManager.show('genericModal');
+            if (modalTitle && modalBody) {
+                modalTitle.innerHTML = `<i class="fas fa-users"></i> ${dateStr}の体験入所予定`;
+                modalBody.innerHTML = content;
+                
+                modalManager.show('trialVisitsModal');
+            } else {
+                console.error('体験入所モーダル要素が見つかりません');
+                this.app.showNotification('モーダルの表示に失敗しました', 'danger');
+            }
             
         } catch (error) {
             console.error('モーダル表示エラー:', error);
