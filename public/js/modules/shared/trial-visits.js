@@ -4,7 +4,7 @@
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from './modal-manager.js';
 import { getCurrentDate, getCurrentTime } from '../../utils/date-time.js';
-import { isJapaneseHoliday } from '../../utils/holidays.js';
+import { isJapaneseHoliday, preloadHolidays } from '../../utils/holidays.js';
 
 export default class TrialVisitsManager {
     constructor(app) {
@@ -450,6 +450,13 @@ export default class TrialVisitsManager {
     // カレンダー読み込み
     async loadCalendar() {
         try {
+            // 祝日データを事前読み込み
+            try {
+                await preloadHolidays();
+            } catch (error) {
+                console.warn('祝日データ取得失敗:', error);
+            }
+
             // 月別体験入所予定データ取得
             const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
             const response = await this.app.apiCall(

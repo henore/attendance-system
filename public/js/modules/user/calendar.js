@@ -4,7 +4,7 @@
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { formatDate, getDaysInMonth } from '../../utils/date-time.js';
 import { modalManager } from '../shared/modal-manager.js';
-import { isJapaneseHoliday } from '../../utils/holidays.js';
+import { isJapaneseHoliday, preloadHolidays } from '../../utils/holidays.js';
 
 export class UserAttendanceCalendar {
   constructor(apiCall, showNotification) {
@@ -109,6 +109,13 @@ export class UserAttendanceCalendar {
     const gridElement = document.getElementById('calendarGridUser');
 
     if (!gridElement) return;
+
+    // 祝日データを事前読み込み
+    try {
+      await preloadHolidays();
+    } catch (error) {
+      console.warn('祝日データ取得失敗:', error);
+    }
 
     if (titleElement) {
       titleElement.textContent = formatDate(this.currentDate, {
