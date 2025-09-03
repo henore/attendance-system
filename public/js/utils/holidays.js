@@ -18,14 +18,19 @@ async function fetchJapaneseHolidays() {
 
   try {
     console.log('🔄 祝日データAPIを呼び出し中...');
-    const response = await fetch('https://holidays-jp.github.io/api/v1/date.json');
+    const response = await fetch('/api/holidays');
     console.log('📡 祝日API レスポンス:', response.status);
     
     if (!response.ok) {
       throw new Error(`祝日API取得エラー: ${response.status}`);
     }
     
-    const data = await response.json();
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+    
+    const data = result.holidays;
     console.log('📅 取得した祝日データ件数:', Object.keys(data).length);
     
     // キャッシュを更新（1日間有効）

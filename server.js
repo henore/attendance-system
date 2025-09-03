@@ -66,7 +66,7 @@ app.use(helmet({
             scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
             fontSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'"],
+            connectSrc: ["'self'", "https://holidays-jp.github.io"],
             objectSrc: ["'none'"],
             mediaSrc: ["'self'"],
             frameSrc: ["'none'"],
@@ -145,6 +145,7 @@ const attendanceRouter = require('./routes/attendance')(dbGet, dbAll, dbRun, req
 const handoverRouter = require('./routes/handover')(dbGet, dbAll, dbRun, requireAuth);
 const trialVisitsRouter = require('./routes/trial-visits')(dbGet, dbAll, dbRun, requireAuth, requireRole);
 const lineRouter = require('./routes/line');
+const holidaysRouter = require('./routes/holidays')(requireAuth);
 
 // 認証チェック用エンドポイント（認証前でもアクセス可能）
 app.get('/api/auth/check-auth', (req, res) => {
@@ -171,6 +172,7 @@ app.use('/api/attendance', requireAuth, attendanceRouter);
 app.use('/api/handover', requireAuth, handoverRouter);
 app.use('/api/trial-visits', requireAuth, requireRole(['staff', 'admin']), trialVisitsRouter);
 app.use('/api/line', requireAuth, lineRouter); 
+app.use('/api/holidays', holidaysRouter);
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
 // サーバー日付取得エンドポイント（JST統一モジュール使用）
