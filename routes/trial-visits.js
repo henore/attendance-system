@@ -106,7 +106,15 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         try {
             const { year, month } = req.params;
             const startDate = `${year}-${month.padStart(2, '0')}-01`;
-            const endDate = `${year}-${(parseInt(month) + 1).toString().padStart(2, '0')}-01`;
+            
+            // 翌月の計算（12月の場合は翌年1月）
+            let nextMonth = parseInt(month) + 1;
+            let nextYear = parseInt(year);
+            if (nextMonth > 12) {
+                nextMonth = 1;
+                nextYear += 1;
+            }
+            const endDate = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`;
             
             const visits = await dbAll(`
                 SELECT visit_date, COUNT(*) as count
