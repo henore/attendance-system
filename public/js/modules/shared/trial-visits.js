@@ -19,11 +19,9 @@ export default class TrialVisitsManager {
             <div class="container-fluid">
                 <div class="row">
                     <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-info text-white">
-                                <h5 class="card-title mb-0">
-                                    <i class="fas fa-user-friends"></i> 体験入所管理
-                                </h5>
+                        <div class="custom-card">
+                            <div class="custom-card-header">
+                                <h5><i class="fas fa-user-friends"></i> 体験入所管理</h5>
                             </div>
                             <div class="card-body">
                                 <!-- 新規登録セクション -->
@@ -70,18 +68,19 @@ export default class TrialVisitsManager {
                                 <!-- カレンダー -->
                                 <div class="row">
                                     <div class="col-12">
-                                        <h6><i class="fas fa-calendar-alt"></i> 体験入所予定カレンダー</h6>
-                                        <div class="calendar-header d-flex justify-content-between align-items-center mb-3">
-                                            <button class="btn btn-outline-secondary btn-sm" id="prevMonth">
-                                                <i class="fas fa-chevron-left"></i> 前月
-                                            </button>
-                                            <h5 id="calendarTitle" class="mb-0"></h5>
-                                            <button class="btn btn-outline-secondary btn-sm" id="nextMonth">
-                                                次月 <i class="fas fa-chevron-right"></i>
-                                            </button>
-                                        </div>
-                                        <div id="trialVisitsCalendar" class="trial-visits-calendar">
-                                            <!-- カレンダーがここに表示される -->
+                                        <div class="calendar-container">
+                                            <div class="calendar-header">
+                                                <button class="calendar-nav-btn" id="prevMonth">
+                                                    <i class="fas fa-chevron-left"></i>
+                                                </button>
+                                                <h6 class="calendar-title" id="calendarTitle">体験入所予定カレンダー</h6>
+                                                <button class="calendar-nav-btn" id="nextMonth">
+                                                    <i class="fas fa-chevron-right"></i>
+                                                </button>
+                                            </div>
+                                            <div class="calendar-grid" id="trialVisitsCalendar">
+                                                <!-- カレンダーがここに表示される -->
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -301,67 +300,84 @@ export default class TrialVisitsManager {
         }
     }
 
-    // カレンダー描画
+    // カレンダー描画（userやstaffカレンダーと完全統一）
     renderCalendar() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
         const firstDay = new Date(this.currentYear, this.currentMonth - 1, 1);
-        const lastDay = new Date(this.currentYear, this.currentMonth, 0);
-        const daysInMonth = lastDay.getDate();
-        const startDay = firstDay.getDay();
+        const startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - firstDay.getDay());
 
         // カレンダータイトル更新
-        document.getElementById('calendarTitle').textContent = 
-            `${this.currentYear}年${this.currentMonth}月`;
+        const titleDate = new Date(this.currentYear, this.currentMonth - 1, 1);
+        document.getElementById('calendarTitle').textContent = titleDate.toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: 'long'
+        });
 
-        let calendarHtml = `
-            <table class="table table-bordered calendar-table">
-                <thead>
-                    <tr class="text-center">
-                        <th class="text-danger">日</th>
-                        <th>月</th>
-                        <th>火</th>
-                        <th>水</th>
-                        <th>木</th>
-                        <th>金</th>
-                        <th class="text-primary">土</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
+        let html = '';
 
-        let date = 1;
-        for (let week = 0; week < 6; week++) {
-            calendarHtml += '<tr>';
-            for (let day = 0; day < 7; day++) {
-                if (week === 0 && day < startDay) {
-                    calendarHtml += '<td class="calendar-empty"></td>';
-                } else if (date > daysInMonth) {
-                    calendarHtml += '<td class="calendar-empty"></td>';
-                } else {
-                    const dateStr = `${this.currentYear}-${String(this.currentMonth).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
-                    const trialVisitCount = this.trialVisitsData.get(dateStr) || 0;
-                    const today = new Date().toISOString().split('T')[0];
-                    
-                    let cellClass = 'calendar-day';
-                    if (day === 0) cellClass += ' text-danger'; // 日曜日
-                    if (day === 6) cellClass += ' text-primary'; // 土曜日
-                    if (dateStr === today) cellClass += ' calendar-today';
-                    if (trialVisitCount > 0) cellClass += ' calendar-has-trials';
+        // 曜日ヘッダー
+        const dayHeaders = ['日', '月', '火', '水', '木', '金', '土'];
+        dayHeaders.forEach((day, index) => {
+            let headerClass = 'calendar-day-header';
+            if (index === 0) headerClass += ' sunday-header';
+            if (index === 6) headerClass += ' saturday-header';
+            html += `<div class="${headerClass}">${day}</div>`;
+        });
 
-                    calendarHtml += `
-                        <td class="${cellClass}" onclick="trialVisitsManager.onDateClick('${dateStr}')">
-                            <div class="calendar-date-number">${date}</div>
-                            ${trialVisitCount > 0 ? `<div class="trial-visit-indicator">${trialVisitCount}件</div>` : ''}
-                        </td>
-                    `;
-                    date++;
-                }
+        // 日付セル
+        const current = new Date(startDate);
+        for (let i = 0; i < 42; i++) {
+            const isCurrentMonth = current.getMonth() === (this.currentMonth - 1);
+            const currentDateReset = new Date(current);
+            currentDateReset.setHours(0, 0, 0, 0);
+            const isToday = currentDateReset.getTime() === today.getTime();
+            const dateStr = this.formatDateString(current);
+            const dayOfWeek = current.getDay();
+            const trialVisitCount = this.trialVisitsData.get(dateStr) || 0;
+            
+            let classes = ['calendar-day'];
+            if (!isCurrentMonth) classes.push('other-month');
+            if (isToday) classes.push('today');
+            
+            // 土日の色分け
+            if (dayOfWeek === 0) classes.push('sunday');
+            if (dayOfWeek === 6) classes.push('saturday');
+            
+            // 体験入所予定がある場合
+            if (trialVisitCount > 0 && isCurrentMonth) {
+                classes.push('has-trials');
             }
-            calendarHtml += '</tr>';
-            if (date > daysInMonth) break;
+
+            html += `
+                <div class="${classes.join(' ')}" data-date="${dateStr}" onclick="trialVisitsManager.onDateClick('${dateStr}')">
+                    <div class="calendar-day-number">${current.getDate()}</div>
+                    ${trialVisitCount > 0 ? `
+                        <div class="calendar-day-indicators">
+                            <span class="calendar-indicator indicator-trial" title="体験入所予定: ${trialVisitCount}件">${trialVisitCount}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            current.setDate(current.getDate() + 1);
         }
 
-        calendarHtml += '</tbody></table>';
-        document.getElementById('trialVisitsCalendar').innerHTML = calendarHtml;
+        document.getElementById('trialVisitsCalendar').innerHTML = html;
+    }
+
+    /**
+     * 日付を文字列にフォーマット（タイムゾーン対応）
+     * @param {Date} date 
+     * @returns {string}
+     */
+    formatDateString(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     // 月ナビゲーション
@@ -467,6 +483,14 @@ export default class TrialVisitsManager {
     requestNotificationPermission() {
         if ('Notification' in window && Notification.permission === 'default') {
             Notification.requestPermission();
+        }
+    }
+
+    // 非表示処理
+    hide() {
+        const trialVisitsContent = document.getElementById('staffContentArea');
+        if (trialVisitsContent) {
+            trialVisitsContent.style.display = 'none';
         }
     }
 
