@@ -299,6 +299,14 @@ function generateSquareLayoutHTML(data) {
           font-size: 24px;
         }
         
+        /* 作業情報行 */
+        .work-info-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-bottom: 8px;
+        }
+        
         /* 健康状態 - 2行表示 */
         .health-row {
           display: grid;
@@ -394,12 +402,27 @@ function generateSquareLayoutHTML(data) {
             <div class="text-content work-content">${data.report.work_content || ''}</div>
           </div>
 
-          ${data.report.external_work_location ? `
-            <div class="form-section compact">
-              <label class="past-form-label">🏢 施設外就労先</label>
-              <div class="past-form-value">${data.report.external_work_location}</div>
-            </div>
-          ` : ''}
+          <!-- 作業場所・PC番号・施設外就労先 -->
+          <div class="work-info-row">
+            ${data.report.work_location ? `
+              <div class="form-section compact">
+                <label class="past-form-label">📍 作業場所</label>
+                <div class="past-form-value">${formatWorkLocation(data.report.work_location)}</div>
+              </div>
+            ` : ''}
+            ${data.report.pc_number ? `
+              <div class="form-section compact">
+                <label class="past-form-label">💻 PC番号</label>
+                <div class="past-form-value">${data.report.pc_number}</div>
+              </div>
+            ` : ''}
+            ${data.report.external_work_location ? `
+              <div class="form-section compact">
+                <label class="past-form-label">🏢 施設外就労先</label>
+                <div class="past-form-value">${data.report.external_work_location}</div>
+              </div>
+            ` : ''}
+          </div>
 
           <!-- 健康状態（1行目） -->
           <div class="health-row">
@@ -497,6 +520,8 @@ function normalizeReportData(reportData, userData, commentData, date) {
     breakTimeDisplay: breakTimeDisplay,
     report: {
       work_content: reportData.work_content || '',
+      work_location: reportData.work_location || null,
+      pc_number: reportData.pc_number || null,
       external_work_location: reportData.external_work_location || null,
       temperature: reportData.temperature || '-',
       appetite: reportData.appetite || null,
@@ -558,6 +583,14 @@ function formatInterviewRequest(value) {
     'interview': '面談希望'
   };
   return labels[value] || value;
+}
+
+function formatWorkLocation(location) {
+  const labels = {
+    'office': '通所',
+    'home': '在宅'
+  };
+  return labels[location] || location;
 }
 
 function calculateSleepHours(bedtime, wakeupTime) {
