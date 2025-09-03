@@ -921,5 +921,124 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
+    // 日報編集（admin用）
+    router.put('/report/:userId/:date', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { userId, date } = req.params;
+            const {
+                workContent,
+                workLocation,
+                pcNumber,
+                externalWorkLocation,
+                temperature,
+                appetite,
+                medicationTime,
+                bedtime,
+                wakeupTime,
+                sleepQuality,
+                reflection,
+                interviewRequest
+            } = req.body;
+            
+            // バリデーション
+            if (!workContent || workContent.trim() === '') {
+                return res.status(400).json({ 
+                    success: false,
+                    error: '作業内容は必須です' 
+                });
+            }
+            
+            // 既存の日報確認
+            const existingReport = await dbGet(
+                'SELECT * FROM daily_reports WHERE user_id = ? AND date = ?',
+                [userId, date]
+            );
+            
+            if (!existingReport) {
+                return res.status(404).json({ 
+                    success: false,
+                    error: '日報が見つかりません' 
+                });
+            }
+            
+            // 日報を更新
+            await dbRun(`
+                UPDATE daily_reports SET
+                    work_content = ?,
+                    work_location = ?,
+                    pc_number = ?,
+                    external_work_location = ?,
+                    temperature = ?,
+                    appetite = ?,
+                    medication_time = ?,
+                    bedtime = ?,
+                    wakeup_time = ?,
+                    sleep_quality = ?,
+                    reflection = ?,
+                    interview_request = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND date = ?
+            `, [
+                workContent,
+                workLocation,
+                pcNumber,
+                externalWorkLocation,
+                temperature,
+                appetite,
+                medicationTime,
+                bedtime,
+                wakeupTime,
+                sleepQuality,
+                reflection,
+                interviewRequest,
+                userId,
+                date
+            ]);
+            
+            // 監査ログ記録
+            await dbRun(
+                `INSERT INTO audit_log (
+                    admin_id, action_type, target_id, target_type,
+                    old_value, new_value, reason, ip_address
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    req.session.user.id,
+                    'report_edit',
+                    existingReport.id,
+                    'daily_report',
+                    JSON.stringify({
+                        work_content: existingReport.work_content,
+                        work_location: existingReport.work_location,
+                        pc_number: existingReport.pc_number,
+                        external_work_location: existingReport.external_work_location,
+                        temperature: existingReport.temperature,
+                        appetite: existingReport.appetite,
+                        medication_time: existingReport.medication_time,
+                        bedtime: existingReport.bedtime,
+                        wakeup_time: existingReport.wakeup_time,
+                        sleep_quality: existingReport.sleep_quality,
+                        reflection: existingReport.reflection,
+                        interview_request: existingReport.interview_request
+                    }),
+                    JSON.stringify(req.body),
+                    '管理者による日報編集',
+                    req.ip
+                ]
+            );
+            
+            res.json({ 
+                success: true, 
+                message: '日報を更新しました' 
+            });
+            
+        } catch (error) {
+            console.error('日報編集エラー:', error);
+            res.status(500).json({ 
+                success: false,
+                error: '日報の編集に失敗しました' 
+            });
+        }
+    });
+
     return router;
 };

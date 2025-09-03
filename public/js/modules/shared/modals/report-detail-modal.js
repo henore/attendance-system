@@ -75,6 +75,14 @@ export class ReportDetailModal {
                   <i class="fas fa-share"></i> 保存して画像にする
                 </button>
               ` : ''}
+              ${this.userRole === 'admin' ? `
+                <button type="button" class="btn btn-warning" id="${this.modalId}EditReportBtn" style="display: none;">
+                  <i class="fas fa-edit"></i> 日報を編集
+                </button>
+                <button type="button" class="btn btn-success" id="${this.modalId}SaveReportBtn" style="display: none;">
+                  <i class="fas fa-save"></i> 日報保存
+                </button>
+              ` : ''}
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                 <i class="fas fa-times"></i> 閉じる
               </button>
@@ -103,6 +111,24 @@ export class ReportDetailModal {
       if (saveAndSendBtn) {
         saveAndSendBtn.addEventListener('click', () => {
           this.saveComment(true); // 画像DLあり
+        });
+      }
+    }
+    
+    // admin用日報編集ボタン
+    if (this.userRole === 'admin') {
+      const editReportBtn = document.getElementById(`${this.modalId}EditReportBtn`);
+      const saveReportBtn = document.getElementById(`${this.modalId}SaveReportBtn`);
+      
+      if (editReportBtn) {
+        editReportBtn.addEventListener('click', () => {
+          this.toggleReportEdit(true);
+        });
+      }
+      
+      if (saveReportBtn) {
+        saveReportBtn.addEventListener('click', () => {
+          this.saveReportEdit();
         });
       }
     }
@@ -408,6 +434,11 @@ export class ReportDetailModal {
     if (this.canComment) {
       this.setupCommentArea();
     }
+    
+    // admin用日報編集ボタンの設定
+    if (this.userRole === 'admin') {
+      this.setupReportEditArea();
+    }
   }
 
   /**
@@ -469,15 +500,33 @@ export class ReportDetailModal {
           <div class="text-content">${report.work_content || ''}</div>
         </div>
 
-        <!-- 施設外就労先 -->
-        ${report.external_work_location ? `
-          <div class="mb-3">
-            <label class="past-form-label">
-              <i class="fas fa-building text-info"></i> 施設外就労先
-            </label>
-            <div class="past-form-value text-info">${report.external_work_location}</div>
-          </div>
-        ` : ''}
+        <!-- 作業場所・PC番号・施設外就労先 -->
+        <div class="row mb-3">
+          ${report.external_work_location ? `
+            <div class="col-6">
+              <label class="past-form-label">
+                <i class="fas fa-building text-info"></i> 施設外就労先
+              </label>
+              <div class="past-form-value text-info">${report.external_work_location}</div>
+            </div>
+          ` : ''}
+          ${report.work_location ? `
+            <div class="col-3">
+              <label class="past-form-label">
+                <i class="fas fa-map-marker-alt text-primary"></i> 作業場所
+              </label>
+              <div class="past-form-value text-primary">${this.getWorkLocationLabel(report.work_location)}</div>
+            </div>
+          ` : ''}
+          ${report.pc_number ? `
+            <div class="col-3">
+              <label class="past-form-label">
+                <i class="fas fa-desktop text-success"></i> PC番号
+              </label>
+              <div class="past-form-value text-success">${report.pc_number}</div>
+            </div>
+          ` : ''}
+        </div>
 
         <!-- 健康状態 -->
         <div class="row mb-3">
@@ -533,6 +582,9 @@ export class ReportDetailModal {
       </div>
 
       <hr>
+
+      <!-- 日報編集エリア（admin のみ） -->
+      ${this.userRole === 'admin' ? this.generateReportEditSection() : ''}
 
       <!-- スタッフコメントエリア -->
       ${this.generateCommentSection(comment)}
@@ -901,6 +953,236 @@ export class ReportDetailModal {
       'interview': '面談希望'
     };
     return labels[value] || value;
+  }
+
+  getWorkLocationLabel(value) {
+    const labels = {
+      'office': '通所',
+      'home': '在宅'
+    };
+    return labels[value] || value;
+  }
+
+  /**
+   * 日報編集セクション生成（admin用）
+   */
+  generateReportEditSection() {
+    const { report } = this.currentData;
+    
+    return `
+      <div class="report-edit-section bg-light p-3 mb-3 border rounded" style="display: none;">
+        <h6><i class="fas fa-edit text-warning"></i> 日報編集（管理者専用）</h6>
+        
+        <!-- 作業内容 -->
+        <div class="mb-3">
+          <label class="form-label">作業内容</label>
+          <textarea 
+            class="form-control" 
+            id="editWorkContent" 
+            rows="3"
+            maxlength="500">${report.work_content || ''}</textarea>
+        </div>
+        
+        <!-- 作業場所・PC番号・施設外就労先 -->
+        <div class="row mb-3">
+          <div class="col-4">
+            <label class="form-label">作業場所</label>
+            <select class="form-control" id="editWorkLocation">
+              <option value="">選択してください</option>
+              <option value="office" ${report.work_location === 'office' ? 'selected' : ''}>通所</option>
+              <option value="home" ${report.work_location === 'home' ? 'selected' : ''}>在宅</option>
+            </select>
+          </div>
+          <div class="col-4">
+            <label class="form-label">PC番号</label>
+            <select class="form-control" id="editPcNumber">
+              <option value="">選択してください</option>
+              ${Array.from({length: 20}, (_, i) => i + 1).map(num => 
+                `<option value="${num}" ${report.pc_number === num.toString() ? 'selected' : ''}>${num}</option>`
+              ).join('')}
+              ${['A', 'B', 'C', 'D'].map(letter => 
+                `<option value="${letter}" ${report.pc_number === letter ? 'selected' : ''}>${letter}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="col-4">
+            <label class="form-label">施設外就労先</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="editExternalWorkLocation" 
+              value="${report.external_work_location || ''}"
+              maxlength="100">
+          </div>
+        </div>
+        
+        <!-- 体温・食欲・頓服・睡眠状態 -->
+        <div class="row mb-3">
+          <div class="col-3">
+            <label class="form-label">体温（℃）</label>
+            <input 
+              type="number" 
+              class="form-control" 
+              id="editTemperature" 
+              value="${report.temperature || ''}"
+              min="35" 
+              max="42" 
+              step="0.1">
+          </div>
+          <div class="col-3">
+            <label class="form-label">食欲</label>
+            <select class="form-control" id="editAppetite">
+              <option value="good" ${report.appetite === 'good' ? 'selected' : ''}>良好</option>
+              <option value="none" ${report.appetite === 'none' ? 'selected' : ''}>なし</option>
+            </select>
+          </div>
+          <div class="col-3">
+            <label class="form-label">頓服服用（時頃）</label>
+            <select class="form-control" id="editMedicationTime">
+              <option value="">なし</option>
+              ${Array.from({length: 24}, (_, i) => i + 1).map(hour => 
+                `<option value="${hour}" ${report.medication_time === hour ? 'selected' : ''}>${hour}時頃</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="col-3">
+            <label class="form-label">睡眠状態</label>
+            <select class="form-control" id="editSleepQuality">
+              <option value="good" ${report.sleep_quality === 'good' ? 'selected' : ''}>良好</option>
+              <option value="poor" ${report.sleep_quality === 'poor' ? 'selected' : ''}>不良</option>
+              <option value="bad" ${report.sleep_quality === 'bad' ? 'selected' : ''}>悪い</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- 就寝・起床時間 -->
+        <div class="row mb-3">
+          <div class="col-6">
+            <label class="form-label">就寝時間</label>
+            <input 
+              type="time" 
+              class="form-control" 
+              id="editBedtime" 
+              value="${report.bedtime || ''}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">起床時間</label>
+            <input 
+              type="time" 
+              class="form-control" 
+              id="editWakeupTime" 
+              value="${report.wakeup_time || ''}">
+          </div>
+        </div>
+        
+        <!-- 振り返り -->
+        <div class="mb-3">
+          <label class="form-label">振り返り・感想</label>
+          <textarea 
+            class="form-control" 
+            id="editReflection" 
+            rows="3"
+            maxlength="500">${report.reflection || ''}</textarea>
+        </div>
+        
+        <!-- 面談希望 -->
+        <div class="mb-3">
+          <label class="form-label">面談希望</label>
+          <select class="form-control" id="editInterviewRequest">
+            <option value="">なし</option>
+            <option value="consultation" ${report.interview_request === 'consultation' ? 'selected' : ''}>相談がある</option>
+            <option value="interview" ${report.interview_request === 'interview' ? 'selected' : ''}>面談希望</option>
+          </select>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * 日報編集エリアの設定（admin用）
+   */
+  setupReportEditArea() {
+    const editBtn = document.getElementById(`${this.modalId}EditReportBtn`);
+    const saveBtn = document.getElementById(`${this.modalId}SaveReportBtn`);
+    
+    if (editBtn && saveBtn) {
+      editBtn.style.display = 'inline-block';
+    }
+  }
+
+  /**
+   * 日報編集モードの切り替え（admin用）
+   */
+  toggleReportEdit(enable) {
+    const editSection = document.querySelector('.report-edit-section');
+    const editBtn = document.getElementById(`${this.modalId}EditReportBtn`);
+    const saveBtn = document.getElementById(`${this.modalId}SaveReportBtn`);
+    
+    if (editSection) {
+      editSection.style.display = enable ? 'block' : 'none';
+    }
+    
+    if (editBtn) {
+      editBtn.style.display = enable ? 'none' : 'inline-block';
+    }
+    
+    if (saveBtn) {
+      saveBtn.style.display = enable ? 'inline-block' : 'none';
+    }
+  }
+
+  /**
+   * 日報編集内容の保存（admin用）
+   */
+  async saveReportEdit() {
+    try {
+      const formData = {
+        workContent: document.getElementById('editWorkContent').value.trim(),
+        workLocation: document.getElementById('editWorkLocation').value,
+        pcNumber: document.getElementById('editPcNumber').value,
+        externalWorkLocation: document.getElementById('editExternalWorkLocation').value.trim(),
+        temperature: parseFloat(document.getElementById('editTemperature').value) || null,
+        appetite: document.getElementById('editAppetite').value,
+        medicationTime: parseInt(document.getElementById('editMedicationTime').value) || null,
+        bedtime: document.getElementById('editBedtime').value || null,
+        wakeupTime: document.getElementById('editWakeupTime').value || null,
+        sleepQuality: document.getElementById('editSleepQuality').value,
+        reflection: document.getElementById('editReflection').value.trim(),
+        interviewRequest: document.getElementById('editInterviewRequest').value || null
+      };
+      
+      if (!formData.workContent) {
+        this.app.showNotification('作業内容は必須です', 'warning');
+        return;
+      }
+      
+      const response = await this.app.apiCall(`/api/admin/report/${this.currentData.userId}/${this.currentData.date}`, {
+        method: 'PUT',
+        body: JSON.stringify(formData)
+      });
+      
+      if (response.success !== false) {
+        this.app.showNotification('日報を更新しました', 'success');
+        
+        // currentDataを更新
+        this.currentData.report = { ...this.currentData.report, ...formData };
+        
+        // 編集モードを終了して表示を更新
+        this.toggleReportEdit(false);
+        this.updateModalContent();
+        
+        // 親モジュールに通知
+        if (this.parent && this.parent.onReportUpdated) {
+          this.parent.onReportUpdated();
+        }
+      } else {
+        this.app.showNotification(response.message || '日報の更新に失敗しました', 'danger');
+      }
+      
+    } catch (error) {
+      console.error('日報編集保存エラー:', error);
+      this.app.showNotification('日報の保存に失敗しました', 'danger');
+    }
   }
 
   /**
