@@ -136,19 +136,10 @@ export class ReportDetailModal {
     // モーダルが閉じられる直前の処理
     const modal = document.getElementById(this.modalId);
     if (modal) {
-      modal.addEventListener('hide.bs.modal', async () => {
-        // adminの場合、モーダルを閉じる前に日報変更を保存
-        if (this.userRole === 'admin' && this.hasReportChanges()) {
-          await this.saveReportChanges();
-        }
-      });
       
       modal.addEventListener('hidden.bs.modal', () => {
         this.stopCommentCheck();
         this.isEditing = false;
-        if (this.autoSaveTimeout) {
-          clearTimeout(this.autoSaveTimeout);
-        }
       });
     }
   }
@@ -158,7 +149,9 @@ export class ReportDetailModal {
    */
   async show(userId, userName, date) {
     try {
-      console.log('[日報詳細] 表示開始:', { userId, userName, date });
+      console.log('🔍 [日報詳細] 表示開始 - 受け取ったパラメータ:', { userId, userName, date });
+      console.log('🔍 [日報詳細] this.userRole:', this.userRole);
+      console.log('🔍 [日報詳細] this.app.currentUser:', this.app.currentUser);
       
       // パラメータ検証
       if (!userId || !date) {
@@ -197,7 +190,10 @@ export class ReportDetailModal {
         updated_at: response.comment.updated_at || response.comment.created_at
       } : null;
       
-      console.log('[日報詳細] currentData設定完了:', this.currentData);
+      console.log('✅ [日報詳細] currentData設定完了:', this.currentData);
+      console.log('📊 [日報詳細] 設定されたuserID:', this.currentData.userId);
+      console.log('👤 [日報詳細] 設定されたユーザー名:', this.currentData.userName);
+      console.log('📅 [日報詳細] 設定された日付:', this.currentData.date);
       
       // モーダルコンテンツを更新
       this.updateModalContent();
@@ -426,10 +422,6 @@ export class ReportDetailModal {
       this.setupCommentArea();
     }
     
-    // admin用自動保存設定
-    if (this.userRole === 'admin') {
-      this.setupAutoSave();
-    }
   }
 
   /**
@@ -1075,53 +1067,7 @@ export class ReportDetailModal {
     return labels[value] || value;
   }
 
-  /**
-   * 自動保存設定（admin用）
-   */
-  setupAutoSave() {
-    // 編集可能フィールドに変更イベントリスナーを追加
-    const editableFields = document.querySelectorAll('.admin-editable');
-    editableFields.forEach(field => {
-      field.addEventListener('change', () => {
-        this.saveReportChanges();
-      });
-      
-      // textareaの場合はinputイベントもリスン
-      if (field.tagName === 'TEXTAREA') {
-        field.addEventListener('input', () => {
-          clearTimeout(this.autoSaveTimeout);
-          this.autoSaveTimeout = setTimeout(() => {
-            this.saveReportChanges();
-          }, 1000); // 1秒遅延で保存
-        });
-      }
-    });
-  }
 
-  /**
-   * 日報に変更があるかチェック（admin用）
-   */
-  hasReportChanges() {
-    if (!this.currentData || this.userRole !== 'admin') return false;
-    
-    const currentReport = this.currentData.report;
-    const formData = this.getReportFormData();
-    
-    return (
-      formData.workContent !== (currentReport.work_content || '') ||
-      formData.externalWorkLocation !== (currentReport.external_work_location || '') ||
-      formData.workLocation !== (currentReport.work_location || '') ||
-      formData.pcNumber !== (currentReport.pc_number || null) ||
-      formData.temperature !== (currentReport.temperature || null) ||
-      formData.appetite !== (currentReport.appetite || 'good') ||
-      formData.medicationTime !== (currentReport.medication_time || null) ||
-      formData.bedtime !== (currentReport.bedtime || null) ||
-      formData.wakeupTime !== (currentReport.wakeup_time || null) ||
-      formData.sleepQuality !== (currentReport.sleep_quality || 'good') ||
-      formData.reflection !== (currentReport.reflection || '') ||
-      formData.interviewRequest !== (currentReport.interview_request || null)
-    );
-  }
   
   /**
    * フォームデータを収集（admin用）
@@ -1174,9 +1120,16 @@ export class ReportDetailModal {
         return;
       }
       
-      console.log('[日報編集] currentData確認:', this.currentData);
+      console.log('🔍 [日報編集] currentData確認:', this.currentData);
+      console.log('🔍 [日報編集] this.currentData.userId:', this.currentData.userId);
+      console.log('🔍 [日報編集] this.currentData.user?.id:', this.currentData.user?.id);
+      console.log('🔍 [日報編集] this.currentData.date:', this.currentData.date);
       
       const userId = this.currentData.userId || this.currentData.user?.id;
+      console.log('🎯 [日報編集] 使用するuserID:', userId);
+      console.log('🎯 [日報編集] APIパス:', `/api/admin/report/${userId}/${this.currentData.date}`);
+      console.log('🎯 [日報編集] 送信データ:', formData);
+      
       const response = await this.app.apiCall(`/api/admin/report/${userId}/${this.currentData.date}`, {
         method: 'PUT',
         body: JSON.stringify(formData)
@@ -1188,9 +1141,8 @@ export class ReportDetailModal {
         // currentDataを更新
         this.currentData.report = { ...this.currentData.report, ...formData };
         
-        // currentDataを更新して表示を更新
+        // currentDataを更新
         Object.assign(this.currentData.report, formData);
-        this.updateModalContent();
         
         // 親モジュールに通知
         if (this.parent && this.parent.onReportUpdated) {
