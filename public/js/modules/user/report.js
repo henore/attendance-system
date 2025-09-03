@@ -401,6 +401,21 @@ export class UserReportHandler {
   }
 
   /**
+   * フォームデータの検証
+   * @returns {boolean}
+   */
+  validateFormData() {
+    // HTML5の標準バリデーションを使用
+    const form = document.getElementById('reportForm');
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
    * フォームデータを収集（施設外就労先対応版）
    * @returns {Object}
    */
