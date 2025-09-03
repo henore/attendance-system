@@ -146,6 +146,41 @@ export default class TrialVisitsManager {
         document.getElementById('nextMonth').addEventListener('click', () => {
             this.navigateMonth(1);
         });
+
+        // カレンダー日付クリック
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.calendar-date-cell')) {
+                const dateCell = e.target.closest('.calendar-date-cell');
+                const date = dateCell.dataset.date;
+                this.onDateClick(date);
+            }
+        });
+
+        // 削除ボタンクリック
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.delete-visit-btn')) {
+                const btn = e.target.closest('.delete-visit-btn');
+                const visitId = btn.dataset.visitId;
+                const visitName = btn.dataset.visitName;
+                this.deleteTrialVisit(visitId, visitName);
+            }
+        });
+
+        // 日付変更
+        document.addEventListener('change', (e) => {
+            if (e.target.classList.contains('update-visit-date')) {
+                const visitId = e.target.dataset.visitId;
+                this.updateVisitDate(visitId, e.target.value);
+            }
+        });
+
+        // 時刻変更
+        document.addEventListener('change', (e) => {
+            if (e.target.classList.contains('update-visit-time')) {
+                const visitId = e.target.dataset.visitId;
+                this.updateVisitTime(visitId, e.target.value);
+            }
+        });
     }
 
     // 新規登録処理
@@ -230,30 +265,17 @@ export default class TrialVisitsManager {
 
         return visits.map(visit => `
             <div class="d-flex justify-content-between align-items-center border-bottom py-3" id="today-visit-${visit.id}">
-                <div class="flex-grow-1">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="fas fa-user-friends text-info me-2"></i>
-                        <span class="fw-bold">${visit.name}</span>
-                    </div>
-                    <div class="d-flex gap-3">
-                        <div>
-                            <label class="form-label form-label-sm">日付</label>
-                            <input type="date" class="form-control form-control-sm" value="${visit.visit_date}" 
-                                   onchange="trialVisitsManager.updateVisitDate(${visit.id}, this.value)">
-                        </div>
-                        <div>
-                            <label class="form-label form-label-sm">時刻</label>
-                            <input type="time" class="form-control form-control-sm" value="${visit.visit_time}" 
-                                   onchange="trialVisitsManager.updateVisitTime(${visit.id}, this.value)">
-                        </div>
+                <div class="d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-user-friends text-info me-3"></i>
+                    <div>
+                        <span class="fw-bold fs-5 me-4">${visit.name}</span>
+                        <span class="text-muted fs-5">${visit.visit_time}</span>
                     </div>
                 </div>
                 ${showDelete ? `
-                    <div class="d-flex flex-column gap-1">
-                        <button class="btn btn-outline-danger btn-sm" onclick="trialVisitsManager.deleteTrialVisit(${visit.id}, '${visit.name}')">
-                            <i class="fas fa-trash"></i> 削除
-                        </button>
-                    </div>
+                    <button class="btn btn-outline-danger btn-sm delete-visit-btn" data-visit-id="${visit.id}" data-visit-name="${visit.name}">
+                        <i class="fas fa-trash"></i> 削除
+                    </button>
                 ` : ''}
             </div>
         `).join('');
@@ -280,18 +302,18 @@ export default class TrialVisitsManager {
                     <div class="d-flex gap-3">
                         <div>
                             <label class="form-label form-label-sm">日付</label>
-                            <input type="date" class="form-control form-control-sm" value="${visit.visit_date}" 
-                                   onchange="trialVisitsManager.updateVisitDate(${visit.id}, this.value)">
+                            <input type="date" class="form-control form-control-sm update-visit-date" value="${visit.visit_date}" 
+                                   data-visit-id="${visit.id}">
                         </div>
                         <div>
                             <label class="form-label form-label-sm">時刻</label>
-                            <input type="time" class="form-control form-control-sm" value="${visit.visit_time}" 
-                                   onchange="trialVisitsManager.updateVisitTime(${visit.id}, this.value)">
+                            <input type="time" class="form-control form-control-sm update-visit-time" value="${visit.visit_time}" 
+                                   data-visit-id="${visit.id}">
                         </div>
                     </div>
                 </div>
                 <div class="d-flex flex-column gap-1">
-                    <button class="btn btn-outline-danger btn-sm" onclick="trialVisitsManager.deleteTrialVisit(${visit.id}, '${visit.name}')">
+                    <button class="btn btn-outline-danger btn-sm delete-visit-btn" data-visit-id="${visit.id}" data-visit-name="${visit.name}">
                         <i class="fas fa-trash"></i> 削除
                     </button>
                 </div>
@@ -447,7 +469,7 @@ export default class TrialVisitsManager {
             }
 
             html += `
-                <div class="${classes.join(' ')}" data-date="${dateStr}" onclick="trialVisitsManager.onDateClick('${dateStr}')">
+                <div class="${classes.join(' ')}" data-date="${dateStr}" data-action="onDateClick('${dateStr}')">
                     <div class="calendar-day-number">${current.getDate()}</div>
                     ${trialVisitCount > 0 ? `
                         <div class="calendar-day-indicators">
