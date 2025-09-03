@@ -824,7 +824,12 @@ export class ReportDetailModal {
           try {
             console.log('[画像DL] 開始');
             await this.lineSender.sendReportCompletion(
-              this.currentData.report,
+              {
+                ...this.currentData.report,
+                attendance: this.currentData.attendance,
+                breakRecord: this.currentData.breakRecord,
+                date: this.currentData.date
+              },
               this.currentData.user,
               {
                 comment: comment,
