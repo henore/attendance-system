@@ -73,6 +73,58 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
+    // 体験入所予定更新
+    router.put('/:id', async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { visitDate, visitTime } = req.body;
+            
+            let updateFields = [];
+            let updateValues = [];
+            
+            if (visitDate) {
+                updateFields.push('visit_date = ?');
+                updateValues.push(visitDate);
+            }
+            
+            if (visitTime) {
+                updateFields.push('visit_time = ?');
+                updateValues.push(visitTime);
+            }
+            
+            if (updateFields.length === 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: '更新するフィールドが指定されていません' 
+                });
+            }
+            
+            updateFields.push('updated_at = CURRENT_TIMESTAMP');
+            updateValues.push(id);
+            
+            const result = await dbRun(`
+                UPDATE trial_visits 
+                SET ${updateFields.join(', ')} 
+                WHERE id = ?
+            `, updateValues);
+
+            if (result.changes === 0) {
+                return res.status(404).json({ 
+                    success: false, 
+                    error: '指定された予定が見つかりません' 
+                });
+            }
+
+            res.json({ 
+                success: true, 
+                message: '体験入所予定を更新しました' 
+            });
+        } catch (error) {
+            console.error('体験入所予定更新エラー:', error);
+            res.status(500).json({ success: false, error: '更新に失敗しました' });
+        }
+    });
+
     // 体験入所予定削除（非表示フラグ）
     router.delete('/:id', async (req, res) => {
         try {

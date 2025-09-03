@@ -65,6 +65,7 @@ export const API_ENDPOINTS = {
     TRIAL_VISITS_TODAY: '/api/trial-visits/today',
     TRIAL_VISITS_BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,
     TRIAL_VISITS_CREATE: '/api/trial-visits/create',
+    TRIAL_VISITS_UPDATE: (id) => `/api/trial-visits/${id}`,
     TRIAL_VISITS_DELETE: (id) => `/api/trial-visits/${id}`,
     TRIAL_VISITS_MONTHLY: (year, month) => `/api/trial-visits/monthly/${year}/${month}`,
     TRIAL_VISITS_NOTIFICATION_CHECK: '/api/trial-visits/notification-check'
@@ -94,6 +95,7 @@ export const API_ENDPOINTS = {
     TRIAL_VISITS_TODAY: '/api/trial-visits/today',
     TRIAL_VISITS_BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,
     TRIAL_VISITS_CREATE: '/api/trial-visits/create',
+    TRIAL_VISITS_UPDATE: (id) => `/api/trial-visits/${id}`,
     TRIAL_VISITS_DELETE: (id) => `/api/trial-visits/${id}`,
     TRIAL_VISITS_MONTHLY: (year, month) => `/api/trial-visits/monthly/${year}/${month}`,
     TRIAL_VISITS_NOTIFICATION_CHECK: '/api/trial-visits/notification-check'

@@ -229,19 +229,114 @@ export default class TrialVisitsManager {
         }
 
         return visits.map(visit => `
-            <div class="d-flex justify-content-between align-items-center border-bottom py-2">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-user-friends text-info me-2"></i>
-                    <span class="fw-bold">${visit.name}</span>
-                    <span class="text-muted ms-3">${visit.visit_time}</span>
+            <div class="d-flex justify-content-between align-items-center border-bottom py-3" id="today-visit-${visit.id}">
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-user-friends text-info me-2"></i>
+                        <span class="fw-bold">${visit.name}</span>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <div>
+                            <label class="form-label form-label-sm">日付</label>
+                            <input type="date" class="form-control form-control-sm" value="${visit.visit_date}" 
+                                   onchange="trialVisitsManager.updateVisitDate(${visit.id}, this.value)">
+                        </div>
+                        <div>
+                            <label class="form-label form-label-sm">時刻</label>
+                            <input type="time" class="form-control form-control-sm" value="${visit.visit_time}" 
+                                   onchange="trialVisitsManager.updateVisitTime(${visit.id}, this.value)">
+                        </div>
+                    </div>
                 </div>
                 ${showDelete ? `
-                    <button class="btn btn-outline-danger btn-sm" onclick="trialVisitsManager.deleteTrialVisit(${visit.id}, '${visit.name}')">
-                        <i class="fas fa-trash"></i> 削除
-                    </button>
+                    <div class="d-flex flex-column gap-1">
+                        <button class="btn btn-outline-danger btn-sm" onclick="trialVisitsManager.deleteTrialVisit(${visit.id}, '${visit.name}')">
+                            <i class="fas fa-trash"></i> 削除
+                        </button>
+                    </div>
                 ` : ''}
             </div>
         `).join('');
+    }
+
+    // 体験入所予定一覧の描画（編集機能付き）
+    renderTrialVisitsListWithEdit(visits) {
+        if (!visits || visits.length === 0) {
+            return `
+                <div class="text-center text-muted p-3">
+                    <i class="fas fa-calendar-times fa-2x mb-2"></i>
+                    <p>この日の体験入所予定はありません</p>
+                </div>
+            `;
+        }
+
+        return visits.map(visit => `
+            <div class="d-flex justify-content-between align-items-center border-bottom py-3" id="visit-${visit.id}">
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-user-friends text-info me-2"></i>
+                        <span class="fw-bold">${visit.name}</span>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <div>
+                            <label class="form-label form-label-sm">日付</label>
+                            <input type="date" class="form-control form-control-sm" value="${visit.visit_date}" 
+                                   onchange="trialVisitsManager.updateVisitDate(${visit.id}, this.value)">
+                        </div>
+                        <div>
+                            <label class="form-label form-label-sm">時刻</label>
+                            <input type="time" class="form-control form-control-sm" value="${visit.visit_time}" 
+                                   onchange="trialVisitsManager.updateVisitTime(${visit.id}, this.value)">
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex flex-column gap-1">
+                    <button class="btn btn-outline-danger btn-sm" onclick="trialVisitsManager.deleteTrialVisit(${visit.id}, '${visit.name}')">
+                        <i class="fas fa-trash"></i> 削除
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // 日付更新処理
+    async updateVisitDate(id, newDate) {
+        try {
+            const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
+            const response = await this.app.apiCall(endpoints.TRIAL_VISITS_UPDATE(id), {
+                method: 'PUT',
+                body: JSON.stringify({ visitDate: newDate })
+            });
+            
+            this.app.showNotification('日付を更新しました', 'success');
+            
+            // データ更新
+            await this.loadTodayTrialVisits();
+            await this.loadCalendar();
+            
+        } catch (error) {
+            this.app.showNotification('日付の更新に失敗しました', 'danger');
+        }
+    }
+
+    // 時刻更新処理
+    async updateVisitTime(id, newTime) {
+        try {
+            const endpoints = this.userRole === 'admin' ? API_ENDPOINTS.ADMIN : API_ENDPOINTS.STAFF;
+            const response = await this.app.apiCall(endpoints.TRIAL_VISITS_UPDATE(id), {
+                method: 'PUT',
+                body: JSON.stringify({ visitTime: newTime })
+            });
+            
+            this.app.showNotification('時刻を更新しました', 'success');
+            
+            // データ更新
+            await this.loadTodayTrialVisits();
+            await this.loadCalendar();
+            
+        } catch (error) {
+            this.app.showNotification('時刻の更新に失敗しました', 'danger');
+        }
     }
 
     // 体験入所予定削除
@@ -417,9 +512,9 @@ export default class TrialVisitsManager {
             modalDateTitle.textContent = `${dateStr} の体験入所予定`;
             modalDateTitle.dataset.date = date;
             
-            // 予定一覧表示
+            // 予定一覧表示（編集機能付き）
             const modalList = document.getElementById('modalTrialVisitsList');
-            modalList.innerHTML = this.renderTrialVisitsList(response.visits || [], true);
+            modalList.innerHTML = this.renderTrialVisitsListWithEdit(response.visits || []);
             
             // モーダル表示
             const modal = new bootstrap.Modal(document.getElementById('trialVisitsModal'));
