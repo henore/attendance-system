@@ -152,9 +152,10 @@ export default class TrialVisitsManager {
 
         // カレンダー日付クリック
         document.addEventListener('click', (e) => {
-            if (e.target.closest('.calendar-date-cell')) {
-                const dateCell = e.target.closest('.calendar-date-cell');
+            if (e.target.closest('.calendar-day')) {
+                const dateCell = e.target.closest('.calendar-day');
                 const date = dateCell.dataset.date;
+                console.log('[体験入所] カレンダークリック - 要素:', dateCell, '日付:', date);
                 this.onDateClick(date);
             }
         });
@@ -562,6 +563,7 @@ export default class TrialVisitsManager {
 
     // 日付クリック処理
     async onDateClick(date) {
+        console.log('[体験入所] 日付クリック:', date);
         await this.showTrialVisitsModal(date);
     }
 
