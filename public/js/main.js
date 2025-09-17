@@ -382,6 +382,10 @@ class AttendanceManagementSystem {
                     }
                     throw error;
                 } catch (jsonError) {
+                    // JSONパースに失敗した場合は元のエラーが存在すれば再投げ、なければ新しいエラー
+                    if (jsonError.message && !jsonError.message.includes('HTTP error!')) {
+                        throw jsonError;
+                    }
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
             }

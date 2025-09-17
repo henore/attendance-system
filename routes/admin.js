@@ -267,12 +267,16 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     router.post('/attendance/correct', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
             const { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason } = req.body;
-            
+
+            // デバッグログ
+            console.log('出勤記録修正リクエスト:', { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason });
+
             // バリデーション
             if (!reason || reason.trim() === '') {
-                return res.status(400).json({ 
+                console.log('バリデーションエラー: 変更理由が空です');
+                return res.status(400).json({
                     success: false,
-                    error: '変更理由を入力してください' 
+                    error: '変更理由を入力してください'
                 });
             }
             
@@ -377,8 +381,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     ]
                 );
             }
-            // recordIdがない場合は新規記録の作成
-            else if (userId && date && newClockIn) {
+            // recordIdがない場合は新規記録の作成（欠勤の場合もnewClockInが空でもOK）
+            else if (userId && date) {
                 // ユーザー情報取得
                 const user = await dbGet(
                     'SELECT id, role FROM users WHERE id = ?',
@@ -450,9 +454,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     ]
                 );
             } else {
-                return res.status(400).json({ 
+                console.log('パラメータ不足エラー:', { recordId, userId, date, newClockIn });
+                return res.status(400).json({
                     success: false,
-                    error: '必要なパラメータが不足しています' 
+                    error: '必要なパラメータが不足しています（userIdまたはdateが必要）'
                 });
             }
             
