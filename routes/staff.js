@@ -51,6 +51,31 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
   });
 
+  // スタッフの強制退勤処理（未コメント日報チェックをスキップ）
+  router.post('/force-clock-out', async (req, res) => {
+    try {
+      const staffId = req.session.user.id;
+      const today = getCurrentDate();
+      const currentTime = getCurrentTime();
+
+      // 未コメントチェックをスキップして退勤処理
+      await dbRun(
+        'UPDATE attendance SET clock_out = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND date = ?',
+        [currentTime, staffId, today]
+      );
+
+      res.json({
+        success: true,
+        message: '退勤しました（未コメント日報あり）',
+        time: currentTime
+      });
+
+    } catch (error) {
+      console.error('強制退勤処理エラー:', error);
+      res.status(500).json({ success: false, error: '強制退勤処理に失敗しました' });
+    }
+  });
+
   router.get('/attendance/search', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
   try {
     const { date, role, userId } = req.query;

@@ -371,7 +371,19 @@ class AttendanceManagementSystem {
                     this.handleSessionExpired();
                     throw new Error(MESSAGES.AUTH.SESSION_EXPIRED);
                 }
-                throw new Error(`HTTP error! status: ${response.status}`);
+
+                // エラーレスポンスのJSONデータも取得して詳細情報を保持
+                try {
+                    const errorData = await response.json();
+                    const error = new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    // エラーレスポンスの追加データを保持
+                    if (errorData.uncommentedReports) {
+                        error.uncommentedReports = errorData.uncommentedReports;
+                    }
+                    throw error;
+                } catch (jsonError) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
             }
 
             const data = await response.json();

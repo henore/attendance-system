@@ -297,16 +297,23 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     [oldRecord.user_id]
                 );
 
+                // 空文字列をNULLに変換（欠勤対応）
+                const clockInValue = newClockIn && newClockIn.trim() !== '' ? newClockIn : null;
+                const clockOutValue = newClockOut && newClockOut.trim() !== '' ? newClockOut : null;
+
                 // 出勤記録を更新
                 await dbRun(
                     'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    [newClockIn, newClockOut, status, recordId]
+                    [clockInValue, clockOutValue, status, recordId]
                 );
 
-                // 休憩記録の処理（利用者とスタッフで分岐）
+                // 休憩記録の処理（利用者とスタッフで分岐）（空文字列をNULLに変換）
+                const breakStartValue = newBreakStart && newBreakStart.trim() !== '' ? newBreakStart : null;
+                const breakEndValue = newBreakEnd && newBreakEnd.trim() !== '' ? newBreakEnd : null;
+
                 if (user.role === 'user') {
                     // 利用者の場合：break_recordsテーブルを更新
-                    if (newBreakStart) {
+                    if (breakStartValue) {
                         const existingBreak = await dbGet(
                             'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
                             [oldRecord.user_id, oldRecord.date]
@@ -316,13 +323,13 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                             // 既存の休憩記録を更新
                             await dbRun(
                                 'UPDATE break_records SET start_time = ?, end_time = ?, duration = ? WHERE id = ?',
-                                [newBreakStart, newBreakEnd, newBreakEnd ? 60 : null, existingBreak.id]
+                                [breakStartValue, breakEndValue, breakEndValue ? 60 : null, existingBreak.id]
                             );
                         } else {
                             // 新しい休憩記録を作成
                             await dbRun(
                                 'INSERT INTO break_records (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)',
-                                [oldRecord.user_id, oldRecord.date, newBreakStart, newBreakEnd, newBreakEnd ? 60 : null]
+                                [oldRecord.user_id, oldRecord.date, breakStartValue, breakEndValue, breakEndValue ? 60 : null]
                             );
                         }
                     } else {
@@ -336,7 +343,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     // スタッフ・管理者の場合：attendanceテーブルのbreak_start/break_endを更新
                     await dbRun(
                         'UPDATE attendance SET break_start = ?, break_end = ? WHERE id = ?',
-                        [newBreakStart, newBreakEnd, recordId]
+                        [breakStartValue, breakEndValue, recordId]
                     );
                 }
                 
@@ -385,29 +392,36 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     });
                 }
                 
+                // 空文字列をNULLに変換（欠勤対応）
+                const clockInValue = newClockIn && newClockIn.trim() !== '' ? newClockIn : null;
+                const clockOutValue = newClockOut && newClockOut.trim() !== '' ? newClockOut : null;
+
                 // 新規出勤記録を作成
                 const result = await dbRun(
-                    `INSERT INTO attendance (user_id, date, clock_in, clock_out, status) 
+                    `INSERT INTO attendance (user_id, date, clock_in, clock_out, status)
                      VALUES (?, ?, ?, ?, ?)
                      ON CONFLICT(user_id, date) DO UPDATE SET
                         clock_in = excluded.clock_in,
                         clock_out = excluded.clock_out,
                         status = excluded.status,
                         updated_at = CURRENT_TIMESTAMP`,
-                    [userId, date, newClockIn, newClockOut, status || 'normal']
+                    [userId, date, clockInValue, clockOutValue, status || 'normal']
                 );
                 
-                // 休憩記録の処理
-                if (newBreakStart && user.role === 'user') {
+                // 休憩記録の処理（空文字列をNULLに変換）
+                const breakStartValue = newBreakStart && newBreakStart.trim() !== '' ? newBreakStart : null;
+                const breakEndValue = newBreakEnd && newBreakEnd.trim() !== '' ? newBreakEnd : null;
+
+                if (breakStartValue && user.role === 'user') {
                     await dbRun(
-                        `INSERT OR REPLACE INTO break_records (user_id, date, start_time, end_time, duration) 
+                        `INSERT OR REPLACE INTO break_records (user_id, date, start_time, end_time, duration)
                          VALUES (?, ?, ?, ?, ?)`,
-                        [userId, date, newBreakStart, newBreakEnd, newBreakEnd ? 60 : null]
+                        [userId, date, breakStartValue, breakEndValue, breakEndValue ? 60 : null]
                     );
-                } else if (newBreakStart && user.role !== 'user') {
+                } else if (breakStartValue && user.role !== 'user') {
                     await dbRun(
                         'UPDATE attendance SET break_start = ?, break_end = ? WHERE user_id = ? AND date = ?',
-                        [newBreakStart, newBreakEnd, userId, date]
+                        [breakStartValue, breakEndValue, userId, date]
                     );
                 }
                 

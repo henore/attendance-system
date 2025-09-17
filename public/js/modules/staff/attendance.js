@@ -74,13 +74,48 @@ export class StaffAttendanceUI {
       if (error.message && error.message.includes('未コメント')) {
         const uncommentedReports = error.uncommentedReports || [];
         const userNames = uncommentedReports.map(r => r.user_name).join('、');
-        this.app.showNotification(
-          `以下の利用者の日報にコメントが記入されていません：${userNames}`,
-          'warning'
+
+        // 確認ダイアログを表示
+        const shouldProceed = confirm(
+          `以下の利用者の日報にコメントが記入されていません：\n${userNames}\n\nコメント未入力ですが退勤しますか？`
         );
+
+        if (shouldProceed) {
+          // 強制退勤処理
+          await this.forceClockOut();
+        }
       } else {
         this.app.showNotification(error.message || '退勤処理に失敗しました', 'danger');
       }
+      return false;
+    }
+  }
+
+  /**
+   * 強制退勤処理（未コメント日報があっても退勤）
+   */
+  async forceClockOut() {
+    try {
+      // 休憩中の場合は自動終了
+      if (this.isOnBreak) {
+        await this.handleBreakEnd(true);
+      }
+
+      // 強制退勤APIを呼び出し（未コメントチェックをスキップ）
+      const response = await this.app.apiCall('/api/staff/force-clock-out', {
+        method: 'POST'
+      });
+
+      if (response.success) {
+        this.isWorking = false;
+        this.currentAttendance.clock_out = response.time;
+        this.updateUI();
+        this.app.showNotification('退勤しました（未コメント日報あり）', 'warning');
+        return true;
+      }
+    } catch (error) {
+      console.error('強制退勤処理エラー:', error);
+      this.app.showNotification(error.message || '強制退勤処理に失敗しました', 'danger');
       return false;
     }
   }
