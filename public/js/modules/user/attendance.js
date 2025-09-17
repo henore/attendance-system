@@ -19,9 +19,9 @@ export class UserAttendanceHandler extends AttendanceHandler {
   roundClockInTime(time) {
     const currentMinutes = timeToMinutes(time);
     
-    // 通所者のみ11:30-12:30の出勤は12:30固定
+    // 通所者のみ11:16-12:30の出勤は12:30固定
     if (this.currentUser.service_type === 'commute' &&
-      currentMinutes >= 690  &&  currentMinutes <= 750) { // 11:30-12:30
+      currentMinutes >= 676  &&  currentMinutes <= 750) { // 11:16-12:30
       return '12:30';
     } 
     // 9:00前は9:00固定（通所者・在宅者共通）
