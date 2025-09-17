@@ -154,8 +154,15 @@ export class AttendanceTable {
 
     // ステータス表示（利用者は非表示、スタッフ・管理者は表示）
     let statusBadge = '-';
-    if (record.user_role !== 'user' && record.clock_in) {
-      statusBadge = this.getStatusBadge(record.status || 'normal');
+    if (record.user_role !== 'user') {
+      if (record.status) {
+        // 明示的にステータスが設定されている場合（欠勤レコードあり）
+        statusBadge = this.getStatusBadge(record.status);
+      } else if (record.clock_in) {
+        // 出勤記録があるが明示的ステータスがない場合は正常
+        statusBadge = this.getStatusBadge('normal');
+      }
+      // 出勤記録もステータスもない場合は「-」のまま
     }
     
     // 操作ボタン（日報マークを除去）
