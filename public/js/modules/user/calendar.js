@@ -513,6 +513,30 @@ export class UserAttendanceCalendar {
             <div class="past-form-value text-info">${report.external_work_location}</div>
           </div>
         ` : ''}
+
+        <div class="row mb-3">
+          ${report.work_location ? `
+          <div class="col-6">
+            <label class="past-form-label">
+              <i class="fas fa-map-marker-alt"></i> 作業場所
+            </label>
+            <div class="past-form-value">
+              <span class="badge bg-info">${report.work_location}</span>
+            </div>
+          </div>
+          ` : ''}
+          ${report.pc_number ? `
+          <div class="col-6">
+            <label class="past-form-label">
+              <i class="fas fa-desktop"></i> PC番号
+            </label>
+            <div class="past-form-value">
+              <span class="badge bg-secondary">${report.pc_number}</span>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+
         <div class="row mb-3">  
           <div class="col-4">
             <label class="past-form-label">体温</label>
