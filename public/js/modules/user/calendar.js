@@ -505,18 +505,17 @@ export class UserAttendanceCalendar {
           <label class="past-form-label">作業内容</label>
           <div class="past-form-textarea">${report.work_content || ''}</div>
         </div>
+        <div class="row mb-3">
           ${report.external_work_location ? `
-          <div class="past-form-section">
+          <div class="col-4">
             <label class="past-form-label">
               <i class="fas fa-building"></i> 施設外就労先
             </label>
             <div class="past-form-value text-info">${report.external_work_location}</div>
           </div>
-        ` : ''}
-
-        <div class="row mb-3">
+          ` : ''}
           ${report.work_location ? `
-          <div class="col-6">
+          <div class="col-4">
             <label class="past-form-label">
               <i class="fas fa-map-marker-alt"></i> 作業場所
             </label>
@@ -526,7 +525,7 @@ export class UserAttendanceCalendar {
           </div>
           ` : ''}
           ${report.pc_number ? `
-          <div class="col-6">
+          <div class="col-4">
             <label class="past-form-label">
               <i class="fas fa-desktop"></i> PC番号
             </label>
