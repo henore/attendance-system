@@ -17,6 +17,21 @@ export class UserAttendanceCalendar {
   }
 
   /**
+   * 作業場所の英語表記を日本語に変換
+   * @param {string} workLocation
+   * @returns {string}
+   */
+  formatWorkLocation(workLocation) {
+    const locationMap = {
+      'home': '在宅',
+      'commute': '通所',
+      'office': '通所',
+      'facility': '通所'
+    };
+    return locationMap[workLocation] || workLocation;
+  }
+
+  /**
    * カレンダーをレンダリング
    * @param {HTMLElement} container 
    */
@@ -520,7 +535,7 @@ export class UserAttendanceCalendar {
               <i class="fas fa-map-marker-alt"></i> 作業場所
             </label>
             <div class="past-form-value">
-              <span class="badge bg-info">${report.work_location}</span>
+              <span class="badge bg-info">${this.formatWorkLocation(report.work_location)}</span>
             </div>
           </div>
           ` : ''}
