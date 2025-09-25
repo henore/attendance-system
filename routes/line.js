@@ -566,11 +566,11 @@ function formatAppetite(appetite) {
 }
 
 function formatSleepQuality(quality) {
-  const labels = { 
-    'good': '良好', 
+  const labels = {
+    'good': '眠れた',
     'normal': '普通',
-    'poor': '不良',
-    'bad': '悪い' 
+    'poor': 'あまり眠れなかった',
+    'bad': '眠れなかった'
   };
   return labels[quality] || quality || '-';
 }

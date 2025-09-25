@@ -32,8 +32,8 @@ export const APPETITE_LABELS = {
 // 睡眠状態ラベル
 export const SLEEP_QUALITY_LABELS = {
     good: '眠れた',
-    poor: 'あまり眠れない',
-    bad: '眠れない'
+    poor: 'あまり眠れなかった',
+    bad: '眠れなかった'
 };
 
 // 面談希望ラベル

@@ -639,9 +639,9 @@ export class ReportDetailModal {
             <label class="${this.userRole === 'admin' ? 'form-label' : 'past-form-label'}"><i class="fas fa-bed"></i> 睡眠状態</label>
             ${this.userRole === 'admin' ? `
               <select class="form-control admin-editable" id="editSleepQuality">
-                <option value="good" ${report.sleep_quality === 'good' ? 'selected' : ''}>良好</option>
-                <option value="poor" ${report.sleep_quality === 'poor' ? 'selected' : ''}>不良</option>
-                <option value="bad" ${report.sleep_quality === 'bad' ? 'selected' : ''}>悪い</option>
+                <option value="good" ${report.sleep_quality === 'good' ? 'selected' : ''}>眠れた</option>
+                <option value="poor" ${report.sleep_quality === 'poor' ? 'selected' : ''}>あまり眠れなかった</option>
+                <option value="bad" ${report.sleep_quality === 'bad' ? 'selected' : ''}>眠れなかった</option>
               </select>
             ` : `
               <div class="past-form-value">${this.getSleepQualityLabel(report.sleep_quality)}</div>
@@ -1045,9 +1045,10 @@ export class ReportDetailModal {
 
   getSleepQualityLabel(value) {
     const labels = {
-      'good': '良好',
+      'good': '眠れた',
       'normal': '普通',
-      'poor': '不良'
+      'poor': 'あまり眠れなかった',
+      'bad': '眠れなかった'
     };
     return labels[value] || value;
   }
