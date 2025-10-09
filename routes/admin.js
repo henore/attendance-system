@@ -451,7 +451,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                                 'PC作業', // 作業内容
                                 'office', // 作業場所：通所
                                 '15', // PC番号：15
-                                '施設外就労', // 施設外就労先チェック済み
+                                '施設外就労先名（佐藤美幸）', // 施設外就労先チェック済み
                                 36.5, // デフォルト体温
                                 'good', // デフォルト食欲
                                 null, // 頓服なし
