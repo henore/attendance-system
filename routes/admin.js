@@ -388,14 +388,14 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     'SELECT id, role FROM users WHERE id = ?',
                     [userId]
                 );
-                
+
                 if (!user) {
-                    return res.status(404).json({ 
+                    return res.status(404).json({
                         success: false,
-                        error: 'ユーザーが見つかりません' 
+                        error: 'ユーザーが見つかりません'
                     });
                 }
-                
+
                 // 空文字列をNULLに変換（欠勤対応）
                 const clockInValue = newClockIn && newClockIn.trim() !== '' ? newClockIn : null;
                 const clockOutValue = newClockOut && newClockOut.trim() !== '' ? newClockOut : null;
@@ -411,7 +411,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                         updated_at = CURRENT_TIMESTAMP`,
                     [userId, date, clockInValue, clockOutValue, status || 'normal']
                 );
-                
+
                 // 休憩記録の処理（空文字列をNULLに変換）
                 const breakStartValue = newBreakStart && newBreakStart.trim() !== '' ? newBreakStart : null;
                 const breakEndValue = newBreakEnd && newBreakEnd.trim() !== '' ? newBreakEnd : null;
@@ -428,7 +428,45 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                         [breakStartValue, breakEndValue, userId, date]
                     );
                 }
-                
+
+                // 利用者の場合、欠勤でない（出勤・退勤時刻がある）場合は日報を自動生成
+                if (user.role === 'user' && clockInValue && clockOutValue && status !== 'absence' && status !== 'paid_leave') {
+                    // 既存の日報があるかチェック
+                    const existingReport = await dbGet(
+                        'SELECT id FROM daily_reports WHERE user_id = ? AND date = ?',
+                        [userId, date]
+                    );
+
+                    if (!existingReport) {
+                        // 日報を自動生成
+                        await dbRun(
+                            `INSERT INTO daily_reports (
+                                user_id, date, work_content, work_location, pc_number,
+                                external_work_location, temperature, appetite, medication_time,
+                                bedtime, wakeup_time, sleep_quality, reflection, interview_request
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [
+                                userId,
+                                date,
+                                'PC作業', // 作業内容
+                                'office', // 作業場所：通所
+                                '15', // PC番号：15
+                                '施設外就労', // 施設外就労先チェック済み
+                                36.5, // デフォルト体温
+                                'good', // デフォルト食欲
+                                null, // 頓服なし
+                                '23:00', // 就寝時間
+                                '07:00', // 起床時間
+                                'good', // 睡眠状態：good
+                                '今日も一日お疲れ様でした', // 振り返り
+                                null // 面談希望なし
+                            ]
+                        );
+
+                        console.log(`[日報自動生成] ユーザーID: ${userId}, 日付: ${date}`);
+                    }
+                }
+
                 // 監査ログ
                 await dbRun(
                     `INSERT INTO audit_log (

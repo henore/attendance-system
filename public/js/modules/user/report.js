@@ -76,13 +76,16 @@ export class UserReportHandler {
       // 退勤済みの場合は日報フォーム表示
       this.hasTodayReport = response.report !== null;
       container.innerHTML = this.generateReportForm(response.report);
-      
+
       // フォームにデータを保存
       const form = document.getElementById('reportForm');
       if (form) {
         form.dataset.attendance = JSON.stringify(this.currentAttendance);
       }
-      
+
+      // 作業場所に応じた施設外就労先の必須制御を設定
+      this.setupWorkLocationValidation();
+
     } catch (error) {
       console.error('日報フォーム読み込みエラー:', error);
       container.innerHTML = this.generateErrorMessage();
@@ -160,15 +163,6 @@ export class UserReportHandler {
         
         <div class="row">
           <div class="col-md-4 mb-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="externalWorkLocation" 
-                     ${report.external_work_location ? 'checked' : ''} required>
-              <label class="form-check-label" for="externalWorkLocation">
-                <i class="fas fa-building"></i> ${EXTERNAL_WORK_LOCATION}
-              </label>
-            </div>
-          </div>
-          <div class="col-md-4 mb-3">
             <label for="workLocation" class="form-label">
               <i class="fas fa-map-marker-alt"></i> 作業場所
             </label>
@@ -179,15 +173,24 @@ export class UserReportHandler {
             </select>
           </div>
           <div class="col-md-4 mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="externalWorkLocation"
+                     ${report.external_work_location ? 'checked' : ''}>
+              <label class="form-check-label" for="externalWorkLocation">
+                <i class="fas fa-building"></i> ${EXTERNAL_WORK_LOCATION}
+              </label>
+            </div>
+          </div>
+          <div class="col-md-4 mb-3">
             <label for="pcNumber" class="form-label">
               <i class="fas fa-desktop"></i> PC番号
             </label>
             <select class="form-control" id="pcNumber" required>
               <option value="">選択してください</option>
-              ${Array.from({length: 20}, (_, i) => i + 1).map(num => 
+              ${Array.from({length: 20}, (_, i) => i + 1).map(num =>
                 `<option value="${num}" ${report.pc_number == num ? 'selected' : ''}>${num}</option>`
               ).join('')}
-              ${['A', 'B', 'C', 'D'].map(letter => 
+              ${['A', 'B', 'C', 'D'].map(letter =>
                 `<option value="${letter}" ${report.pc_number === letter ? 'selected' : ''}>${letter}</option>`
               ).join('')}
             </select>
@@ -401,17 +404,64 @@ export class UserReportHandler {
   }
 
   /**
+   * 作業場所に応じた施設外就労先の必須制御を設定
+   */
+  setupWorkLocationValidation() {
+    const workLocationSelect = document.getElementById('workLocation');
+    const externalWorkCheckbox = document.getElementById('externalWorkLocation');
+
+    if (!workLocationSelect || !externalWorkCheckbox) return;
+
+    // 初期状態の設定
+    const updateExternalWorkRequired = () => {
+      const workLocation = workLocationSelect.value;
+
+      if (workLocation === 'office') {
+        // 通所の場合は必須かつ有効化
+        externalWorkCheckbox.required = true;
+        externalWorkCheckbox.disabled = false;
+      } else if (workLocation === 'home') {
+        // 在宅の場合は必須解除、無効化、チェックを外す
+        externalWorkCheckbox.required = false;
+        externalWorkCheckbox.disabled = true;
+        externalWorkCheckbox.checked = false;
+      } else {
+        // 未選択の場合は必須解除、無効化
+        externalWorkCheckbox.required = false;
+        externalWorkCheckbox.disabled = true;
+        externalWorkCheckbox.checked = false;
+      }
+    };
+
+    // 初期状態を反映
+    updateExternalWorkRequired();
+
+    // 作業場所変更時のイベントリスナー
+    workLocationSelect.addEventListener('change', updateExternalWorkRequired);
+  }
+
+  /**
    * フォームデータの検証
    * @returns {boolean}
    */
   validateFormData() {
+    // 作業場所が通所の場合、施設外就労先のチェックが必要
+    const workLocation = document.getElementById('workLocation').value;
+    const externalWorkCheckbox = document.getElementById('externalWorkLocation');
+
+    if (workLocation === 'office' && !externalWorkCheckbox.checked) {
+      this.showNotification('通所の場合、施設外就労先のチェックが必要です', 'warning');
+      externalWorkCheckbox.focus();
+      return false;
+    }
+
     // HTML5の標準バリデーションを使用
     const form = document.getElementById('reportForm');
     if (!form.checkValidity()) {
       form.reportValidity();
       return false;
     }
-    
+
     return true;
   }
 

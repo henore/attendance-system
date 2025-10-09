@@ -67,13 +67,13 @@ export class AttendanceTable {
       return `
         <thead class="table-primary">
           <tr>
-            ${showDate ? '<th width="5%">日</th><th width="5%">曜</th>' : ''}
-            <th width="10%">出勤</th>
-            <th width="10%">退勤</th>
-            <th width="15%">休憩</th>
-            <th width="8%">実働</th>
-            <th width="8%">状態</th>
-            ${showOperations ? '<th width="24%">操作</th>' : ''}
+            ${showDate ? '<th class="text-center" width="5%">日</th><th class="text-center" width="5%">曜</th>' : ''}
+            <th class="text-center" width="10%">出勤</th>
+            <th class="text-center" width="10%">退勤</th>
+            <th class="text-center" width="15%">休憩</th>
+            <th class="text-center" width="8%">実働</th>
+            <th class="text-center" width="8%">状態</th>
+            ${showOperations ? '<th class="text-center" width="24%">操作</th>' : ''}
           </tr>
         </thead>
       `;
@@ -83,16 +83,16 @@ export class AttendanceTable {
     return `
       <thead class="table-light">
         <tr>
-          ${showDate ? '<th width="10%">日付</th>' : ''}
-          <th width="15%">ユーザー</th>
-          <th width="10%">権限</th>
-          <th width="10%">出勤</th>
-          <th width="10%">退勤</th>
-          <th width="12%">休憩</th>
-          <th width="8%">実働</th>
-          <th width="8%">状態</th>
-          <th width="12%">日報・コメント</th>
-          ${showOperations ? '<th width="15%">操作</th>' : ''}
+          ${showDate ? '<th class="text-center" width="10%">日付</th>' : ''}
+          <th class="text-center" width="15%">ユーザー</th>
+          <th class="text-center" width="10%">権限</th>
+          <th class="text-center" width="10%">出勤</th>
+          <th class="text-center" width="10%">退勤</th>
+          <th class="text-center" width="12%">休憩</th>
+          <th class="text-center" width="8%">実働</th>
+          <th class="text-center" width="8%">状態</th>
+          <th class="text-center" width="12%">日報・コメント</th>
+          ${showOperations ? '<th class="text-center" width="15%">操作</th>' : ''}
         </tr>
       </thead>
     `;
