@@ -500,19 +500,263 @@ router.post('/break/end', async (req, res) => {
     try {
       const staffId = req.session.user.id;
       const { date } = req.params;
-      
+
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
         [staffId, date]
       );
-      
-      res.json({ 
-        success: true, 
-        attendance: attendance || null 
+
+      res.json({
+        success: true,
+        attendance: attendance || null
       });
     } catch (error) {
       console.error('出勤記録取得エラー:', error);
       res.status(500).json({ success: false, error: '出勤記録の取得に失敗しました' });
+    }
+  });
+
+  // ===== 稟議承認システム =====
+
+  // 稟議作成/更新（下書き保存）
+  router.post('/approval/save', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const { id, title, content, amount, urgency } = req.body;
+      const staffId = req.session.user.id;
+
+      // バリデーション
+      if (!title || !content) {
+        return res.status(400).json({
+          success: false,
+          error: 'タイトルと内容は必須です'
+        });
+      }
+
+      if (urgency && !['normal', 'urgent'].includes(urgency)) {
+        return res.status(400).json({
+          success: false,
+          error: '緊急度が不正です'
+        });
+      }
+
+      const currentTime = getCurrentDate();
+
+      if (id) {
+        // 更新（下書きのみ）
+        const existing = await dbGet(
+          'SELECT * FROM approval_requests WHERE id = ? AND staff_id = ?',
+          [id, staffId]
+        );
+
+        if (!existing) {
+          return res.status(404).json({
+            success: false,
+            error: '稟議が見つかりません'
+          });
+        }
+
+        if (existing.status !== 'draft') {
+          return res.status(400).json({
+            success: false,
+            error: '下書き状態の稟議のみ編集できます'
+          });
+        }
+
+        await dbRun(
+          `UPDATE approval_requests SET
+            title = ?, content = ?, amount = ?, urgency = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+          [title, content, amount || null, urgency || 'normal', id]
+        );
+
+        res.json({
+          success: true,
+          message: '稟議を保存しました',
+          id: id
+        });
+      } else {
+        // 新規作成
+        const result = await dbRun(
+          `INSERT INTO approval_requests (title, content, amount, urgency, status, staff_id)
+          VALUES (?, ?, ?, ?, 'draft', ?)`,
+          [title, content, amount || null, urgency || 'normal', staffId]
+        );
+
+        res.json({
+          success: true,
+          message: '稟議を下書き保存しました',
+          id: result.lastID
+        });
+      }
+    } catch (error) {
+      console.error('稟議保存エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '稟議の保存に失敗しました'
+      });
+    }
+  });
+
+  // 稟議申請
+  router.post('/approval/submit/:id', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const staffId = req.session.user.id;
+
+      const approval = await dbGet(
+        'SELECT * FROM approval_requests WHERE id = ? AND staff_id = ?',
+        [id, staffId]
+      );
+
+      if (!approval) {
+        return res.status(404).json({
+          success: false,
+          error: '稟議が見つかりません'
+        });
+      }
+
+      if (approval.status !== 'draft') {
+        return res.status(400).json({
+          success: false,
+          error: '下書き状態の稟議のみ申請できます'
+        });
+      }
+
+      await dbRun(
+        `UPDATE approval_requests SET
+          status = 'pending', submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?`,
+        [id]
+      );
+
+      res.json({
+        success: true,
+        message: '稟議を申請しました'
+      });
+    } catch (error) {
+      console.error('稟議申請エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '稟議の申請に失敗しました'
+      });
+    }
+  });
+
+  // 稟議一覧取得（スタッフ自身のもの）
+  router.get('/approval/list', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const staffId = req.session.user.id;
+      const { status } = req.query;
+
+      let query = `
+        SELECT
+          ar.*,
+          u.name as staff_name,
+          a.name as admin_name
+        FROM approval_requests ar
+        LEFT JOIN users u ON ar.staff_id = u.id
+        LEFT JOIN users a ON ar.admin_id = a.id
+        WHERE ar.staff_id = ?
+      `;
+      const params = [staffId];
+
+      if (status) {
+        query += ' AND ar.status = ?';
+        params.push(status);
+      }
+
+      query += ' ORDER BY ar.created_at DESC';
+
+      const approvals = await dbAll(query, params);
+
+      res.json({
+        success: true,
+        approvals
+      });
+    } catch (error) {
+      console.error('稟議一覧取得エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '稟議一覧の取得に失敗しました'
+      });
+    }
+  });
+
+  // 稟議詳細取得
+  router.get('/approval/:id', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const staffId = req.session.user.id;
+
+      const approval = await dbGet(
+        `SELECT
+          ar.*,
+          u.name as staff_name,
+          a.name as admin_name
+        FROM approval_requests ar
+        LEFT JOIN users u ON ar.staff_id = u.id
+        LEFT JOIN users a ON ar.admin_id = a.id
+        WHERE ar.id = ? AND ar.staff_id = ?`,
+        [id, staffId]
+      );
+
+      if (!approval) {
+        return res.status(404).json({
+          success: false,
+          error: '稟議が見つかりません'
+        });
+      }
+
+      res.json({
+        success: true,
+        approval
+      });
+    } catch (error) {
+      console.error('稟議詳細取得エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '稟議詳細の取得に失敗しました'
+      });
+    }
+  });
+
+  // 稟議削除（下書きのみ）
+  router.delete('/approval/:id', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const staffId = req.session.user.id;
+
+      const approval = await dbGet(
+        'SELECT * FROM approval_requests WHERE id = ? AND staff_id = ?',
+        [id, staffId]
+      );
+
+      if (!approval) {
+        return res.status(404).json({
+          success: false,
+          error: '稟議が見つかりません'
+        });
+      }
+
+      if (approval.status !== 'draft') {
+        return res.status(400).json({
+          success: false,
+          error: '下書き状態の稟議のみ削除できます'
+        });
+      }
+
+      await dbRun('DELETE FROM approval_requests WHERE id = ?', [id]);
+
+      res.json({
+        success: true,
+        message: '稟議を削除しました'
+      });
+    } catch (error) {
+      console.error('稟議削除エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '稟議の削除に失敗しました'
+      });
     }
   });
 

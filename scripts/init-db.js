@@ -148,11 +148,36 @@ db.serialize(() => {
         )
     `);
 
+    // 稟議申請テーブル
+    db.run(`
+        CREATE TABLE IF NOT EXISTS approval_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            amount REAL,
+            attachment_path TEXT,
+            urgency TEXT NOT NULL DEFAULT 'normal' CHECK(urgency IN ('normal', 'urgent')),
+            status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'pending', 'approved', 'rejected', 'completed')),
+            staff_id INTEGER NOT NULL,
+            admin_id INTEGER,
+            rejection_reason TEXT,
+            submitted_at DATETIME,
+            reviewed_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (staff_id) REFERENCES users(id),
+            FOREIGN KEY (admin_id) REFERENCES users(id)
+        )
+    `);
+
     // インデックス作成
     db.run(`CREATE INDEX IF NOT EXISTS idx_attendance_user_date ON attendance(user_id, date)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_daily_reports_user_date ON daily_reports(user_id, date)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_staff_comments_user_date ON staff_comments(user_id, date)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_approval_requests_staff_id ON approval_requests(staff_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests(status)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_approval_requests_created_at ON approval_requests(created_at)`);
 
     // デフォルトユーザー作成（セキュアなランダムパスワード）
     const adminPassword = generateSecurePassword(20);

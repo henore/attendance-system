@@ -7,6 +7,7 @@ import SharedMonthlyReport from '../shared/monthly-report.js';
 import { StaffReportNotification } from './report-notification.js';
 import SharedHandover from '../shared/handover.js';
 import TrialVisitsManager from '../shared/trial-visits.js';
+import StaffApproval from './approval.js';
 import { getCurrentDate, formatDateTime } from '../../utils/date-time.js';
 
 export default class StaffModule extends BaseModule {
@@ -26,20 +27,21 @@ export default class StaffModule extends BaseModule {
     this.handoverSection = null;
     this.monthlyReport = null;
     this.trialVisitsManager = null;
-    
+    this.staffApproval = null; // 稟議申請モジュール
+
     // スタッフ専用モジュール
     this.attendanceBook = new StaffAttendanceBook(
       this.app.apiCall.bind(this.app),
       this.app.showNotification.bind(this.app)
     );
-    
+
     this.reportNotification = new StaffReportNotification(
       this.app.apiCall.bind(this.app),
       this.app.showNotification.bind(this.app),
       this.switchToSection.bind(this)
     );
-   
-   
+
+
     this.beforeUnloadHandler = null;
   }
 
@@ -69,6 +71,9 @@ export default class StaffModule extends BaseModule {
             </button>
             <button class="btn btn-outline-primary staff-menu-btn" data-target="attendanceManagementSection">
               <i class="fas fa-users"></i> 利用者出勤状況
+            </button>
+            <button class="btn btn-outline-primary staff-menu-btn" data-target="approvalSection">
+              <i class="fas fa-file-signature"></i> 稟議申請
             </button>
             <button class="btn btn-outline-primary staff-menu-btn" data-target="trialVisits">
               <i class="fas fa-user-friends"></i> 体験入所管理
@@ -186,20 +191,27 @@ export default class StaffModule extends BaseModule {
 
   async initializeSharedModules() {
     const contentArea = document.querySelector('.staff-dashboard');
-    
+
     try {
       // 共通出勤管理モジュール
       this.attendanceManagement = new SharedAttendanceManagement(this.app, this);
       await this.attendanceManagement.init(contentArea);
-      
+
       // 申し送りモジュール
       this.handoverSection = new SharedHandover(this.app, this);
       await this.handoverSection.init(contentArea);
-      
+
       // 月別出勤簿モジュール
       this.monthlyReport = new SharedMonthlyReport(this.app, this);
       await this.monthlyReport.init(contentArea);
-      
+
+      // 稟議申請モジュール
+      this.staffApproval = new StaffApproval(this.app, this);
+      await this.staffApproval.init(contentArea);
+
+      // グローバルに公開（イベントハンドラ用）
+      window.staffApproval = this.staffApproval;
+
       console.log('✅ 共通モジュール初期化完了');
     } catch (error) {
       console.error('❌ 共通モジュール初期化エラー:', error);
@@ -237,21 +249,27 @@ export default class StaffModule extends BaseModule {
     if (this.handoverSection) this.handoverSection.hide();
     if (this.monthlyReport) this.monthlyReport.hide();
     if (this.trialVisitsManager) this.trialVisitsManager.hide();
-    
+    if (this.staffApproval) this.staffApproval.hide();
+
     // 指定されたセクションのみ表示
     const targetSection = document.getElementById(sectionId);
     if (targetSection) {
       targetSection.style.display = 'block';
     }
-    
+
     this.state.currentView = sectionId;
-    
+
     // 各セクション固有の処理
     try {
       switch (sectionId) {
         case 'attendanceManagementSection':
           if (this.attendanceManagement) {
             await this.attendanceManagement.show();
+          }
+          break;
+        case 'approvalSection':
+          if (this.staffApproval) {
+            await this.staffApproval.show();
           }
           break;
         case 'trialVisits':
@@ -433,41 +451,47 @@ callApi(endpoint, options = {}) {
     if (this.attendanceUI) {
       this.attendanceUI.destroy();
     }
-    
+
     if (this.attendanceManagement) {
       this.attendanceManagement.destroy();
     }
-    
+
     if (this.handoverSection) {
       this.handoverSection.destroy();
     }
-    
+
     if (this.trialVisitsManager) {
       this.trialVisitsManager.destroy();
       this.trialVisitsManager = null;
       window.trialVisitsManager = null;
     }
-    
+
     if (this.monthlyReport) {
       this.monthlyReport.destroy();
     }
-    
+
+    if (this.staffApproval) {
+      this.staffApproval.destroy();
+      this.staffApproval = null;
+      window.staffApproval = null;
+    }
+
     if (this.reportNotification) {
       this.reportNotification.stopMonitoring();
     }
-    
+
     if (this.attendanceBook) {
       this.attendanceBook.destroy();
     }
-    
+
     // ページ離脱警告を削除
     if (this.beforeUnloadHandler) {
       window.removeEventListener('beforeunload', this.beforeUnloadHandler);
     }
-    
+
     // 親クラスのクリーンアップ
     super.destroy();
-    
+
     console.log('👥 スタッフモジュールクリーンアップ完了');
   }
 }

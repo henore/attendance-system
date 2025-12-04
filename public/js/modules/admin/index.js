@@ -7,6 +7,7 @@ import SharedMonthlyReport from '../shared/monthly-report.js';
 import SharedHandover from '../shared/handover.js';
 import AdminAuditLog from './audit-log.js';
 import TrialVisitsManager from '../shared/trial-visits.js';
+import AdminApproval from './approval.js';
 
 // グローバルに modalManager を公開（一時的な対処）
 window.modalManager = modalManager;
@@ -61,6 +62,9 @@ export default class AdminModule extends BaseModule {
                         <button class="btn btn-outline-primary admin-menu-btn" data-target="userManagement">
                             <i class="fas fa-users-cog"></i> ユーザー管理
                         </button>
+                        <button class="btn btn-outline-primary admin-menu-btn" data-target="approvalManagement">
+                            <i class="fas fa-file-signature"></i> 稟議承認
+                        </button>
                         <button class="btn btn-outline-primary admin-menu-btn" data-target="trialVisits">
                             <i class="fas fa-user-friends"></i> 体験入所管理
                         </button>
@@ -102,7 +106,7 @@ export default class AdminModule extends BaseModule {
 
     async initializeSubModules() {
         const contentArea = document.getElementById('adminContentArea');
-        
+
         // 共通出勤管理モジュール
         this.attendanceManagement = new SharedAttendanceManagement(this.app, this);
         await this.attendanceManagement.init(contentArea);
@@ -114,6 +118,13 @@ export default class AdminModule extends BaseModule {
         // 月別出勤簿モジュール（共通化）
         this.monthlyReport = new SharedMonthlyReport(this.app, this);
         await this.monthlyReport.init(contentArea);
+
+        // 稟議承認モジュール
+        this.adminApproval = new AdminApproval(this.app, this);
+        await this.adminApproval.init(contentArea);
+
+        // グローバルに公開（イベントハンドラ用）
+        window.adminApproval = this.adminApproval;
 
         // 各サブモジュールを初期化
         this.subModules = {
@@ -129,12 +140,13 @@ export default class AdminModule extends BaseModule {
 
     async switchToView(viewName) {
         console.log(`[AdminModule] 画面切り替え: ${viewName}`);
-        
+
         // 全てのセクションを非表示
         this.attendanceManagement?.hide();
         this.handoverSection?.hide();
         this.monthlyReport?.hide();
         this.trialVisitsManager?.hide();
+        this.adminApproval?.hide();
         Object.values(this.subModules).forEach(module => {
             if (module.hide) {
                 module.hide();
@@ -150,6 +162,8 @@ export default class AdminModule extends BaseModule {
         // 新しいビューを表示
         if (viewName === 'attendanceManagement') {
             await this.attendanceManagement?.show();
+        } else if (viewName === 'approvalManagement') {
+            await this.adminApproval?.show();
         } else if (viewName === 'trialVisits') {
             await this.showTrialVisits();
         } else if (viewName === 'handoverSection') {
@@ -289,6 +303,13 @@ export default class AdminModule extends BaseModule {
             window.trialVisitsManager = null;
         }
 
+        // 稟議承認モジュールのクリーンアップ
+        if (this.adminApproval) {
+            this.adminApproval.destroy();
+            this.adminApproval = null;
+            window.adminApproval = null;
+        }
+
         // 各サブモジュールをクリーンアップ
         Object.values(this.subModules).forEach(module => {
             if (module.destroy) {
@@ -301,5 +322,5 @@ export default class AdminModule extends BaseModule {
 
         console.log('🔧 管理者モジュールクリーンアップ完了');
     }
-  
+
 }
