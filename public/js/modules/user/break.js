@@ -18,6 +18,14 @@ export class UserBreakHandler {
     this.hasBreakToday = false;
     this.breakCheckInterval = null;
     this.autoEndTimeout = null; // 自動終了タイマー
+
+    // 小休憩状態
+    this.isOnShortBreak = false;
+    this.shortBreakInterval = null;
+    this.shortBreakStartTime = null;
+
+    // 中抜け状態
+    this.isOnAbsence = false;
   }
 
   /**
@@ -82,13 +90,21 @@ export class UserBreakHandler {
   /**
    * 未出勤時のUI
    */
- 
+
   renderNotWorkingUI(breakElement, breakDisplay) {
     breakElement.innerHTML = `
       <p class="text-muted">出勤後に休憩機能が利用できます</p>
-      <button class="btn btn-info" disabled>
-        <i class="fas fa-pause"></i> 休憩開始
-      </button>
+      <div class="d-grid gap-2">
+        <button class="btn btn-info" id="userBreakBtn" disabled>
+          <i class="fas fa-pause"></i> 休憩
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn" disabled>
+          <i class="fas fa-clock"></i> 小休憩（10分）
+        </button>
+        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn" disabled>
+          <i class="fas fa-door-open"></i> 中抜け
+        </button>
+      </div>
     `;
     if (breakDisplay) breakDisplay.style.display = 'none';
 }
@@ -98,11 +114,22 @@ export class UserBreakHandler {
   renderNoBreakUI(breakElement, breakDisplay) {
     breakElement.innerHTML = `
       <p class="text-muted">午後出勤のため休憩はありません</p>
-      <button class="btn btn-info" disabled>
-        <i class="fas fa-pause"></i> 休憩なし
-      </button>
+      <div class="d-grid gap-2">
+        <button class="btn btn-info" id="userBreakBtn" disabled>
+          <i class="fas fa-pause"></i> 休憩なし
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn">
+          <i class="fas fa-clock"></i> 小休憩（10分）
+        </button>
+        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn">
+          <i class="fas fa-door-open"></i> 中抜け
+        </button>
+      </div>
     `;
     if (breakDisplay) breakDisplay.style.display = 'none';
+
+    // イベントリスナーを追加
+    this.attachShortBreakAndAbsenceListeners();
   }
 
   /**
@@ -110,28 +137,39 @@ export class UserBreakHandler {
    */
   renderBreakingUI(breakElement, breakDisplay) {
     const serviceType = this.currentUser.service_type;
-    
-    let endInfo = '';
+
+    let breakButtons = '';
+    let breakInfo = '';
+
     if (serviceType === 'commute') {
-      endInfo = '<p class="text-info">通所の方は12:30に自動終了します</p>';
+      breakInfo = '<p class="text-info">通所の方は12:30に自動終了します</p>';
     } else {
-      endInfo = `
+      breakButtons = `
         <button class="btn btn-warning" id="userBreakEndBtn">
           <i class="fas fa-play"></i> 休憩終了
         </button>
-        <p class="text-info mt-2">60分で自動終了します</p>
       `;
+      breakInfo = '<p class="text-info mt-2">60分で自動終了します</p>';
     }
-    
+
     breakElement.innerHTML = `
       <p class="mb-3 text-warning">
         <i class="fas fa-pause-circle"></i> 休憩中（${this.currentBreakStart}〜）
       </p>
-      ${endInfo}
+      <div class="d-grid gap-2">
+        ${breakButtons}
+        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn" disabled>
+          <i class="fas fa-clock"></i> 小休憩（10分）
+        </button>
+        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn" disabled>
+          <i class="fas fa-door-open"></i> 中抜け
+        </button>
+      </div>
+      ${breakInfo}
     `;
-    
+
     if (breakDisplay) breakDisplay.style.display = 'block';
-    
+
     // 在宅者の手動終了ボタン
     if (serviceType === 'home') {
       const endBtn = document.getElementById('userBreakEndBtn');
@@ -139,6 +177,9 @@ export class UserBreakHandler {
         endBtn.addEventListener('click', () => this.handleBreakEnd());
       }
     }
+
+    // イベントリスナーを追加
+    this.attachShortBreakAndAbsenceListeners();
   }
 
   /**
@@ -147,11 +188,22 @@ export class UserBreakHandler {
   renderBreakCompletedUI(breakElement, breakDisplay) {
     breakElement.innerHTML = `
       <p class="text-info">本日の休憩は完了しました（60分）</p>
-      <button class="btn btn-info" disabled>
-        <i class="fas fa-check"></i> 休憩済み
-      </button>
+      <div class="d-grid gap-2">
+        <button class="btn btn-info" id="userBreakBtn" disabled>
+          <i class="fas fa-check"></i> 休憩済み
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn">
+          <i class="fas fa-clock"></i> 小休憩（10分）
+        </button>
+        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn">
+          <i class="fas fa-door-open"></i> 中抜け
+        </button>
+      </div>
     `;
     if (breakDisplay) breakDisplay.style.display = 'none';
+
+    // イベントリスナーを追加
+    this.attachShortBreakAndAbsenceListeners();
   }
 
   /**
@@ -160,26 +212,37 @@ export class UserBreakHandler {
   renderBreakAvailableUI(breakElement, breakDisplay) {
     const serviceType = this.currentUser.service_type;
     let breakInfo = '';
-    
+
     if (serviceType === 'commute') {
       breakInfo = '通所の方：どのタイミングでも11:30-12:30固定（60分）';
     } else {
       breakInfo = '在宅の方：15分刻み切り捨てで開始、60分固定';
     }
-      
+
     breakElement.innerHTML = `
       <p class="text-muted">${breakInfo}</p>
-      <button class="btn btn-info" id="userBreakStartBtn">
-        <i class="fas fa-pause"></i> 休憩開始
-      </button>
+      <div class="d-grid gap-2">
+        <button class="btn btn-info" id="userBreakStartBtn">
+          <i class="fas fa-pause"></i> 休憩開始
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn">
+          <i class="fas fa-clock"></i> 小休憩（10分）
+        </button>
+        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn">
+          <i class="fas fa-door-open"></i> 中抜け
+        </button>
+      </div>
     `;
-    
+
     if (breakDisplay) breakDisplay.style.display = 'none';
-    
+
     const startBtn = document.getElementById('userBreakStartBtn');
     if (startBtn) {
       startBtn.addEventListener('click', () => this.handleBreakStart());
     }
+
+    // イベントリスナーを追加
+    this.attachShortBreakAndAbsenceListeners();
   }
 
   /**
@@ -188,16 +251,24 @@ export class UserBreakHandler {
   disableUI() {
     const breakElement = document.getElementById('userBreakStatus');
     const breakDisplay = document.getElementById('userBreakTimeDisplay');
-    
+
     if (breakElement) {
       breakElement.innerHTML = `
         <p class="text-muted">退勤済みです</p>
-        <button class="btn btn-info" disabled>
-          <i class="fas fa-pause"></i> 休憩開始
-        </button>
+        <div class="d-grid gap-2">
+          <button class="btn btn-info" id="userBreakBtn" disabled>
+            <i class="fas fa-pause"></i> 休憩開始
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn" disabled>
+            <i class="fas fa-clock"></i> 小休憩（10分）
+          </button>
+          <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn" disabled>
+            <i class="fas fa-door-open"></i> 中抜け
+          </button>
+        </div>
       `;
     }
-    
+
     if (breakDisplay) {
       breakDisplay.style.display = 'none';
     }
@@ -431,10 +502,232 @@ export class UserBreakHandler {
   }
 
   /**
+   * 小休憩と中抜けボタンのイベントリスナーをアタッチ
+   */
+  attachShortBreakAndAbsenceListeners() {
+    const shortBreakBtn = document.getElementById('userShortBreakBtn');
+    const absenceBtn = document.getElementById('userAbsenceBtn');
+
+    if (shortBreakBtn && !shortBreakBtn.disabled) {
+      shortBreakBtn.addEventListener('click', () => this.handleShortBreakStart());
+    }
+
+    if (absenceBtn) {
+      absenceBtn.addEventListener('click', () => this.handleAbsenceStart());
+    }
+  }
+
+  /**
+   * 小休憩開始処理（10分タイマー）
+   */
+  handleShortBreakStart() {
+    if (this.isOnShortBreak) {
+      this.showNotification('既に小休憩中です', 'warning');
+      return;
+    }
+
+    if (this.isOnAbsence) {
+      this.showNotification('中抜け中は小休憩できません', 'warning');
+      return;
+    }
+
+    // 小休憩開始
+    this.isOnShortBreak = true;
+    this.shortBreakStartTime = Date.now();
+
+    // プログレスバー表示を開始
+    this.startShortBreakProgress();
+
+    this.showNotification('小休憩を開始しました（10分）', 'info');
+  }
+
+  /**
+   * 小休憩プログレスバー更新
+   */
+  startShortBreakProgress() {
+    const display = document.getElementById('userShortBreakDisplay');
+    const progressBar = document.getElementById('shortBreakProgressBar');
+    const timerText = document.getElementById('shortBreakTimer');
+
+    if (!display || !progressBar || !timerText) return;
+
+    // 表示
+    display.style.display = 'block';
+
+    // 10分 = 600秒
+    const totalDuration = 600;
+    let elapsed = 0;
+
+    // 1秒ごとに更新
+    this.shortBreakInterval = setInterval(() => {
+      elapsed++;
+      const remaining = totalDuration - elapsed;
+      const progress = (elapsed / totalDuration) * 100;
+
+      // プログレスバー更新
+      progressBar.style.width = `${progress}%`;
+
+      // 残り時間表示
+      const minutes = Math.floor(remaining / 60);
+      const seconds = remaining % 60;
+      timerText.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+      // 10分経過で自動終了
+      if (elapsed >= totalDuration) {
+        this.endShortBreak();
+      }
+    }, 1000);
+  }
+
+  /**
+   * 小休憩終了
+   */
+  endShortBreak() {
+    if (this.shortBreakInterval) {
+      clearInterval(this.shortBreakInterval);
+      this.shortBreakInterval = null;
+    }
+
+    this.isOnShortBreak = false;
+    this.shortBreakStartTime = null;
+
+    // プログレスバー非表示
+    const display = document.getElementById('userShortBreakDisplay');
+    if (display) {
+      display.style.display = 'none';
+    }
+
+    // プログレスバーリセット
+    const progressBar = document.getElementById('shortBreakProgressBar');
+    const timerText = document.getElementById('shortBreakTimer');
+    if (progressBar) progressBar.style.width = '0%';
+    if (timerText) timerText.textContent = '10:00';
+
+    this.showNotification('小休憩が終了しました', 'success');
+  }
+
+  /**
+   * 中抜け開始処理
+   */
+  async handleAbsenceStart() {
+    if (this.isOnAbsence) {
+      // 既に中抜け中の場合は終了処理
+      this.handleAbsenceEnd();
+      return;
+    }
+
+    // 確認ダイアログ表示
+    if (this.confirmationModal) {
+      const confirmed = await this.confirmationModal.show({
+        title: '中抜け確認',
+        message: 'これは通院などによる途中休憩用です。\n中抜けの際は必ず現場監督の方に伝えて下さい。',
+        time: '',
+        confirmText: 'はい',
+        cancelText: 'いいえ',
+        icon: 'fa-door-open'
+      });
+
+      if (!confirmed) {
+        this.showNotification('中抜けをキャンセルしました', 'info');
+        return;
+      }
+    }
+
+    // 中抜け開始
+    this.isOnAbsence = true;
+
+    // ボタンのテキストを変更
+    const absenceBtn = document.getElementById('userAbsenceBtn');
+    if (absenceBtn) {
+      absenceBtn.innerHTML = '<i class="fas fa-door-open"></i> 中抜け中';
+      absenceBtn.classList.remove('btn-outline-warning');
+      absenceBtn.classList.add('btn-warning');
+    }
+
+    // 他のボタンを無効化
+    this.disableButtonsDuringAbsence();
+
+    this.showNotification('中抜けを開始しました', 'info');
+  }
+
+  /**
+   * 中抜け終了処理
+   */
+  handleAbsenceEnd() {
+    this.isOnAbsence = false;
+
+    // ボタンのテキストを戻す
+    const absenceBtn = document.getElementById('userAbsenceBtn');
+    if (absenceBtn) {
+      absenceBtn.innerHTML = '<i class="fas fa-door-open"></i> 中抜け';
+      absenceBtn.classList.remove('btn-warning');
+      absenceBtn.classList.add('btn-outline-warning');
+    }
+
+    // ボタンを再有効化
+    this.enableButtonsAfterAbsence();
+
+    this.showNotification('中抜けを終了しました', 'success');
+  }
+
+  /**
+   * 中抜け中にボタンを無効化
+   */
+  disableButtonsDuringAbsence() {
+    const clockInBtn = document.getElementById('userClockInBtn');
+    const clockOutBtn = document.getElementById('userClockOutBtn');
+    const breakBtn = document.getElementById('userBreakBtn');
+    const breakStartBtn = document.getElementById('userBreakStartBtn');
+    const breakEndBtn = document.getElementById('userBreakEndBtn');
+    const shortBreakBtn = document.getElementById('userShortBreakBtn');
+
+    if (clockInBtn) clockInBtn.disabled = true;
+    if (clockOutBtn) clockOutBtn.disabled = true;
+    if (breakBtn) breakBtn.disabled = true;
+    if (breakStartBtn) breakStartBtn.disabled = true;
+    if (breakEndBtn) breakEndBtn.disabled = true;
+    if (shortBreakBtn) shortBreakBtn.disabled = true;
+  }
+
+  /**
+   * 中抜け終了後にボタンを再有効化
+   */
+  enableButtonsAfterAbsence() {
+    const clockOutBtn = document.getElementById('userClockOutBtn');
+    const breakBtn = document.getElementById('userBreakBtn');
+    const breakStartBtn = document.getElementById('userBreakStartBtn');
+    const breakEndBtn = document.getElementById('userBreakEndBtn');
+    const shortBreakBtn = document.getElementById('userShortBreakBtn');
+
+    // 退勤ボタンは常に有効化
+    if (clockOutBtn) clockOutBtn.disabled = false;
+
+    // 休憩ボタンは状態に応じて有効化
+    if (!this.hasBreakToday && breakStartBtn) {
+      breakStartBtn.disabled = false;
+    }
+    if (this.isOnBreak && breakEndBtn) {
+      breakEndBtn.disabled = false;
+    }
+    if (breakBtn && !this.isOnBreak) {
+      breakBtn.disabled = false;
+    }
+
+    // 小休憩ボタンは有効化
+    if (shortBreakBtn) shortBreakBtn.disabled = false;
+  }
+
+  /**
    * クリーンアップ
    */
   destroy() {
     this.stopBreakTimeMonitoring();
     this.clearAutoBreakEnd();
+
+    // 小休憩タイマーのクリーンアップ
+    if (this.shortBreakInterval) {
+      clearInterval(this.shortBreakInterval);
+      this.shortBreakInterval = null;
+    }
   }
 }

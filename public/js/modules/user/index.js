@@ -191,12 +191,27 @@ export default class UserModule extends BaseModule {
               <h6><i class="fas fa-coffee"></i> 休憩管理</h6>
               <div id="userBreakStatus">
                 <p class="text-muted">出勤後に休憩機能が利用できます</p>
-                <button class="btn btn-info" id="userBreakBtn" disabled>
-                  <i class="fas fa-pause"></i> 休憩
-                </button>
+                <div class="d-grid gap-2">
+                  <button class="btn btn-info" id="userBreakBtn" disabled>
+                    <i class="fas fa-pause"></i> 休憩
+                  </button>
+                  <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn" disabled>
+                    <i class="fas fa-clock"></i> 小休憩（10分）
+                  </button>
+                  <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn" disabled>
+                    <i class="fas fa-door-open"></i> 中抜け
+                  </button>
+                </div>
               </div>
               <div id="userBreakTimeDisplay" class="mt-2" style="display: none;">
                 <small class="text-muted">休憩時間: <span id="userBreakDuration">00:00</span></small>
+              </div>
+              <div id="userShortBreakDisplay" class="mt-2" style="display: none;">
+                <div class="progress" style="height: 20px;">
+                  <div class="progress-bar progress-bar-striped progress-bar-animated" id="shortBreakProgressBar" role="progressbar" style="width: 0%">
+                    <span id="shortBreakTimer">10:00</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -267,16 +282,22 @@ export default class UserModule extends BaseModule {
   setupEventListeners() {
     // 出退勤ボタン
     this.addEventListenerById('userClockInBtn', 'click', () => this.handleClockIn());
-    
+
     // 日報更新
     this.addEventListenerById('refreshReportBtn', 'click', () => this.loadReportForm());
-    
+
     // カレンダー更新
     this.addEventListenerById('refreshCalendarBtn', 'click', () => this.refreshCalendar());
-    
+
     // スタッフコメント
     this.addEventListenerById('markCommentReadBtn', 'click', () => this.markCommentAsRead());
-    
+
+    // 小休憩ボタン
+    this.addEventListenerById('userShortBreakBtn', 'click', () => this.breakHandler.handleShortBreakStart());
+
+    // 中抜けボタン
+    this.addEventListenerById('userAbsenceBtn', 'click', () => this.breakHandler.handleAbsenceStart());
+
     // 日報フォームのイベント（動的生成のため委譲）
     document.addEventListener('submit', (e) => {
       if (e.target.id === 'reportForm') {

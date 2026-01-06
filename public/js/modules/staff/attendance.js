@@ -2,9 +2,8 @@
 // スタッフの出退勤UI制御（簡潔版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-import { getCurrentTime, getCurrentDate } from '../../utils/date-time.js';
+import { getCurrentTime, getCurrentDate, calculateWorkHours } from '../../utils/date-time.js';
 import { ConfirmationModal } from '../user/confirmation-modal.js';
-import { StaffDailyReportModal } from './daily-report-modal.js';
 
 export class StaffAttendanceUI {
   constructor(app, parentModule) {
@@ -13,10 +12,6 @@ export class StaffAttendanceUI {
 
     // 確認ダイアログ
     this.confirmationModal = new ConfirmationModal();
-    this.dailyReportModal = new StaffDailyReportModal(
-      this.app.apiCall.bind(this.app),
-      this.app.showNotification.bind(this.app)
-    );
 
     // 状態管理
     this.isWorking = false;
@@ -115,9 +110,8 @@ export class StaffAttendanceUI {
         this.updateUI();
         this.app.showNotification('退勤しました', 'success');
 
-        // 日報モーダルを表示
-        console.log('[退勤] 日報モーダル表示開始', this.currentAttendance);
-        await this.showDailyReportModal();
+        // 日報セクションを更新（フォーム表示）
+        this.updateReportSection();
         return true;
       }
     } catch (error) {
@@ -144,33 +138,6 @@ export class StaffAttendanceUI {
     }
   }
 
-  /**
-   * 日報モーダルを表示
-   */
-  async showDailyReportModal() {
-    try {
-      console.log('[日報モーダル] 表示処理開始', {
-        currentAttendance: this.currentAttendance,
-        clock_in: this.currentAttendance?.clock_in,
-        clock_out: this.currentAttendance?.clock_out,
-        date: this.currentAttendance?.date
-      });
-
-      if (!this.currentAttendance) {
-        console.error('[日報モーダル] currentAttendanceが未設定');
-        this.app.showNotification('出勤記録が見つかりません', 'danger');
-        return;
-      }
-
-      await this.dailyReportModal.show(this.currentAttendance, () => {
-        // 日報提出完了時の処理
-        console.log('[日報モーダル] 日報提出完了');
-      });
-    } catch (error) {
-      console.error('[日報モーダル] 表示エラー:', error);
-      this.app.showNotification('日報モーダルの表示に失敗しました: ' + error.message, 'danger');
-    }
-  }
 
   /**
    * 強制退勤処理（未コメント日報があっても退勤）
@@ -197,9 +164,8 @@ export class StaffAttendanceUI {
         this.updateUI();
         this.app.showNotification('退勤しました（未コメント日報あり）', 'warning');
 
-        // 日報モーダルを表示
-        console.log('[強制退勤] 日報モーダル表示開始', this.currentAttendance);
-        await this.showDailyReportModal();
+        // 日報セクションを更新（フォーム表示）
+        this.updateReportSection();
         return true;
       }
     } catch (error) {
@@ -779,19 +745,13 @@ stopBreakTimer() {
   /**
    * 日報セクションの更新
    */
-  updateReportSection() {
+  async updateReportSection() {
     const reportSection = document.getElementById('staffReportSection');
     if (!reportSection) return;
 
     if (!this.isWorking && this.currentAttendance && this.currentAttendance.clock_out) {
-      // 退勤後: 日報入力を促すメッセージ
-      reportSection.innerHTML = `
-        <div class="alert alert-warning text-center">
-          <i class="fas fa-clipboard-list fa-2x mb-3"></i>
-          <h5>退勤後の日報を提出してください</h5>
-          <p class="mb-0">退勤時に日報モーダルが表示されます。スキップした場合は、出勤簿から後で入力できます。</p>
-        </div>
-      `;
+      // 退勤後: 日報入力フォームを表示
+      await this.loadReportForm(reportSection);
     } else {
       // 退勤前: デフォルトメッセージ
       reportSection.innerHTML = `
@@ -800,6 +760,209 @@ stopBreakTimer() {
           <p>退勤後に日報を入力できます</p>
         </div>
       `;
+    }
+  }
+
+  /**
+   * 日報フォームを読み込み
+   */
+  async loadReportForm(container) {
+    try {
+      // 既存の日報を取得
+      const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY);
+      const existingReport = response.report;
+
+      // 実働時間を計算
+      const workHours = calculateWorkHours(
+        this.currentAttendance.clock_in,
+        this.currentAttendance.clock_out,
+        60 // 休憩60分固定
+      );
+
+      container.innerHTML = this.generateReportForm(workHours, existingReport);
+
+      // イベントリスナーを設定
+      this.setupReportEventListeners();
+
+    } catch (error) {
+      console.error('日報フォーム読み込みエラー:', error);
+      container.innerHTML = `
+        <div class="alert alert-danger">
+          <i class="fas fa-exclamation-triangle"></i> 日報フォームの読み込みに失敗しました
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * 日報フォームHTML生成
+   */
+  generateReportForm(workHours, existingReport) {
+    const workReport = existingReport?.work_report || '';
+    const communication = existingReport?.communication || '';
+
+    return `
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> スタッフ日報</h5>
+        </div>
+        <div class="card-body">
+          <!-- 出勤情報 -->
+          <div class="row mb-3">
+            <div class="col-md-3">
+              <div class="info-box">
+                <label class="form-label">出勤時間</label>
+                <div class="info-value">${this.currentAttendance.clock_in}</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="info-box">
+                <label class="form-label">退勤時間</label>
+                <div class="info-value">${this.currentAttendance.clock_out}</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="info-box">
+                <label class="form-label">休憩時間</label>
+                <div class="info-value">60分</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="info-box">
+                <label class="form-label text-primary">実働時間</label>
+                <div class="info-value text-primary fw-bold">${workHours}</div>
+              </div>
+            </div>
+          </div>
+
+          <hr>
+
+          <!-- 日報フォーム -->
+          <form id="staffDailyReportForm">
+            <div class="mb-3">
+              <label for="staffWorkReport" class="form-label required">
+                <i class="fas fa-tasks"></i> 本日の業務報告
+              </label>
+              <textarea
+                class="form-control"
+                id="staffWorkReport"
+                rows="8"
+                required
+                placeholder="本日の業務内容、対応した利用者の状況、特記事項などを記入してください"
+              >${workReport}</textarea>
+            </div>
+
+            <div class="mb-3">
+              <label for="staffCommunication" class="form-label">
+                <i class="fas fa-comment-dots"></i> 連絡事項
+              </label>
+              <textarea
+                class="form-control"
+                id="staffCommunication"
+                rows="5"
+                placeholder="次のシフトのスタッフへの申し送りや、重要な連絡事項があれば記入してください"
+              >${communication}</textarea>
+            </div>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary btn-lg" id="staffSubmitReportBtn">
+                <i class="fas fa-paper-plane"></i> 日報を提出
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <style>
+        .info-box {
+          background: #f8f9fa;
+          border-radius: 8px;
+          padding: 10px;
+          text-align: center;
+        }
+        .info-box .form-label {
+          font-size: 0.875rem;
+          color: #6c757d;
+          margin-bottom: 5px;
+        }
+        .info-box .info-value {
+          font-size: 1.25rem;
+          font-weight: bold;
+          color: #333;
+        }
+        .required::after {
+          content: " *";
+          color: #dc3545;
+        }
+      </style>
+    `;
+  }
+
+  /**
+   * 日報フォームのイベントリスナー設定
+   */
+  setupReportEventListeners() {
+    const form = document.getElementById('staffDailyReportForm');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.handleReportSubmit();
+      });
+    }
+  }
+
+  /**
+   * 日報提出処理
+   */
+  async handleReportSubmit() {
+    try {
+      const workReport = document.getElementById('staffWorkReport').value;
+      const communication = document.getElementById('staffCommunication').value;
+
+      if (!workReport || !workReport.trim()) {
+        this.app.showNotification('業務報告を入力してください', 'warning');
+        return;
+      }
+
+      const data = {
+        date: this.currentAttendance.date,
+        work_report: workReport,
+        communication: communication
+      };
+
+      const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_SUBMIT, {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+
+      if (response.success) {
+        this.app.showNotification('日報を提出しました', 'success');
+
+        // フォームを無効化
+        const form = document.getElementById('staffDailyReportForm');
+        if (form) {
+          const inputs = form.querySelectorAll('textarea, button');
+          inputs.forEach(input => input.disabled = true);
+        }
+
+        // 提出済みメッセージを表示
+        const reportSection = document.getElementById('staffReportSection');
+        if (reportSection) {
+          reportSection.innerHTML = `
+            <div class="alert alert-success text-center">
+              <i class="fas fa-check-circle fa-2x mb-3"></i>
+              <h5>日報を提出しました</h5>
+              <p class="mb-0">お疲れ様でした。</p>
+            </div>
+          `;
+        }
+      } else {
+        throw new Error(response.error || '日報の提出に失敗しました');
+      }
+
+    } catch (error) {
+      console.error('日報提出エラー:', error);
+      this.app.showNotification(error.message, 'danger');
     }
   }
 
