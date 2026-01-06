@@ -307,15 +307,28 @@ export class AttendanceTable {
   generateOperationButtons(record, context, currentDate) {
     const buttons = [];
     const date = currentDate || record.date;
-    
+
     // 日報詳細ボタン（利用者の日報がある場合）
     if (record.user_role === 'user' && record.report_id) {
       buttons.push(`
-        <button class="btn btn-sm btn-outline-primary btn-show-report" 
+        <button class="btn btn-sm btn-outline-primary btn-show-report"
                 data-user-id="${record.user_id}"
                 data-user-name="${record.user_name}"
                 data-date="${date}"
                 title="日報詳細・コメント">
+          <i class="fas fa-file-alt"></i>
+        </button>
+      `);
+    }
+
+    // スタッフ日報詳細ボタン（adminのみ、スタッフの日報がある場合）
+    if (this.userRole === 'admin' && record.user_role === 'staff' && record.staff_report_id) {
+      buttons.push(`
+        <button class="btn btn-sm btn-outline-info btn-show-staff-report"
+                data-user-id="${record.user_id}"
+                data-user-name="${record.user_name}"
+                data-date="${date}"
+                title="スタッフ日報詳細">
           <i class="fas fa-file-alt"></i>
         </button>
       `);

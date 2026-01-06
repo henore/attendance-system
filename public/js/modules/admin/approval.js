@@ -162,7 +162,7 @@ export default class AdminApproval {
                 params.append('status', statusFilter);
             }
 
-            const response = await this.parentModule.callApi(`/api/admin/approval/list?${params}`);
+            const response = await this.parentModule.callApi(`/api/staff/approval/list?${params}`);
 
             if (response.success) {
                 this.approvals = response.approvals;
@@ -235,7 +235,7 @@ export default class AdminApproval {
 
     async viewDetail(id) {
         try {
-            const response = await this.parentModule.callApi(`/api/admin/approval/${id}`);
+            const response = await this.parentModule.callApi(`/api/staff/approval/${id}`);
 
             if (response.success) {
                 this.showDetailModal(response.approval);

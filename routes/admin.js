@@ -190,22 +190,24 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
     
     let query = `
-      SELECT 
+      SELECT
         a.id, a.user_id, a.date, a.clock_in, a.clock_out, a.status,
         a.break_start, a.break_end,
         u.name as user_name, u.role as user_role, u.service_type, u.workweek as user_workweek,u.id as user_id,
         dr.id as report_id,
         sc.id as comment_id,
-        br.start_time as br_start, br.end_time as br_end, br.duration as br_duration
+        br.start_time as br_start, br.end_time as br_end, br.duration as br_duration,
+        sdr.id as staff_report_id
       FROM users u
       LEFT JOIN attendance a ON u.id = a.user_id AND a.date = ?
       LEFT JOIN daily_reports dr ON u.id = dr.user_id AND dr.date = ?
       LEFT JOIN staff_comments sc ON u.id = sc.user_id AND sc.date = ?
       LEFT JOIN break_records br ON u.id = br.user_id AND br.date = ?
+      LEFT JOIN staff_daily_reports sdr ON u.id = sdr.staff_id AND sdr.date = ?
       WHERE u.is_active = 1
     `;
-    
-    const params = [date, date, date, date];
+
+    const params = [date, date, date, date, date];
     
     if (role) {
       query += ' AND u.role = ?';
@@ -235,7 +237,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         clock_out: record.clock_out,
         status: record.status || 'normal',
         report_id: record.report_id,
-        comment_id: record.comment_id
+        comment_id: record.comment_id,
+        staff_report_id: record.staff_report_id
       };
       
       // スタッフ・管理者の休憩情報

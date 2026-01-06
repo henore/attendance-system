@@ -293,7 +293,16 @@ export class SharedAttendanceManagement {
       const date = btn.getAttribute('data-date');
       this.reportDetailModal.show(userId, userName, date);
     }
-    
+
+    // スタッフ日報詳細ボタン（adminのみ）
+    if (e.target.closest('.btn-show-staff-report')) {
+      const btn = e.target.closest('.btn-show-staff-report');
+      const userId = btn.getAttribute('data-user-id');
+      const userName = btn.getAttribute('data-user-name');
+      const date = btn.getAttribute('data-date');
+      this.showStaffReportModal(userId, userName, date);
+    }
+
     // 編集ボタン（管理者のみ）
     if (this.userRole === 'admin' && e.target.closest('.btn-edit-attendance')) {
       const btn = e.target.closest('.btn-edit-attendance');
@@ -773,12 +782,92 @@ async searchAttendanceRecords() {
     this.searchAttendanceRecords();
   }
 
+  /**
+   * スタッフ日報詳細モーダルを表示
+   */
+  async showStaffReportModal(userId, userName, date) {
+    try {
+      const response = await this.apiCall(`/api/staff/daily-report/${date}?staffId=${userId}`);
+
+      if (!response.report) {
+        this.parent.showNotification('日報が見つかりません', 'warning');
+        return;
+      }
+
+      const report = response.report;
+
+      // モーダルHTML生成
+      const modalHTML = `
+        <div class="modal fade" id="staffReportDetailModal" tabindex="-1">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                  <i class="fas fa-file-alt"></i> スタッフ日報詳細
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label fw-bold">スタッフ名</label>
+                  <p>${userName}</p>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold">日付</label>
+                  <p>${date}</p>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold">業務報告</label>
+                  <div class="border rounded p-3 bg-light" style="white-space: pre-wrap;">${report.work_report || ''}</div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold">連絡事項</label>
+                  <div class="border rounded p-3 bg-light" style="white-space: pre-wrap;">${report.communication || '-'}</div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold">提出日時</label>
+                  <p>${new Date(report.created_at).toLocaleString('ja-JP')}</p>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 既存のモーダルを削除
+      const existingModal = document.getElementById('staffReportDetailModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+
+      // 新しいモーダルをDOMに追加
+      document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+      // モーダルを表示
+      const modalElement = document.getElementById('staffReportDetailModal');
+      const modal = new bootstrap.Modal(modalElement);
+      modal.show();
+
+      // モーダルが閉じられた時にDOMから削除
+      modalElement.addEventListener('hidden.bs.modal', () => {
+        modalElement.remove();
+      });
+
+    } catch (error) {
+      console.error('スタッフ日報取得エラー:', error);
+      this.parent.showNotification('日報の取得に失敗しました', 'danger');
+    }
+  }
+
   destroy() {
     // モーダルのクリーンアップ
     if (this.reportDetailModal) {
       this.reportDetailModal.destroy();
     }
-    
+
     if (this.container && this.container.parentNode) {
       this.container.parentNode.removeChild(this.container);
     }
