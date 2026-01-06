@@ -5,6 +5,8 @@ import { UserBreakHandler } from './break.js';
 import { UserAttendanceCalendar } from './calendar.js';
 import { TermsModal } from './terms-modal.js';
 import { LastReportModal } from './last-report-modal.js';
+import { ConfirmationModal } from './confirmation-modal.js';
+import { getCurrentTime } from '../../utils/date-time.js';
 
 export default class UserModule extends BaseModule {
   constructor(app) {
@@ -21,11 +23,15 @@ export default class UserModule extends BaseModule {
       this.apiCall.bind(this),
       this.app.showNotification.bind(this.app)
     );
-    
+
+    // confirmationModalを先に初期化
+    this.confirmationModal = new ConfirmationModal();
+
     this.breakHandler = new UserBreakHandler(
       this.apiCall.bind(this),
       this.app.showNotification.bind(this.app),
-      this.currentUser
+      this.currentUser,
+      this.confirmationModal
     );
     
     this.calendar = new UserAttendanceCalendar(
@@ -42,7 +48,7 @@ export default class UserModule extends BaseModule {
       this.attendanceHandler.updateClockInButtonState.bind(this.attendanceHandler),
       this.app.showNotification.bind(this.app)
     );
-    
+
     // 状態管理
     this.state = {
       currentAttendance: null,
@@ -112,32 +118,53 @@ export default class UserModule extends BaseModule {
       this.app.showNotification('前回の記録を確認してください', 'warning');
       return;
     }
-    
-    // 利用規約の同意チェック
-  if (!this.state.hasAcceptedTerms) {
-    this.app.showNotification('利用規約に同意してください', 'warning');
-    return;
-  }
 
+    // 利用規約の同意チェック
+    if (!this.state.hasAcceptedTerms) {
+      this.app.showNotification('利用規約に同意してください', 'warning');
+      return;
+    }
+
+    // 出勤予定時刻を計算
+    const currentTime = getCurrentTime();
+    const scheduledTime = this.attendanceHandler.roundClockInTime(currentTime);
+
+    // 確認モーダルを表示
+    const confirmed = await this.confirmationModal.show({
+      title: '出勤確認',
+      message: '出勤時刻は以下になります。出勤しますか？',
+      time: scheduledTime,
+      confirmText: 'はい',
+      cancelText: 'いいえ',
+      icon: 'fa-sign-in-alt'
+    });
+
+    // いいえの場合は処理を中断
+    if (!confirmed) {
+      this.app.showNotification('出勤をキャンセルしました', 'info');
+      return;
+    }
+
+    // はいの場合は出勤処理を実行
     const result = await this.attendanceHandler.clockIn();
     if (result.success) {
       this.state.currentAttendance = result.attendance;
       this.state.isWorking = true;
       this.state.hasClockInToday = true;
-      
+
       this.breakHandler.resetBreakState();
       this.updateAttendanceUI();
       this.updateLogoutButtonVisibility();
-      
+
       // 日報提出時のコールバックを設定（追加）
       this.reportHandler.onReportSubmit = () => {
         this.state.hasTodayReport = true;
         this.updateLogoutButtonVisibility();
       };
-      
+
       // 出勤後の警告設定を更新
       this.updatePageLeaveWarning();
-      
+
       this.app.showNotification('出勤しました。本日の業務を開始してください。', 'success');
     }
   }
@@ -343,24 +370,45 @@ export default class UserModule extends BaseModule {
       }
     }
 
+    // 退勤予定時刻を計算
+    const currentTime = getCurrentTime();
+    const scheduledTime = this.attendanceHandler.roundClockOutTime(currentTime);
+
+    // 確認モーダルを表示
+    const confirmed = await this.confirmationModal.show({
+      title: '退勤確認',
+      message: '退勤時刻は以下になります。退勤しますか？',
+      time: scheduledTime,
+      confirmText: 'はい',
+      cancelText: 'いいえ',
+      icon: 'fa-sign-out-alt'
+    });
+
+    // いいえの場合は処理を中断
+    if (!confirmed) {
+      this.app.showNotification('退勤をキャンセルしました', 'info');
+      return;
+    }
+
+    // はいの場合は退勤処理を実行
     const result = await this.attendanceHandler.clockOut(this.state.currentAttendance);
     if (result.success) {
       this.state.currentAttendance = result.attendance;
       this.state.isWorking = false;
-      
+
       // 休憩を強制終了
       if (this.breakHandler.isOnBreak) {
         this.breakHandler.isOnBreak = false;
         this.breakHandler.stopBreakTimeMonitoring();
         this.breakHandler.clearAutoBreakEnd();
       }
-      
+
       this.updateAttendanceUI();
       this.loadReportForm();
-      
+
       // ログアウトボタンの表示状態を更新
       this.updateLogoutButtonVisibility();
-      
+
       this.app.showNotification('退勤しました。日報の入力をお願いします。', 'info');
     }
   }

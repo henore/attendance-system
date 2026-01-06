@@ -760,5 +760,166 @@ router.post('/break/end', async (req, res) => {
     }
   });
 
+  // ===== スタッフ日報機能 =====
+
+  /**
+   * スタッフ日報提出
+   */
+  router.post('/daily-report', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const staffId = req.session.user.id;
+      const { date, work_report, communication } = req.body;
+
+      // 必須項目チェック
+      if (!date || !work_report) {
+        return res.status(400).json({
+          success: false,
+          error: '日付と業務報告は必須です'
+        });
+      }
+
+      // 出勤記録が存在するかチェック
+      const attendance = await dbGet(
+        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+        [staffId, date]
+      );
+
+      if (!attendance || !attendance.clock_out) {
+        return res.status(400).json({
+          success: false,
+          error: '退勤記録がありません。先に退勤処理を完了してください'
+        });
+      }
+
+      // 既存の日報があるかチェック
+      const existingReport = await dbGet(
+        'SELECT * FROM staff_daily_reports WHERE staff_id = ? AND date = ?',
+        [staffId, date]
+      );
+
+      if (existingReport) {
+        // 更新
+        await dbRun(
+          `UPDATE staff_daily_reports
+           SET work_report = ?, communication = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE staff_id = ? AND date = ?`,
+          [work_report, communication || null, staffId, date]
+        );
+      } else {
+        // 新規作成
+        await dbRun(
+          `INSERT INTO staff_daily_reports (staff_id, date, work_report, communication)
+           VALUES (?, ?, ?, ?)`,
+          [staffId, date, work_report, communication || null]
+        );
+      }
+
+      // 出勤記録のhas_reportフラグを更新
+      await dbRun(
+        'UPDATE attendance SET has_report = 1 WHERE user_id = ? AND date = ?',
+        [staffId, date]
+      );
+
+      res.json({
+        success: true,
+        message: '日報を提出しました'
+      });
+
+    } catch (error) {
+      console.error('スタッフ日報提出エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '日報の提出に失敗しました'
+      });
+    }
+  });
+
+  /**
+   * スタッフ日報取得（日付指定）
+   */
+  router.get('/daily-report/:date', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const { date } = req.params;
+      const requestUserId = req.session.user.id;
+      const requestUserRole = req.session.user.role;
+
+      // staffIdパラメータがある場合はそれを使用（admin用）
+      const staffId = req.query.staffId ? parseInt(req.query.staffId) : requestUserId;
+
+      // staff権限の場合は自分の日報のみ取得可能
+      if (requestUserRole === 'staff' && staffId !== requestUserId) {
+        return res.status(403).json({
+          success: false,
+          error: '他のスタッフの日報は閲覧できません'
+        });
+      }
+
+      // 日報取得
+      const report = await dbGet(
+        `SELECT
+          sdr.*,
+          u.name as staff_name,
+          u.role as staff_role
+         FROM staff_daily_reports sdr
+         LEFT JOIN users u ON sdr.staff_id = u.id
+         WHERE sdr.staff_id = ? AND sdr.date = ?`,
+        [staffId, date]
+      );
+
+      // 出勤記録も取得
+      const attendance = await dbGet(
+        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+        [staffId, date]
+      );
+
+      res.json({
+        success: true,
+        report: report || null,
+        attendance: attendance || null
+      });
+
+    } catch (error) {
+      console.error('スタッフ日報取得エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '日報の取得に失敗しました'
+      });
+    }
+  });
+
+  /**
+   * 今日のスタッフ日報取得
+   */
+  router.get('/daily-report-today', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const staffId = req.session.user.id;
+      const today = getCurrentDate();
+
+      const report = await dbGet(
+        `SELECT * FROM staff_daily_reports WHERE staff_id = ? AND date = ?`,
+        [staffId, today]
+      );
+
+      const attendance = await dbGet(
+        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+        [staffId, today]
+      );
+
+      res.json({
+        success: true,
+        report: report || null,
+        attendance: attendance || null,
+        hasReport: !!report
+      });
+
+    } catch (error) {
+      console.error('今日のスタッフ日報取得エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '日報の取得に失敗しました'
+      });
+    }
+  });
+
   return router;
 };

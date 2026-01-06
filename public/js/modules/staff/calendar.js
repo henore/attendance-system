@@ -327,9 +327,10 @@ export class StaffAttendanceBook {
    */
   async onDateClick(dateStr) {
     const attendanceData = this.getAttendanceData(dateStr);
-    
+
     if (attendanceData && attendanceData.clock_in) {
-      this.showAttendanceDetail(dateStr, attendanceData);
+      // スタッフ日報も取得
+      await this.showAttendanceDetail(dateStr, attendanceData);
     } else {
       this.showNotification('この日の出勤記録はありません', 'info');
     }
@@ -338,41 +339,50 @@ export class StaffAttendanceBook {
   /**
    * 出勤詳細を表示（修正版）
    */
-  showAttendanceDetail(dateStr, attendanceData) {
-    // 既存のモーダルがあれば破棄
-    if (this.currentModalId) {
-      modalManager.destroy(this.currentModalId);
+  async showAttendanceDetail(dateStr, attendanceData) {
+    try {
+      // スタッフ日報を取得
+      const reportResponse = await this.apiCall(`/api/staff/daily-report/${dateStr}`);
+      const dailyReport = reportResponse.report;
+
+      // 既存のモーダルがあれば破棄
+      if (this.currentModalId) {
+        modalManager.destroy(this.currentModalId);
+      }
+
+      const formattedDate = formatDate(dateStr, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      });
+
+      const content = this.generateAttendanceDetailContent(attendanceData, dailyReport);
+
+      // 日付を含む一意のモーダルIDを生成
+      const modalId = `staffAttendanceDetailModal_${dateStr.replace(/-/g, '_')}`;
+      this.currentModalId = modalId;
+
+      modalManager.create({
+        id: modalId,
+        title: `<i class="fas fa-calendar-check"></i> ${formattedDate}の出勤記録`,
+        content: content,
+        size: 'modal-lg',
+        headerClass: 'bg-primary text-white',
+        saveButton: false
+      });
+
+      modalManager.show(modalId);
+    } catch (error) {
+      console.error('出勤詳細取得エラー:', error);
+      this.showNotification('出勤詳細の取得に失敗しました', 'danger');
     }
-    
-    const formattedDate = formatDate(dateStr, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
-
-    const content = this.generateAttendanceDetailContent(attendanceData);
-    
-    // 日付を含む一意のモーダルIDを生成
-    const modalId = `staffAttendanceDetailModal_${dateStr.replace(/-/g, '_')}`;
-    this.currentModalId = modalId;
-
-    modalManager.create({
-      id: modalId,
-      title: `<i class="fas fa-calendar-check"></i> ${formattedDate}の出勤記録`,
-      content: content,
-      size: 'modal-lg',
-      headerClass: 'bg-primary text-white',
-      saveButton: false
-    });
-
-    modalManager.show(modalId);
   }
 
   /**
    * 出勤詳細コンテンツを生成
    */
-  generateAttendanceDetailContent(attendanceData) {
+  generateAttendanceDetailContent(attendanceData, dailyReport) {
     let html = '<div class="staff-attendance-detail">';
 
     // 基本的な出勤情報
@@ -414,6 +424,45 @@ export class StaffAttendanceBook {
         <div class="detail-section">
           <h6><i class="fas fa-coffee text-warning"></i> 休憩記録</h6>
           <p>休憩時間: ${attendanceData.break_time}分</p>
+        </div>
+      `;
+    }
+
+    // スタッフ日報
+    if (dailyReport) {
+      html += `
+        <hr>
+        <div class="staff-daily-report mt-3">
+          <h6><i class="fas fa-file-alt text-primary"></i> スタッフ日報</h6>
+
+          <div class="report-section mb-3">
+            <label class="form-label fw-bold">業務報告</label>
+            <div class="report-content">${dailyReport.work_report || '-'}</div>
+          </div>
+
+          ${dailyReport.communication ? `
+            <div class="report-section">
+              <label class="form-label fw-bold">連絡事項</label>
+              <div class="report-content">${dailyReport.communication}</div>
+            </div>
+          ` : ''}
+        </div>
+
+        <style>
+          .report-content {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            white-space: pre-wrap;
+          }
+        </style>
+      `;
+    } else if (attendanceData.clock_out) {
+      html += `
+        <hr>
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle"></i> この日の日報は未提出です
         </div>
       `;
     }

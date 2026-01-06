@@ -542,31 +542,33 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 });
             }
             
-            // 出勤記録取得（休憩データ統合）
+            // 出勤記録取得（休憩データ統合、スタッフ日報追加）
             const records = await dbAll(`
-                SELECT 
+                SELECT
                     a.*,
                     dr.id as report_id,
+                    sdr.id as staff_report_id,
                     sc.comment,
-                    CASE 
+                    CASE
                         WHEN u.role = 'user' THEN br.start_time
                         ELSE a.break_start
                     END as break_start,
-                    CASE 
+                    CASE
                         WHEN u.role = 'user' THEN br.end_time
                         ELSE a.break_end
                     END as break_end,
-                    CASE 
+                    CASE
                         WHEN u.role = 'user' THEN br.duration
-                        ELSE CASE 
-                            WHEN a.break_start IS NOT NULL AND a.break_end IS NOT NULL 
-                            THEN 60 
-                            ELSE NULL 
+                        ELSE CASE
+                            WHEN a.break_start IS NOT NULL AND a.break_end IS NOT NULL
+                            THEN 60
+                            ELSE NULL
                         END
                     END as break_duration
                 FROM attendance a
                 JOIN users u ON a.user_id = u.id
                 LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
+                LEFT JOIN staff_daily_reports sdr ON a.user_id = sdr.staff_id AND a.date = sdr.date
                 LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
                 LEFT JOIN break_records br ON a.user_id = br.user_id AND a.date = br.date AND u.role = 'user'
                 WHERE a.user_id = ? AND a.date BETWEEN ? AND ?

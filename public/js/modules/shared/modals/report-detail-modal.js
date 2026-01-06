@@ -155,26 +155,45 @@ export class ReportDetailModal {
       console.log('🔍 [日報詳細] 表示開始 - 受け取ったパラメータ:', { userId, userName, date });
       console.log('🔍 [日報詳細] this.userRole:', this.userRole);
       console.log('🔍 [日報詳細] this.app.currentUser:', this.app.currentUser);
-      
+
       // パラメータ検証
       if (!userId || !date) {
         console.error('[日報詳細] 必須パラメータが不足:', { userId, userName, date });
         this.app.showNotification('表示に必要な情報が不足しています', 'warning');
         return;
       }
-      
+
       // データ取得
       const response = await this.app.apiCall(
         API_ENDPOINTS.STAFF.REPORT(userId, date)
       );
-      
+
       console.log('[日報詳細] APIレスポンス:', response);
-      
-      if (!response || !response.report) {
+
+      // ユーザーのroleを確認
+      const targetUserRole = response.user?.role;
+      console.log('[日報詳細] ターゲットユーザーのrole:', targetUserRole);
+
+      // staffまたはadminの場合、staff日報も取得
+      let staffReport = null;
+      if (targetUserRole === 'staff' || targetUserRole === 'admin') {
+        try {
+          const staffReportResponse = await this.app.apiCall(
+            `${API_ENDPOINTS.STAFF.DAILY_REPORT(date)}?staffId=${userId}`
+          );
+          staffReport = staffReportResponse.report;
+          console.log('[日報詳細] スタッフ日報:', staffReport);
+        } catch (error) {
+          console.log('[日報詳細] スタッフ日報の取得に失敗（日報未提出の可能性）:', error);
+        }
+      }
+
+      // user日報とstaff日報のどちらもない場合
+      if (!response.report && !staffReport) {
         this.app.showNotification('この日の日報はありません', 'info');
         return;
       }
-      
+
       // 現在のデータを保存
       this.currentData = {
         userId: userId,
@@ -184,35 +203,36 @@ export class ReportDetailModal {
         attendance: response.attendance || null,
         report: response.report || {},
         comment: response.comment || null,
-        breakRecord: response.breakRecord || null
+        breakRecord: response.breakRecord || null,
+        staffReport: staffReport || null // スタッフ日報を追加
       };
-      
+
       // コメントのタイムスタンプを保存（競合検知用）
       this.originalComment = response.comment ? {
         comment: response.comment.comment,
         updated_at: response.comment.updated_at || response.comment.created_at
       } : null;
-      
+
       console.log('✅ [日報詳細] currentData設定完了:', this.currentData);
       console.log('📊 [日報詳細] 設定されたuserID:', this.currentData.userId);
       console.log('👤 [日報詳細] 設定されたユーザー名:', this.currentData.userName);
       console.log('📅 [日報詳細] 設定された日付:', this.currentData.date);
-      
+
       // モーダルコンテンツを更新
       this.updateModalContent();
-      
+
       // モーダル表示
       modalManager.show(this.modalId);
-      
+
       // コメントの定期チェック開始
       if (this.canComment && this.userRole === 'staff') {
         this.startCommentCheck();
       }
-      
+
     } catch (error) {
       console.error('日報詳細取得エラー:', error);
       this.app.showNotification('日報の取得に失敗しました', 'danger');
-      
+
       // エラー時はcurrentDataをリセット
       this.currentData = null;
     }
@@ -431,7 +451,7 @@ export class ReportDetailModal {
    * 詳細コンテンツ生成（月別レポート表示を維持）
    */
   generateDetailContent() {
-    const { user, attendance, report, comment, breakRecord } = this.currentData;
+    const { user, attendance, report, comment, breakRecord, staffReport } = this.currentData;
     
     // 休憩時間の表示
     let breakTimeDisplay = '-';
@@ -476,7 +496,8 @@ export class ReportDetailModal {
 
       <hr>
 
-      <!-- 日報内容 -->
+      <!-- 日報内容（利用者のみ） -->
+      ${user.role === 'user' && report ? `
       <div class="report-summary">
         <h6><i class="fas fa-file-alt"></i> 日報内容</h6>
         
@@ -681,7 +702,30 @@ export class ReportDetailModal {
       </div>
 
       <hr>
+      ` : ''}
 
+      <!-- スタッフ日報（staff/adminの場合） -->
+      ${(user.role === 'staff' || user.role === 'admin') && staffReport ? `
+        <div class="staff-daily-report-section">
+          <h6><i class="fas fa-clipboard-list"></i> スタッフ日報</h6>
+
+          <!-- 業務報告 -->
+          <div class="mb-3">
+            <label class="past-form-label"><i class="fas fa-tasks"></i> 本日の業務報告</label>
+            <div class="text-content bg-light p-3 rounded">${staffReport.work_report || ''}</div>
+          </div>
+
+          <!-- 連絡事項 -->
+          ${staffReport.communication ? `
+            <div class="mb-3">
+              <label class="past-form-label"><i class="fas fa-comment-dots"></i> 連絡事項</label>
+              <div class="text-content bg-light p-3 rounded">${staffReport.communication}</div>
+            </div>
+          ` : ''}
+        </div>
+
+        <hr>
+      ` : ''}
 
       <!-- スタッフコメントエリア -->
       ${this.generateCommentSection(comment)}

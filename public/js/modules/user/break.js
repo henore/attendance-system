@@ -6,11 +6,12 @@ import { MESSAGES } from '../../constants/labels.js';
 import { getCurrentDate, getCurrentTime, timeToMinutes, calculateBreakDuration } from '../../utils/date-time.js';
 
 export class UserBreakHandler {
-  constructor(apiCall, showNotification, currentUser) {
+  constructor(apiCall, showNotification, currentUser, confirmationModal = null) {
     this.apiCall = apiCall;
     this.showNotification = showNotification;
     this.currentUser = currentUser;
-    
+    this.confirmationModal = confirmationModal;
+
     // 休憩状態
     this.isOnBreak = false;
     this.currentBreakStart = null;
@@ -212,11 +213,48 @@ export class UserBreakHandler {
     }
 
     try {
+      const serviceType = this.currentUser.service_type;
+
+      // 確認モーダルを表示（confirmationModalがある場合）
+      if (this.confirmationModal) {
+        let message = '';
+        let timeInfo = '';
+
+        if (serviceType === 'commute') {
+          message = '11:30から12:30までの固定休憩です。';
+          timeInfo = '11:30 〜 12:30（60分）';
+        } else {
+          message = '休憩開始から1時間で自動終了します。';
+          const currentTime = getCurrentTime();
+          const currentMinutes = timeToMinutes(currentTime);
+          const adjustedMinutes = Math.floor(currentMinutes / 15) * 15;
+          const hours = Math.floor(adjustedMinutes / 60);
+          const minutes = adjustedMinutes % 60;
+          const adjustedStartTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+          timeInfo = `${adjustedStartTime} 開始（60分間）`;
+        }
+
+        const confirmed = await this.confirmationModal.show({
+          title: '休憩確認',
+          message: `${message}\n休憩に入りますか？`,
+          time: timeInfo,
+          confirmText: 'はい',
+          cancelText: 'いいえ',
+          icon: 'fa-coffee'
+        });
+
+        // いいえの場合は処理を中断
+        if (!confirmed) {
+          this.showNotification('休憩をキャンセルしました', 'info');
+          return;
+        }
+      }
+
       const currentTime = getCurrentTime();
       let adjustedStartTime = currentTime;
-      
+
       // 在宅者の場合は15分刻み切り捨て
-      if (this.currentUser.service_type === 'home') {
+      if (serviceType === 'home') {
         const currentMinutes = timeToMinutes(currentTime);
         const adjustedMinutes = Math.floor(currentMinutes / 15) * 15;
         const hours = Math.floor(adjustedMinutes / 60);
@@ -224,22 +262,20 @@ export class UserBreakHandler {
         adjustedStartTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
       }
 
-      const response = await this.apiCall(API_ENDPOINTS.USER.BREAK_START, { 
+      const response = await this.apiCall(API_ENDPOINTS.USER.BREAK_START, {
         method: 'POST',
         body: JSON.stringify({ startTime: adjustedStartTime })
       });
-      
+
       if (response && response.success) {
         this.hasBreakToday = true;
         this.currentBreakStart = response.startTime || adjustedStartTime;
-        
-        const serviceType = this.currentUser.service_type;
-        
+
         if (serviceType === 'commute' || response.isCompleted) {
           // 通所者は即座に完了状態
           this.isOnBreak = false;
           this.showNotification(
-            response.message || '休憩時間を記録しました（11:30-12:30 60分）', 
+            response.message || '休憩時間を記録しました（11:30-12:30 60分）',
             'success'
           );
         } else {
@@ -247,16 +283,16 @@ export class UserBreakHandler {
           this.isOnBreak = true;
           this.startBreakTimeMonitoring();
           this.setupAutoBreakEnd(); // 60分後自動終了設定
-          
+
           let message = `休憩開始（${this.currentBreakStart}）`;
           if (adjustedStartTime !== currentTime) {
             message += ` ※開始時刻を${adjustedStartTime}に調整しました`;
           }
           message += ' - 60分で自動終了します';
-          
+
           this.showNotification(message, 'info');
         }
-        
+
         this.updateUI();
       }
     } catch (error) {

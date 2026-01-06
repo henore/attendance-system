@@ -176,7 +176,10 @@ export class AttendanceTable {
     else if (record.dayOfWeek === 6) rowClass = 'table-info';
 
     // 日の列をクリック可能にするためのdata属性を追加
-    const dayClickAttrs = record.user_role === 'user' && record.report_id ? 
+    // 利用者: report_idがある場合、スタッフ・管理者: staff_report_idがある場合
+    const hasReport = (record.user_role === 'user' && record.report_id) ||
+                      ((record.user_role === 'staff' || record.user_role === 'admin') && record.staff_report_id);
+    const dayClickAttrs = hasReport ?
       `data-user-id="${record.user_id}" data-user-name="${record.user_name}" data-date="${record.date}" style="cursor: pointer;"` : '';
 
     return `

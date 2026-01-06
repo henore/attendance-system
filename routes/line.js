@@ -34,31 +34,31 @@ router.post('/generate-report-image', async (req, res) => {
   let browser = null;
   try {
     const { reportData, userData, commentData, date } = req.body;
-    
-    console.log('[画像生成] 開始:', { 
-      userName: userData?.name, 
+
+    console.log('[画像生成] 開始:', {
+      userName: userData?.name,
       date: date || reportData?.date,
       hasReportData: !!reportData,
       hasUserData: !!userData,
       hasCommentData: !!commentData
     });
-    
+
     // 必須データの検証
     if (!reportData || !userData) {
       throw new Error('必須データ（reportData, userData）が不足しています');
     }
-    
+
     // データの正規化
     const normalizedData = normalizeReportData(reportData, userData, commentData, date);
-    
+
     // HTMLテンプレートを生成（正方形レイアウト対応）
     const html = generateSquareLayoutHTML(normalizedData);
-    
+
     // Puppeteerで画像生成
   browser = await puppeteer.launch({
   headless: 'new',
   args: [
-    '--no-sandbox', 
+    '--no-sandbox',
     '--disable-setuid-sandbox',
     '--disable-dev-shm-usage',
     '--disable-accelerated-2d-canvas',
@@ -79,18 +79,18 @@ router.post('/generate-report-image', async (req, res) => {
     browser.on('disconnected', () => {
       console.log('[Puppeteer] ブラウザが切断されました');
     });
-    
+
     const page = await browser.newPage();
-    
+
     // 日本語フォントの設定
     await page.evaluateOnNewDocument(() => {
       document.documentElement.style.fontFamily = '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif';
     });
-    
+
     // 正方形のビューポート設定
     await page.setViewport({ width: 1024, height: 1024, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: 'networkidle0' });
-    
+
     // レンダリング完了を待つ
     const { setTimeout } = require('node:timers/promises');
     await setTimeout(2000);
@@ -101,47 +101,102 @@ router.post('/generate-report-image', async (req, res) => {
       fullPage: false, // ビューポートサイズで固定
       encoding: 'binary'
     });
-    
+
     await browser.close();
     browser = null;
-    
+
     // sharpを使用して画像を処理
     const imageId = `report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
     const imageDir = path.join(__dirname, '..', 'public', 'images');
-    
+
     // 1024x1024のオリジナル画像（JPEG変換）
     const originalPath = path.join(imageDir, `${imageId}_original.jpg`);
     await sharp(pngBuffer)
-      .resize(1024, 1024, { 
+      .resize(1024, 1024, {
         fit: 'cover',
         position: 'top'
       })
-      .jpeg({ 
+      .jpeg({
         progressive: true,
         mozjpeg: true
       })
       .toFile(originalPath);
-       
-    
+
+
     console.log('[画像生成] 完了:', {
       imageId,
     });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       imageId,
       originalSize: originalPath,
       imageUrl: `/images/${imageId}_original.jpg`,
+      fileName: `${imageId}_original.jpg`,
       message: '画像生成完了'
     });
-    
+
   } catch (error) {
     console.error('[画像生成] エラー:', error);
     if (browser) await browser.close();
-    
-    res.status(500).json({ 
-      success: false, 
+
+    res.status(500).json({
+      success: false,
       message: '画像生成に失敗しました: ' + error.message
+    });
+  }
+});
+
+/**
+ * 画像キャッシュクリーンアップ（ダウンロード完了後の即削除）
+ */
+router.post('/cleanup-image', async (req, res) => {
+  try {
+    const { fileName } = req.body;
+
+    if (!fileName) {
+      return res.status(400).json({
+        success: false,
+        message: 'ファイル名が指定されていません'
+      });
+    }
+
+    // セキュリティチェック: パストラバーサル攻撃を防ぐ
+    if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+      return res.status(400).json({
+        success: false,
+        message: '無効なファイル名です'
+      });
+    }
+
+    const imageDir = path.join(__dirname, '..', 'public', 'images');
+    const filePath = path.join(imageDir, fileName);
+
+    // ファイルが存在するか確認
+    try {
+      await fs.access(filePath);
+    } catch (error) {
+      console.log(`[画像削除] ファイルが既に削除されているか存在しません: ${fileName}`);
+      return res.json({
+        success: true,
+        message: 'ファイルは既に削除されています'
+      });
+    }
+
+    // ファイルを削除
+    await fs.unlink(filePath);
+    console.log(`[画像削除] 成功: ${fileName}`);
+
+    res.json({
+      success: true,
+      message: '画像キャッシュをクリーンアップしました'
+    });
+
+  } catch (error) {
+    console.error('[画像削除] エラー:', error);
+    res.status(500).json({
+      success: false,
+      message: '画像の削除に失敗しました: ' + error.message
     });
   }
 });

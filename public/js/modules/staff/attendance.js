@@ -2,13 +2,22 @@
 // スタッフの出退勤UI制御（簡潔版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-import { getCurrentTime } from '../../utils/date-time.js';
+import { getCurrentTime, getCurrentDate } from '../../utils/date-time.js';
+import { ConfirmationModal } from '../user/confirmation-modal.js';
+import { StaffDailyReportModal } from './daily-report-modal.js';
 
 export class StaffAttendanceUI {
   constructor(app, parentModule) {
     this.app = app;
     this.parent = parentModule;
-    
+
+    // 確認ダイアログ
+    this.confirmationModal = new ConfirmationModal();
+    this.dailyReportModal = new StaffDailyReportModal(
+      this.app.apiCall.bind(this.app),
+      this.app.showNotification.bind(this.app)
+    );
+
     // 状態管理
     this.isWorking = false;
     this.isOnBreak = false;
@@ -22,11 +31,29 @@ export class StaffAttendanceUI {
    */
   async handleClockIn() {
     try {
+      const currentTime = getCurrentTime();
+
+      // 確認ダイアログを表示
+      const confirmed = await this.confirmationModal.show({
+        title: '出勤確認',
+        message: '出勤時刻は以下になります。出勤しますか？',
+        time: currentTime,
+        confirmText: 'はい',
+        cancelText: 'いいえ',
+        icon: 'fa-sign-in-alt'
+      });
+
+      // いいえの場合は処理を中断
+      if (!confirmed) {
+        this.app.showNotification('出勤をキャンセルしました', 'info');
+        return false;
+      }
+
       const response = await this.app.apiCall(API_ENDPOINTS.ATTENDANCE.CLOCK_IN, {
         method: 'POST',
-        body: JSON.stringify({ time: getCurrentTime() })
+        body: JSON.stringify({ time: currentTime })
       });
-      
+
       if (response.success) {
         this.isWorking = true;
         this.currentAttendance = response.attendance;
@@ -56,20 +83,42 @@ export class StaffAttendanceUI {
         await this.handleBreakEnd(true);
       }
 
+      const currentTime = getCurrentTime();
+
+      // 確認ダイアログを表示
+      const confirmed = await this.confirmationModal.show({
+        title: '退勤確認',
+        message: '退勤時刻は以下になります。退勤しますか？',
+        time: currentTime,
+        confirmText: 'はい',
+        cancelText: 'いいえ',
+        icon: 'fa-sign-out-alt'
+      });
+
+      // いいえの場合は処理を中断
+      if (!confirmed) {
+        this.app.showNotification('退勤をキャンセルしました', 'info');
+        return false;
+      }
+
       const response = await this.app.apiCall(API_ENDPOINTS.STAFF.CLOCK_OUT, {
         method: 'POST'
       });
-      
+
       if (response.success) {
         this.isWorking = false;
         this.currentAttendance.clock_out = response.time;
+        this.currentAttendance.date = getCurrentDate();
         this.updateUI();
         this.app.showNotification('退勤しました', 'success');
+
+        // 日報モーダルを表示
+        await this.showDailyReportModal();
         return true;
       }
     } catch (error) {
       console.error('退勤処理エラー:', error);
-      
+
       // 未コメントの日報がある場合の処理
       if (error.message && error.message.includes('未コメント')) {
         const uncommentedReports = error.uncommentedReports || [];
@@ -88,6 +137,20 @@ export class StaffAttendanceUI {
         this.app.showNotification(error.message || '退勤処理に失敗しました', 'danger');
       }
       return false;
+    }
+  }
+
+  /**
+   * 日報モーダルを表示
+   */
+  async showDailyReportModal() {
+    try {
+      await this.dailyReportModal.show(this.currentAttendance, () => {
+        // 日報提出完了時の処理
+        console.log('日報提出完了');
+      });
+    } catch (error) {
+      console.error('日報モーダル表示エラー:', error);
     }
   }
 
@@ -130,10 +193,28 @@ export class StaffAttendanceUI {
     }
 
     try {
+      const currentTime = getCurrentTime();
+
+      // 確認ダイアログを表示
+      const confirmed = await this.confirmationModal.show({
+        title: '休憩確認',
+        message: '休憩を開始しますか？',
+        time: `${currentTime} 開始（60分間）`,
+        confirmText: 'はい',
+        cancelText: 'いいえ',
+        icon: 'fa-coffee'
+      });
+
+      // いいえの場合は処理を中断
+      if (!confirmed) {
+        this.app.showNotification('休憩をキャンセルしました', 'info');
+        return false;
+      }
+
       const response = await this.app.apiCall(API_ENDPOINTS.STAFF.BREAK_START, {
         method: 'POST'
       });
-      
+
       if (response.success) {
         this.isOnBreak = true;
         this.breakStartTime = response.startTime;

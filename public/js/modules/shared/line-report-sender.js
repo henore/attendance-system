@@ -58,22 +58,43 @@ export class LineReportSender {
       // 自動ダウンロード処理を追加
       if (imageResponse.imageUrl) {
         console.log('[画像生成] ダウンロード開始:', imageResponse.imageUrl);
-        
+
         const link = document.createElement('a');
         link.href = imageResponse.imageUrl;
         link.download = `${safeUserName}_${safeDate}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         console.log('[画像生成] ダウンロード完了');
-        
+
+        // ダウンロード完了後、即座にサーバー側の画像キャッシュを削除
+        setTimeout(async () => {
+          try {
+            if (imageResponse.fileName) {
+              console.log('[画像削除] キャッシュクリーンアップ開始:', imageResponse.fileName);
+
+              await this.app.apiCall(API_ENDPOINTS.LINE.CLEANUP_IMAGE, {
+                method: 'POST',
+                body: JSON.stringify({
+                  fileName: imageResponse.fileName
+                })
+              });
+
+              console.log('[画像削除] キャッシュクリーンアップ完了');
+            }
+          } catch (cleanupError) {
+            // クリーンアップエラーはログのみ（ユーザーには通知しない）
+            console.error('[画像削除] クリーンアップエラー:', cleanupError);
+          }
+        }, 1000); // 1秒待ってからクリーンアップ（ダウンロード完了を確実にするため）
+
         // 成功メッセージ
         this.app.showNotification('日報画像を保存しました', 'success');
       } else {
         throw new Error('画像URLが返されませんでした');
       }
-      
+
       return imageResponse;
     
     } catch (error) {

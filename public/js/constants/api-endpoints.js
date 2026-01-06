@@ -26,6 +26,7 @@ export const API_ENDPOINTS = {
   // LINE連携
   LINE: {
     GENERATE_IMAGE: '/api/line/generate-report-image',
+    CLEANUP_IMAGE: '/api/line/cleanup-image',
   },
   
   // 利用者用
@@ -59,8 +60,12 @@ export const API_ENDPOINTS = {
     ATTENDANCE: (date) => `/api/staff/attendance/${date}`,
     USER_STATUS: (userId) => `/api/staff/users/${userId}/status`,
     REPORT: (userId, date) => `/api/staff/reports/${userId}/${date}`,
-    MONTHLY_ATTENDANCE: (year, month, userId) => 
+    MONTHLY_ATTENDANCE: (year, month, userId) =>
         `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`,
+    // スタッフ日報
+    DAILY_REPORT_SUBMIT: '/api/staff/daily-report',
+    DAILY_REPORT_TODAY: '/api/staff/daily-report-today',
+    DAILY_REPORT: (date) => `/api/staff/daily-report/${date}`,
     // 体験入所管理
     TRIAL_VISITS_TODAY: '/api/trial-visits/today',
     TRIAL_VISITS_BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,
