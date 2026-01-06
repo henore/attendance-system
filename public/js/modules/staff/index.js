@@ -159,6 +159,14 @@ export default class StaffModule extends BaseModule {
         <div id="attendanceStatusDisplay" class="status-display">
           <!-- 動的に更新される -->
         </div>
+
+        <!-- 日報セクション -->
+        <div id="staffReportSection" class="mt-4">
+          <div class="text-center text-muted p-4">
+            <i class="fas fa-info-circle fa-2x mb-3"></i>
+            <p>退勤後に日報を入力できます</p>
+          </div>
+        </div>
       </div>
     </div>
   `;

@@ -107,12 +107,16 @@ export class StaffAttendanceUI {
 
       if (response.success) {
         this.isWorking = false;
+        // currentAttendanceを更新（dateは既に設定されているはず）
+        if (!this.currentAttendance.date) {
+          this.currentAttendance.date = getCurrentDate();
+        }
         this.currentAttendance.clock_out = response.time;
-        this.currentAttendance.date = getCurrentDate();
         this.updateUI();
         this.app.showNotification('退勤しました', 'success');
 
         // 日報モーダルを表示
+        console.log('[退勤] 日報モーダル表示開始', this.currentAttendance);
         await this.showDailyReportModal();
         return true;
       }
@@ -145,12 +149,26 @@ export class StaffAttendanceUI {
    */
   async showDailyReportModal() {
     try {
+      console.log('[日報モーダル] 表示処理開始', {
+        currentAttendance: this.currentAttendance,
+        clock_in: this.currentAttendance?.clock_in,
+        clock_out: this.currentAttendance?.clock_out,
+        date: this.currentAttendance?.date
+      });
+
+      if (!this.currentAttendance) {
+        console.error('[日報モーダル] currentAttendanceが未設定');
+        this.app.showNotification('出勤記録が見つかりません', 'danger');
+        return;
+      }
+
       await this.dailyReportModal.show(this.currentAttendance, () => {
         // 日報提出完了時の処理
-        console.log('日報提出完了');
+        console.log('[日報モーダル] 日報提出完了');
       });
     } catch (error) {
-      console.error('日報モーダル表示エラー:', error);
+      console.error('[日報モーダル] 表示エラー:', error);
+      this.app.showNotification('日報モーダルの表示に失敗しました: ' + error.message, 'danger');
     }
   }
 
@@ -171,9 +189,17 @@ export class StaffAttendanceUI {
 
       if (response.success) {
         this.isWorking = false;
+        // currentAttendanceを更新（dateは既に設定されているはず）
+        if (!this.currentAttendance.date) {
+          this.currentAttendance.date = getCurrentDate();
+        }
         this.currentAttendance.clock_out = response.time;
         this.updateUI();
         this.app.showNotification('退勤しました（未コメント日報あり）', 'warning');
+
+        // 日報モーダルを表示
+        console.log('[強制退勤] 日報モーダル表示開始', this.currentAttendance);
+        await this.showDailyReportModal();
         return true;
       }
     } catch (error) {
@@ -345,6 +371,7 @@ async loadTodayAttendance() {
   updateUI() {
     this.updateAttendanceDisplay();
     this.updateButtonStates();
+    this.updateReportSection();
   }
 
   /**
@@ -748,6 +775,33 @@ stopBreakTimer() {
     this.breakButtonUpdateInterval = null;
   }
 }
+
+  /**
+   * 日報セクションの更新
+   */
+  updateReportSection() {
+    const reportSection = document.getElementById('staffReportSection');
+    if (!reportSection) return;
+
+    if (!this.isWorking && this.currentAttendance && this.currentAttendance.clock_out) {
+      // 退勤後: 日報入力を促すメッセージ
+      reportSection.innerHTML = `
+        <div class="alert alert-warning text-center">
+          <i class="fas fa-clipboard-list fa-2x mb-3"></i>
+          <h5>退勤後の日報を提出してください</h5>
+          <p class="mb-0">退勤時に日報モーダルが表示されます。スキップした場合は、出勤簿から後で入力できます。</p>
+        </div>
+      `;
+    } else {
+      // 退勤前: デフォルトメッセージ
+      reportSection.innerHTML = `
+        <div class="text-center text-muted p-4">
+          <i class="fas fa-info-circle fa-2x mb-3"></i>
+          <p>退勤後に日報を入力できます</p>
+        </div>
+      `;
+    }
+  }
 
   /**
    * クリーンアップ

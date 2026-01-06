@@ -18,9 +18,17 @@ export class StaffDailyReportModal {
    */
   async show(attendance, onSubmit) {
     try {
+      console.log('[StaffDailyReportModal] show()呼び出し', {
+        attendance,
+        clock_in: attendance?.clock_in,
+        clock_out: attendance?.clock_out,
+        date: attendance?.date
+      });
+
       // 既存の日報があるか確認
       const response = await this.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY);
       const existingReport = response.report;
+      console.log('[StaffDailyReportModal] 既存日報:', existingReport);
 
       // 実働時間を計算
       const workHours = calculateWorkHours(
@@ -28,6 +36,7 @@ export class StaffDailyReportModal {
         attendance.clock_out,
         60 // 休憩60分固定
       );
+      console.log('[StaffDailyReportModal] 実働時間:', workHours);
 
       // モーダルHTMLを生成
       const modalHTML = this.generateModalHTML(attendance, workHours, existingReport);
