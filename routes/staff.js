@@ -585,7 +585,7 @@ router.post('/break/end', async (req, res) => {
         res.json({
           success: true,
           message: '稟議を下書き保存しました',
-          id: result.lastID
+          id: result.id
         });
       }
     } catch (error) {
