@@ -642,10 +642,11 @@ router.post('/break/end', async (req, res) => {
     }
   });
 
-  // 稟議一覧取得（スタッフ自身のもの）
+  // 稟議一覧取得（staffは自身のもの、adminは全て）
   router.get('/approval/list', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
     try {
       const staffId = req.session.user.id;
+      const userRole = req.session.user.role;
       const { status } = req.query;
 
       let query = `
@@ -656,9 +657,16 @@ router.post('/break/end', async (req, res) => {
         FROM approval_requests ar
         LEFT JOIN users u ON ar.staff_id = u.id
         LEFT JOIN users a ON ar.admin_id = a.id
-        WHERE ar.staff_id = ?
       `;
-      const params = [staffId];
+      const params = [];
+
+      // adminは全ての稟議、staffは自分の稟議のみ
+      if (userRole !== 'admin') {
+        query += ' WHERE ar.staff_id = ?';
+        params.push(staffId);
+      } else {
+        query += ' WHERE 1=1'; // adminは全件取得
+      }
 
       if (status) {
         query += ' AND ar.status = ?';
@@ -687,18 +695,33 @@ router.post('/break/end', async (req, res) => {
     try {
       const { id } = req.params;
       const staffId = req.session.user.id;
+      const userRole = req.session.user.role;
 
-      const approval = await dbGet(
-        `SELECT
+      // adminは全ての稟議、staffは自分の稟議のみ
+      let query, params;
+      if (userRole === 'admin') {
+        query = `SELECT
           ar.*,
           u.name as staff_name,
           a.name as admin_name
         FROM approval_requests ar
         LEFT JOIN users u ON ar.staff_id = u.id
         LEFT JOIN users a ON ar.admin_id = a.id
-        WHERE ar.id = ? AND ar.staff_id = ?`,
-        [id, staffId]
-      );
+        WHERE ar.id = ?`;
+        params = [id];
+      } else {
+        query = `SELECT
+          ar.*,
+          u.name as staff_name,
+          a.name as admin_name
+        FROM approval_requests ar
+        LEFT JOIN users u ON ar.staff_id = u.id
+        LEFT JOIN users a ON ar.admin_id = a.id
+        WHERE ar.id = ? AND ar.staff_id = ?`;
+        params = [id, staffId];
+      }
+
+      const approval = await dbGet(query, params);
 
       if (!approval) {
         return res.status(404).json({
@@ -720,16 +743,24 @@ router.post('/break/end', async (req, res) => {
     }
   });
 
-  // 稟議削除（下書きのみ）
+  // 稟議削除（staffは下書きのみ、adminは全て）
   router.delete('/approval/:id', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
     try {
       const { id } = req.params;
       const staffId = req.session.user.id;
+      const userRole = req.session.user.role;
 
-      const approval = await dbGet(
-        'SELECT * FROM approval_requests WHERE id = ? AND staff_id = ?',
-        [id, staffId]
-      );
+      // adminは全ての稟議、staffは自分の稟議のみ
+      let query, params;
+      if (userRole === 'admin') {
+        query = 'SELECT * FROM approval_requests WHERE id = ?';
+        params = [id];
+      } else {
+        query = 'SELECT * FROM approval_requests WHERE id = ? AND staff_id = ?';
+        params = [id, staffId];
+      }
+
+      const approval = await dbGet(query, params);
 
       if (!approval) {
         return res.status(404).json({
@@ -738,7 +769,8 @@ router.post('/break/end', async (req, res) => {
         });
       }
 
-      if (approval.status !== 'draft') {
+      // staffは下書きのみ削除可能、adminは全て削除可能
+      if (userRole !== 'admin' && approval.status !== 'draft') {
         return res.status(400).json({
           success: false,
           error: '下書き状態の稟議のみ削除できます'
