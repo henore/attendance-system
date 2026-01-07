@@ -198,6 +198,30 @@ export default class StaffApproval {
         if (listTab) {
             listTab.addEventListener('shown.bs.tab', () => this.loadApprovalList());
         }
+
+        // テーブルボタンのイベント委譲
+        document.addEventListener('click', (e) => {
+            // 詳細ボタン
+            if (e.target.closest('.btn-show-approval-detail')) {
+                const btn = e.target.closest('.btn-show-approval-detail');
+                const id = parseInt(btn.dataset.id);
+                this.viewDetail(id);
+            }
+
+            // 編集ボタン
+            if (e.target.closest('.btn-edit-approval')) {
+                const btn = e.target.closest('.btn-edit-approval');
+                const id = parseInt(btn.dataset.id);
+                this.editApproval(id);
+            }
+
+            // 削除ボタン
+            if (e.target.closest('.btn-delete-approval')) {
+                const btn = e.target.closest('.btn-delete-approval');
+                const id = parseInt(btn.dataset.id);
+                this.deleteApproval(id);
+            }
+        });
     }
 
     async handleSaveDraft() {
@@ -352,14 +376,14 @@ export default class StaffApproval {
                 <td>${this.getStatusBadge(approval.status)}</td>
                 <td>${this.formatDateTime(approval.submitted_at || approval.created_at)}</td>
                 <td>
-                    <button class="btn btn-sm btn-info" onclick="window.staffApproval.viewDetail(${approval.id})">
+                    <button class="btn btn-sm btn-info btn-show-approval-detail" data-id="${approval.id}">
                         <i class="fas fa-eye"></i> 詳細
                     </button>
                     ${approval.status === 'draft' ? `
-                        <button class="btn btn-sm btn-primary" onclick="window.staffApproval.editApproval(${approval.id})">
+                        <button class="btn btn-sm btn-primary btn-edit-approval" data-id="${approval.id}">
                             <i class="fas fa-edit"></i> 編集
                         </button>
-                        <button class="btn btn-sm btn-danger" onclick="window.staffApproval.deleteApproval(${approval.id})">
+                        <button class="btn btn-sm btn-danger btn-delete-approval" data-id="${approval.id}">
                             <i class="fas fa-trash"></i> 削除
                         </button>
                     ` : ''}

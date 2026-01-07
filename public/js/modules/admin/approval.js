@@ -141,6 +141,44 @@ export default class AdminApproval {
         if (confirmRejectBtn) {
             confirmRejectBtn.addEventListener('click', () => this.confirmReject());
         }
+
+        // テーブルボタンのイベント委譲
+        document.addEventListener('click', (e) => {
+            // 詳細ボタン
+            if (e.target.closest('.btn-show-admin-approval-detail')) {
+                const btn = e.target.closest('.btn-show-admin-approval-detail');
+                const id = parseInt(btn.dataset.id);
+                this.viewDetail(id);
+            }
+
+            // 承認ボタン
+            if (e.target.closest('.btn-approve-approval')) {
+                const btn = e.target.closest('.btn-approve-approval');
+                const id = parseInt(btn.dataset.id);
+                this.approveApproval(id);
+            }
+
+            // 却下ボタン
+            if (e.target.closest('.btn-reject-approval')) {
+                const btn = e.target.closest('.btn-reject-approval');
+                const id = parseInt(btn.dataset.id);
+                this.showRejectModal(id);
+            }
+
+            // 完了ボタン
+            if (e.target.closest('.btn-complete-approval')) {
+                const btn = e.target.closest('.btn-complete-approval');
+                const id = parseInt(btn.dataset.id);
+                this.completeApproval(id);
+            }
+
+            // 削除ボタン
+            if (e.target.closest('.btn-delete-admin-approval')) {
+                const btn = e.target.closest('.btn-delete-admin-approval');
+                const id = parseInt(btn.dataset.id);
+                this.deleteApproval(id);
+            }
+        });
     }
 
     async loadApprovalList() {
@@ -212,22 +250,25 @@ export default class AdminApproval {
                 <td>${this.getStatusBadge(approval.status)}</td>
                 <td>${this.formatDateTime(approval.submitted_at || approval.created_at)}</td>
                 <td>
-                    <button class="btn btn-sm btn-info mb-1" onclick="window.adminApproval.viewDetail(${approval.id})">
+                    <button class="btn btn-sm btn-info mb-1 btn-show-admin-approval-detail" data-id="${approval.id}">
                         <i class="fas fa-eye"></i> 詳細
                     </button>
                     ${approval.status === 'pending' ? `
-                        <button class="btn btn-sm btn-success mb-1" onclick="window.adminApproval.approveApproval(${approval.id})">
+                        <button class="btn btn-sm btn-success mb-1 btn-approve-approval" data-id="${approval.id}">
                             <i class="fas fa-check-circle"></i> 承認
                         </button>
-                        <button class="btn btn-sm btn-danger mb-1" onclick="window.adminApproval.showRejectModal(${approval.id})">
+                        <button class="btn btn-sm btn-danger mb-1 btn-reject-approval" data-id="${approval.id}">
                             <i class="fas fa-times-circle"></i> 却下
                         </button>
                     ` : ''}
                     ${approval.status === 'approved' ? `
-                        <button class="btn btn-sm btn-primary mb-1" onclick="window.adminApproval.completeApproval(${approval.id})">
+                        <button class="btn btn-sm btn-primary mb-1 btn-complete-approval" data-id="${approval.id}">
                             <i class="fas fa-check"></i> 完了
                         </button>
                     ` : ''}
+                    <button class="btn btn-sm btn-outline-danger mb-1 btn-delete-admin-approval" data-id="${approval.id}">
+                        <i class="fas fa-trash"></i> 削除
+                    </button>
                 </td>
             </tr>
         `).join('');
@@ -445,6 +486,28 @@ export default class AdminApproval {
         } catch (error) {
             console.error('完了エラー:', error);
             this.parentModule.showNotification('完了処理に失敗しました', 'danger');
+        }
+    }
+
+    async deleteApproval(id) {
+        if (!confirm('この稟議を削除してもよろしいですか？')) {
+            return;
+        }
+
+        try {
+            const response = await this.parentModule.callApi(`/api/staff/approval/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.success) {
+                this.parentModule.showNotification(response.message, 'success');
+                this.loadApprovalList();
+            } else {
+                this.parentModule.showNotification(response.error || '削除に失敗しました', 'danger');
+            }
+        } catch (error) {
+            console.error('削除エラー:', error);
+            this.parentModule.showNotification('削除に失敗しました', 'danger');
         }
     }
 
