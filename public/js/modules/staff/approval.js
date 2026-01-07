@@ -1,6 +1,8 @@
 // modules/staff/approval.js
 // スタッフ用稟議申請モジュール
 
+import { formatDateTime } from '../../utils/date-time.js';
+
 export default class StaffApproval {
     constructor(app, parentModule) {
         this.app = app;
@@ -374,7 +376,7 @@ export default class StaffApproval {
                 <td>${approval.amount ? approval.amount.toLocaleString() + '円' : '-'}</td>
                 <td>${this.getUrgencyBadge(approval.urgency)}</td>
                 <td>${this.getStatusBadge(approval.status)}</td>
-                <td>${this.formatDateTime(approval.submitted_at || approval.created_at)}</td>
+                <td>${formatDateTime(approval.submitted_at || approval.created_at)}</td>
                 <td>
                     <button class="btn btn-sm btn-info btn-show-approval-detail" data-id="${approval.id}">
                         <i class="fas fa-eye"></i> 詳細
@@ -450,18 +452,18 @@ export default class StaffApproval {
                 ` : ''}
                 <tr>
                     <th>作成日時</th>
-                    <td>${this.formatDateTime(approval.created_at)}</td>
+                    <td>${formatDateTime(approval.created_at)}</td>
                 </tr>
                 ${approval.submitted_at ? `
                     <tr>
                         <th>申請日時</th>
-                        <td>${this.formatDateTime(approval.submitted_at)}</td>
+                        <td>${formatDateTime(approval.submitted_at)}</td>
                     </tr>
                 ` : ''}
                 ${approval.reviewed_at ? `
                     <tr>
                         <th>承認/却下日時</th>
-                        <td>${this.formatDateTime(approval.reviewed_at)}</td>
+                        <td>${formatDateTime(approval.reviewed_at)}</td>
                     </tr>
                 ` : ''}
             </table>
@@ -540,12 +542,6 @@ export default class StaffApproval {
             'urgent': '<span class="badge bg-danger">至急</span>'
         };
         return urgencyMap[urgency] || urgency;
-    }
-
-    formatDateTime(dateTimeStr) {
-        if (!dateTimeStr) return '-';
-        const date = new Date(dateTimeStr);
-        return date.toLocaleString('ja-JP');
     }
 
     escapeHtml(text) {

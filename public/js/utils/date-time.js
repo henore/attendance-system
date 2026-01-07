@@ -192,20 +192,35 @@ export const parseJSTDate = (dateStr, timeStr = '00:00') => {
 
 /**
  * 日付をフォーマット（シンプル版）
- * @param {Date|string} date 
+ * SQLiteのタイムスタンプ（UTC）を日本時間（JST）に変換して表示
+ * @param {Date|string} date
  * @param {string} format 'date' | 'time' | 'datetime'
  * @returns {string}
  */
 export const formatDateTime = (date, format = 'datetime') => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  const jst = new Date(dateObj.getTime() + (9 * 60 * 60 * 1000));
-  
-  const year = jst.getFullYear();
-  const month = String(jst.getMonth() + 1).padStart(2, '0');
-  const day = String(jst.getDate()).padStart(2, '0');
-  const hours = String(jst.getHours()).padStart(2, '0');
-  const minutes = String(jst.getMinutes()).padStart(2, '0');
-  
+  if (!date) return '-';
+
+  // 文字列の場合、末尾に'Z'を追加してUTCとして明示的にパース
+  let dateObj;
+  if (typeof date === 'string') {
+    // SQLiteのタイムスタンプフォーマット: 'YYYY-MM-DD HH:MM:SS'
+    // これをUTCとして解釈するために'Z'を追加
+    const utcString = date.includes('T') ? date : date.replace(' ', 'T') + 'Z';
+    dateObj = new Date(utcString);
+  } else {
+    dateObj = date;
+  }
+
+  // UTCタイムスタンプをJST（UTC+9）に変換
+  const jstOffset = 9 * 60 * 60 * 1000;
+  const jstTime = new Date(dateObj.getTime() + jstOffset);
+
+  const year = jstTime.getUTCFullYear();
+  const month = String(jstTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(jstTime.getUTCDate()).padStart(2, '0');
+  const hours = String(jstTime.getUTCHours()).padStart(2, '0');
+  const minutes = String(jstTime.getUTCMinutes()).padStart(2, '0');
+
   switch (format) {
     case 'date':
       return `${year}-${month}-${day}`;
