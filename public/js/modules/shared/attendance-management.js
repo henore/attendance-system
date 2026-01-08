@@ -787,7 +787,7 @@ async searchAttendanceRecords() {
    */
   async showStaffReportModal(userId, userName, date) {
     try {
-      const response = await this.apiCall(`/api/staff/daily-report/${date}?staffId=${userId}`);
+      const response = await this.app.apiCall(`/api/staff/daily-report/${date}?staffId=${userId}`);
 
       if (!response.report) {
         this.parent.showNotification('日報が見つかりません', 'warning');

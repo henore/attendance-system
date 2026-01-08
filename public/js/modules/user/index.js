@@ -156,12 +156,6 @@ export default class UserModule extends BaseModule {
       this.updateAttendanceUI();
       this.updateLogoutButtonVisibility();
 
-      // 日報提出時のコールバックを設定（追加）
-      this.reportHandler.onReportSubmit = () => {
-        this.state.hasTodayReport = true;
-        this.updateLogoutButtonVisibility();
-      };
-
       // 出勤後の警告設定を更新
       this.updatePageLeaveWarning();
 
@@ -319,23 +313,29 @@ export default class UserModule extends BaseModule {
    */
   async loadTodayAttendance() {
     const result = await this.attendanceHandler.getTodayAttendance();
-    
+
     this.state.currentAttendance = result.attendance;
     this.state.isWorking = result.isWorking;
     this.state.hasTodayReport = result.hasReport;
-    
+
     // 今日出勤したかのフラグを設定
     this.state.hasClockInToday = !!(result.attendance && result.attendance.clock_in);
-    
+
     // 既に出勤している場合は、モーダル確認済みとする
     if (this.state.hasClockInToday) {
       this.state.hasConfirmedLastReport = true;
       this.state.hasAcceptedTerms = true;
     }
-    
+
     if (result.attendance) {
     await this.breakHandler.loadBreakStatus(this.state.currentAttendance);
     }
+
+    // 日報提出時のコールバックを設定（ページリロード後も機能するように）
+    this.reportHandler.onReportSubmit = () => {
+      this.state.hasTodayReport = true;
+      this.updateLogoutButtonVisibility();
+    };
 
     this.updateAttendanceUI();
     this.updateLogoutButtonVisibility();
