@@ -687,4 +687,301 @@ function calculateSleepHours(bedtime, wakeupTime) {
   }
 }
 
+/**
+ * スタッフ日報画像生成
+ */
+router.post('/generate-staff-report-image', async (req, res) => {
+  let browser = null;
+  try {
+    const { staffReportData, userData, date } = req.body;
+
+    console.log('[スタッフ日報画像生成] 開始:', {
+      userName: userData?.name,
+      date: date || staffReportData?.date,
+      hasStaffReportData: !!staffReportData,
+      hasUserData: !!userData
+    });
+
+    // 必須データの検証
+    if (!staffReportData || !userData) {
+      throw new Error('必須データ（staffReportData, userData）が不足しています');
+    }
+
+    // HTMLテンプレートを生成
+    const html = generateStaffReportHTML(staffReportData, userData, date);
+
+    // Puppeteerで画像生成
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+        '--single-process',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins',
+        '--disable-site-isolation-trials'
+      ],
+      ignoreDefaultArgs: ['--disable-extensions'],
+      timeout: 30000
+    });
+
+    browser.on('disconnected', () => {
+      console.log('[Puppeteer] ブラウザが切断されました');
+    });
+
+    const page = await browser.newPage();
+
+    // 日本語フォントの設定
+    await page.evaluateOnNewDocument(() => {
+      document.documentElement.style.fontFamily = '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif';
+    });
+
+    // ビューポート設定
+    await page.setViewport({ width: 1024, height: 1024, deviceScaleFactor: 2 });
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    // レンダリング完了を待つ
+    const { setTimeout } = require('node:timers/promises');
+    await setTimeout(2000);
+
+    // スクリーンショット取得
+    const pngBuffer = await page.screenshot({
+      type: 'png',
+      fullPage: false,
+      encoding: 'binary'
+    });
+
+    await browser.close();
+    browser = null;
+
+    // sharpを使用して画像を処理
+    const imageId = `staff_report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+    const imageDir = path.join(__dirname, '..', 'public', 'images');
+
+    // JPEG変換
+    const originalPath = path.join(imageDir, `${imageId}_original.jpg`);
+    await sharp(pngBuffer)
+      .resize(1024, 1024, {
+        fit: 'cover',
+        position: 'top'
+      })
+      .jpeg({
+        progressive: true,
+        mozjpeg: true
+      })
+      .toFile(originalPath);
+
+    console.log('[スタッフ日報画像生成] 完了:', {
+      imageId
+    });
+
+    res.json({
+      success: true,
+      imageId,
+      imageUrl: `/images/${imageId}_original.jpg`,
+      fileName: `${imageId}_original.jpg`
+    });
+
+  } catch (error) {
+    console.error('[スタッフ日報画像生成エラー]:', error);
+
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error('[Browser close error]:', closeError);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'スタッフ日報画像の生成に失敗しました'
+    });
+  }
+});
+
+/**
+ * スタッフ日報用HTMLテンプレート生成
+ */
+function generateStaffReportHTML(staffReportData, userData, date) {
+  const { work_report, communication, attendance } = staffReportData;
+  const displayDate = date || staffReportData.date;
+
+  // 休憩時間表示
+  let breakTimeDisplay = '-';
+  if (attendance && attendance.break_start) {
+    breakTimeDisplay = attendance.break_end ?
+      `${attendance.break_start}〜${attendance.break_end} (60分)` :
+      `${attendance.break_start}〜`;
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>スタッフ日報</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        body {
+          width: 1024px;
+          height: 1024px;
+          font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px;
+        }
+
+        .container {
+          width: 100%;
+          height: 100%;
+          background: white;
+          border-radius: 24px;
+          padding: 48px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          overflow: hidden;
+        }
+
+        .header {
+          text-align: center;
+          margin-bottom: 36px;
+          padding-bottom: 24px;
+          border-bottom: 3px solid #667eea;
+        }
+
+        .title {
+          font-size: 42px;
+          font-weight: bold;
+          color: #667eea;
+          margin-bottom: 12px;
+        }
+
+        .subtitle {
+          font-size: 28px;
+          color: #555;
+        }
+
+        .date-info {
+          text-align: center;
+          font-size: 24px;
+          color: #666;
+          margin-bottom: 32px;
+        }
+
+        .section {
+          margin-bottom: 28px;
+        }
+
+        .section-title {
+          font-size: 20px;
+          font-weight: bold;
+          color: #667eea;
+          margin-bottom: 12px;
+          padding-bottom: 8px;
+          border-bottom: 2px solid #e0e0e0;
+        }
+
+        .time-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 16px;
+          margin-bottom: 28px;
+        }
+
+        .time-item {
+          background: #f8f9fa;
+          padding: 16px;
+          border-radius: 12px;
+          border-left: 4px solid #667eea;
+        }
+
+        .time-label {
+          font-size: 16px;
+          color: #888;
+          margin-bottom: 8px;
+        }
+
+        .time-value {
+          font-size: 28px;
+          font-weight: bold;
+          color: #333;
+        }
+
+        .content-box {
+          background: #f8f9fa;
+          padding: 20px;
+          border-radius: 12px;
+          min-height: 120px;
+          font-size: 18px;
+          line-height: 1.8;
+          color: #333;
+          white-space: pre-wrap;
+        }
+
+        .footer {
+          margin-top: 32px;
+          text-align: center;
+          font-size: 16px;
+          color: #999;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="title">スタッフ日報</div>
+          <div class="subtitle">${userData.name || 'スタッフ'}</div>
+        </div>
+
+        <div class="date-info">${displayDate}</div>
+
+        <div class="time-grid">
+          <div class="time-item">
+            <div class="time-label">出勤</div>
+            <div class="time-value">${attendance ? (attendance.clock_in || '-') : '-'}</div>
+          </div>
+          <div class="time-item">
+            <div class="time-label">休憩</div>
+            <div class="time-value" style="font-size: 20px;">${breakTimeDisplay}</div>
+          </div>
+          <div class="time-item">
+            <div class="time-label">退勤</div>
+            <div class="time-value">${attendance ? (attendance.clock_out || '-') : '-'}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">業務報告</div>
+          <div class="content-box">${work_report || ''}</div>
+        </div>
+
+        ${communication ? `
+          <div class="section">
+            <div class="section-title">連絡事項</div>
+            <div class="content-box">${communication}</div>
+          </div>
+        ` : ''}
+
+        <div class="footer">
+          出力日時: ${new Date().toLocaleString('ja-JP')}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 module.exports = router;

@@ -6,6 +6,7 @@ import { modalManager } from '../shared/modal-manager.js';
 import { getCurrentDate, formatDate } from '../../utils/date-time.js';
 import { AttendanceTable } from './components/attendance-table.js';
 import { ReportDetailModal } from './modals/report-detail-modal.js';
+import { LineReportSender } from './line-report-sender.js';
 
 export class SharedAttendanceManagement {
   constructor(app, parentModule) {
@@ -14,11 +15,12 @@ export class SharedAttendanceManagement {
     this.container = null;
     this.currentRecords = [];
     this.userRole = app.currentUser.role; // 'staff' or 'admin'
-    
+
     // 新しいコンポーネント
     this.attendanceTable = new AttendanceTable(parentModule);
     this.reportDetailModal = new ReportDetailModal(app, parentModule);
-    
+    this.lineSender = new LineReportSender(app);
+
     // 出勤者、出勤予定者のみ表示フラグ
     this.showOnlyWorking = true; // デフォルトで出勤者のみ表示
   }
@@ -795,6 +797,15 @@ async searchAttendanceRecords() {
       }
 
       const report = response.report;
+      const attendance = response.attendance;
+
+      // 休憩時間表示の計算
+      let breakTimeDisplay = '-';
+      if (attendance && attendance.break_start) {
+        breakTimeDisplay = attendance.break_end ?
+          `${attendance.break_start}〜${attendance.break_end} (60分)` :
+          `${attendance.break_start}〜 (進行中)`;
+      }
 
       // モーダルHTML生成
       const modalHTML = `
@@ -805,32 +816,93 @@ async searchAttendanceRecords() {
                 <h5 class="modal-title">
                   <i class="fas fa-file-alt"></i> スタッフ日報詳細
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
-              <div class="modal-body">
-                <div class="mb-3">
-                  <label class="form-label fw-bold">スタッフ名</label>
-                  <p>${userName}</p>
+              <div class="modal-body" id="staffReportModalBody">
+                <!-- 基本情報 -->
+                <div class="mb-4">
+                  <div class="row">
+                    <div class="col-6">
+                      <label class="form-label fw-bold text-muted">スタッフ名</label>
+                      <p class="h5">${userName}</p>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label fw-bold text-muted">日付</label>
+                      <p class="h5">${date}</p>
+                    </div>
+                  </div>
                 </div>
-                <div class="mb-3">
-                  <label class="form-label fw-bold">日付</label>
-                  <p>${date}</p>
+
+                <!-- 出勤情報 -->
+                <div class="row mb-4">
+                  <div class="col-4">
+                    <div class="detail-section border rounded p-3 bg-light">
+                      <h6 class="text-muted mb-2">
+                        <i class="fas fa-clock text-success"></i> 出勤時間
+                      </h6>
+                      <div class="detail-value h4 text-success mb-0">
+                        ${attendance ? (attendance.clock_in || '-') : '-'}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-4">
+                    <div class="detail-section border rounded p-3 bg-light">
+                      <h6 class="text-muted mb-2">
+                        <i class="fas fa-coffee text-warning"></i> 休憩時間
+                      </h6>
+                      <div class="detail-value small mb-0">
+                        ${breakTimeDisplay}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-4">
+                    <div class="detail-section border rounded p-3 bg-light">
+                      <h6 class="text-muted mb-2">
+                        <i class="fas fa-clock text-info"></i> 退勤時間
+                      </h6>
+                      <div class="detail-value h4 ${attendance && attendance.clock_out ? 'text-info' : 'text-muted'} mb-0">
+                        ${attendance ? (attendance.clock_out || '未退勤') : '-'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
+                <hr>
+
+                <!-- 日報内容 -->
                 <div class="mb-3">
-                  <label class="form-label fw-bold">業務報告</label>
-                  <div class="border rounded p-3 bg-light" style="white-space: pre-wrap;">${report.work_report || ''}</div>
+                  <label class="form-label fw-bold">
+                    <i class="fas fa-tasks"></i> 本日の業務報告
+                  </label>
+                  <div class="border rounded p-3 bg-light" style="white-space: pre-wrap; min-height: 100px;">
+                    ${report.work_report || ''}
+                  </div>
                 </div>
-                <div class="mb-3">
-                  <label class="form-label fw-bold">連絡事項</label>
-                  <div class="border rounded p-3 bg-light" style="white-space: pre-wrap;">${report.communication || '-'}</div>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label fw-bold">提出日時</label>
-                  <p>${new Date(report.created_at).toLocaleString('ja-JP')}</p>
+
+                ${report.communication ? `
+                  <div class="mb-3">
+                    <label class="form-label fw-bold">
+                      <i class="fas fa-comment-dots"></i> 連絡事項
+                    </label>
+                    <div class="border rounded p-3 bg-light" style="white-space: pre-wrap;">
+                      ${report.communication}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <div class="mb-3 mt-4">
+                  <small class="text-muted">
+                    <i class="fas fa-clock"></i> 提出日時: ${new Date(report.created_at).toLocaleString('ja-JP')}
+                  </small>
                 </div>
               </div>
               <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                <button type="button" class="btn btn-success" id="downloadStaffReportImageBtn">
+                  <i class="fas fa-download"></i> 画像として保存
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                  <i class="fas fa-times"></i> 閉じる
+                </button>
               </div>
             </div>
           </div>
@@ -850,6 +922,44 @@ async searchAttendanceRecords() {
       const modalElement = document.getElementById('staffReportDetailModal');
       const modal = new bootstrap.Modal(modalElement);
       modal.show();
+
+      // 画像保存ボタンのイベントリスナー
+      const downloadBtn = document.getElementById('downloadStaffReportImageBtn');
+      if (downloadBtn) {
+        downloadBtn.addEventListener('click', async () => {
+          try {
+            downloadBtn.disabled = true;
+            downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
+
+            // スタッフ日報用のデータ構造を作成
+            await this.lineSender.sendStaffReportCompletion(
+              {
+                work_report: report.work_report,
+                communication: report.communication,
+                date: date,
+                attendance: attendance
+              },
+              {
+                name: userName,
+                id: userId,
+                role: 'staff'
+              }
+            );
+
+            downloadBtn.innerHTML = '<i class="fas fa-check"></i> 保存完了';
+            setTimeout(() => {
+              downloadBtn.disabled = false;
+              downloadBtn.innerHTML = '<i class="fas fa-download"></i> 画像として保存';
+            }, 2000);
+
+          } catch (error) {
+            console.error('画像保存エラー:', error);
+            this.parent.showNotification('画像の保存に失敗しました', 'danger');
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = '<i class="fas fa-download"></i> 画像として保存';
+          }
+        });
+      }
 
       // モーダルが閉じられた時にDOMから削除
       modalElement.addEventListener('hidden.bs.modal', () => {
