@@ -427,8 +427,8 @@ export default class UserModule extends BaseModule {
       this.updateAttendanceUI();
       this.loadReportForm();
 
-      // ログアウトボタンの表示状態を更新
-      this.updateLogoutButtonVisibility();
+      // 退勤時はログアウトボタンを非表示のまま（日報提出後に表示）
+      this.app.hideLogoutButtonForUser();
 
       this.app.showNotification('退勤しました。日報の入力をお願いします。', 'info');
     }
@@ -441,12 +441,14 @@ export default class UserModule extends BaseModule {
     const container = document.getElementById('reportFormContainer');
     await this.reportHandler.loadForm(container, this.state.currentAttendance);
     this.state.hasTodayReport = this.reportHandler.hasTodayReport;
-    
+
     // 日報提出状況に応じて警告を更新
     this.updatePageLeaveWarning();
-    
-    // ログアウトボタンの表示状態を更新（追加）
-    this.updateLogoutButtonVisibility();
+
+    // 日報提出済みの場合のみログアウトボタンを表示（ページリロード時用）
+    if (this.state.hasTodayReport) {
+      this.updateLogoutButtonVisibility();
+    }
   }
 
   /**

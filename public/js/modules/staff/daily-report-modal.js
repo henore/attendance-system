@@ -22,6 +22,8 @@ export class StaffDailyReportModal {
         attendance,
         clock_in: attendance?.clock_in,
         clock_out: attendance?.clock_out,
+        break_start: attendance?.break_start,
+        break_end: attendance?.break_end,
         date: attendance?.date
       });
 
@@ -30,16 +32,20 @@ export class StaffDailyReportModal {
       const existingReport = response.report;
       console.log('[StaffDailyReportModal] 既存日報:', existingReport);
 
+      // 休憩時間を判定（break_startがある場合は60分、ない場合は0分）
+      const breakMinutes = attendance.break_start ? 60 : 0;
+      console.log('[StaffDailyReportModal] 休憩時間:', breakMinutes);
+
       // 実働時間を計算
       const workHours = calculateWorkHours(
         attendance.clock_in,
         attendance.clock_out,
-        60 // 休憩60分固定
+        breakMinutes
       );
       console.log('[StaffDailyReportModal] 実働時間:', workHours);
 
       // モーダルHTMLを生成
-      const modalHTML = this.generateModalHTML(attendance, workHours, existingReport);
+      const modalHTML = this.generateModalHTML(attendance, workHours, existingReport, breakMinutes);
 
       // 既存のモーダルを削除
       this.removeExistingModal();
@@ -66,10 +72,17 @@ export class StaffDailyReportModal {
 
   /**
    * モーダルHTMLを生成
+   * @param {Object} attendance - 出勤記録
+   * @param {string} workHours - 実働時間
+   * @param {Object} existingReport - 既存の日報
+   * @param {number} breakMinutes - 休憩時間（分）
    */
-  generateModalHTML(attendance, workHours, existingReport) {
+  generateModalHTML(attendance, workHours, existingReport, breakMinutes = 60) {
     const workReport = existingReport?.work_report || '';
     const communication = existingReport?.communication || '';
+
+    // 休憩時間の表示（0分の場合は「なし」）
+    const breakDisplay = breakMinutes > 0 ? `${breakMinutes}分` : 'なし';
 
     return `
       <div class="modal fade" id="${this.modalId}" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -98,7 +111,7 @@ export class StaffDailyReportModal {
                 <div class="col-md-3">
                   <div class="info-box">
                     <label class="form-label">休憩時間</label>
-                    <div class="info-value">60分</div>
+                    <div class="info-value">${breakDisplay}</div>
                   </div>
                 </div>
                 <div class="col-md-3">
