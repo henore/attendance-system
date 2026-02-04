@@ -305,23 +305,39 @@ export class PrintManager {
                     print-color-adjust: exact;
                 }
                 
-                /* 月別出勤簿の印刷時に非表示にしたい列 */
-                .attendance-table thead tr th:nth-child(7),  /* 状態 */
-                .attendance-table tbody tr td:nth-child(7),
+                /* 月別出勤簿の印刷時に非表示にしたい列（利用者の場合） */
+                .attendance-table-user thead tr th:nth-child(7),  /* 状態 */
+                .attendance-table-user tbody tr td:nth-child(7),
                 .attendance-table thead tr th:nth-child(8),  /* 日報・コメント */
                 .attendance-table tbody tr td:nth-child(8),
                 .attendance-table thead tr th:nth-child(9),  /* 操作 */
                 .attendance-table tbody tr td:nth-child(9) {
                     display: none !important;
                 }
-                
-                /* カラム幅の調整（表示される6列分） */
-                .attendance-table thead tr th:nth-child(1) { width: 8%; }  /* 日 */
-                .attendance-table thead tr th:nth-child(2) { width: 8%; }  /* 曜 */
-                .attendance-table thead tr th:nth-child(3) { width: 15%; } /* 出勤 */
-                .attendance-table thead tr th:nth-child(4) { width: 15%; } /* 退勤 */
-                .attendance-table thead tr th:nth-child(5) { width: 26%; } /* 休憩 */
-                .attendance-table thead tr th:nth-child(6) { width: 12%; } /* 実働 */
+
+                /* カラム幅の調整（利用者: 状態列なしの6列分） */
+                .attendance-table-user thead tr th:nth-child(1) { width: 8%; }  /* 日 */
+                .attendance-table-user thead tr th:nth-child(2) { width: 8%; }  /* 曜 */
+                .attendance-table-user thead tr th:nth-child(3) { width: 15%; } /* 出勤 */
+                .attendance-table-user thead tr th:nth-child(4) { width: 15%; } /* 退勤 */
+                .attendance-table-user thead tr th:nth-child(5) { width: 26%; } /* 休憩 */
+                .attendance-table-user thead tr th:nth-child(6) { width: 12%; } /* 実働 */
+
+                /* カラム幅の調整（スタッフ・管理者: 状態列ありの7列分） */
+                .attendance-table-staff thead tr th:nth-child(1),
+                .attendance-table-admin thead tr th:nth-child(1) { width: 7%; }  /* 日 */
+                .attendance-table-staff thead tr th:nth-child(2),
+                .attendance-table-admin thead tr th:nth-child(2) { width: 7%; }  /* 曜 */
+                .attendance-table-staff thead tr th:nth-child(3),
+                .attendance-table-admin thead tr th:nth-child(3) { width: 13%; } /* 出勤 */
+                .attendance-table-staff thead tr th:nth-child(4),
+                .attendance-table-admin thead tr th:nth-child(4) { width: 13%; } /* 退勤 */
+                .attendance-table-staff thead tr th:nth-child(5),
+                .attendance-table-admin thead tr th:nth-child(5) { width: 22%; } /* 休憩 */
+                .attendance-table-staff thead tr th:nth-child(6),
+                .attendance-table-admin thead tr th:nth-child(6) { width: 10%; } /* 実働 */
+                .attendance-table-staff thead tr th:nth-child(7),
+                .attendance-table-admin thead tr th:nth-child(7) { width: 10%; } /* 状態 */
                 
                 /* 土日の背景色 */
                 .table-danger { /* 日曜日 */

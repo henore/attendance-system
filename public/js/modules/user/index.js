@@ -617,6 +617,32 @@ export default class UserModule extends BaseModule {
   }
 
   /**
+   * ログアウト処理（日報提出チェック付き）
+   * @returns {Promise<boolean>} ログアウト可能かどうか
+   */
+  async handleLogout() {
+    // 出勤前の場合はログアウト可能
+    if (!this.state.hasClockInToday) {
+      return true;
+    }
+
+    // 勤務中の場合はログアウト不可
+    if (this.state.isWorking) {
+      this.app.showNotification('勤務中はログアウトできません。先に退勤処理を行ってください。', 'warning');
+      return false;
+    }
+
+    // 退勤済みだが日報未提出の場合はログアウト不可
+    if (!this.state.hasTodayReport) {
+      this.app.showNotification('日報を提出してからログアウトしてください。', 'warning');
+      return false;
+    }
+
+    // 退勤済みかつ日報提出済みの場合のみログアウト可能
+    return true;
+  }
+
+  /**
    * クリーンアップ
    */
   destroy() {

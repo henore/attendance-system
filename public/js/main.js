@@ -304,8 +304,8 @@ class AttendanceManagementSystem {
 
     async handleLogout() {
         try {
-            // スタッフの場合は特別な確認
-            if (this.currentUser.role === 'staff' && this.currentModule.handleLogout) {
+            // モジュールにhandleLogoutがある場合は確認処理を実行
+            if (this.currentModule && this.currentModule.handleLogout) {
                 const canLogout = await this.currentModule.handleLogout();
                 if (!canLogout) return;
             }

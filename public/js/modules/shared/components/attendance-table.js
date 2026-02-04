@@ -40,13 +40,17 @@ export class AttendanceTable {
     if (filteredRecords.length === 0) {
       return this.generateEmptyState(showOnlyWorking);
     }
- 
+
+    // ユーザーのロールを取得（テーブルのクラスに追加用）
+    const userRole = filteredRecords[0]?.user_role || '';
+    const roleClass = userRole ? `attendance-table-${userRole}` : '';
+
     return `
-      <div class="table-responsive attendance-table">
+      <div class="table-responsive attendance-table ${roleClass}">
         <table class="table table-hover">
           ${this.generateTableHeader(options)}
           <tbody>
-            ${filteredRecords.map(record => 
+            ${filteredRecords.map(record =>
               this.generateTableRow(record, options)
             ).join('')}
           </tbody>
