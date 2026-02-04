@@ -772,14 +772,17 @@ stopBreakTimer() {
       const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY);
       const existingReport = response.report;
 
+      // 休憩時間を判定（break_startがある場合は60分、ない場合は0分）
+      const breakMinutes = this.currentAttendance.break_start ? 60 : 0;
+
       // 実働時間を計算
       const workHours = calculateWorkHours(
         this.currentAttendance.clock_in,
         this.currentAttendance.clock_out,
-        60 // 休憩60分固定
+        breakMinutes
       );
 
-      container.innerHTML = this.generateReportForm(workHours, existingReport);
+      container.innerHTML = this.generateReportForm(workHours, existingReport, breakMinutes);
 
       // イベントリスナーを設定
       this.setupReportEventListeners();
@@ -796,10 +799,16 @@ stopBreakTimer() {
 
   /**
    * 日報フォームHTML生成
+   * @param {string} workHours - 実働時間
+   * @param {Object} existingReport - 既存の日報
+   * @param {number} breakMinutes - 休憩時間（分）
    */
-  generateReportForm(workHours, existingReport) {
+  generateReportForm(workHours, existingReport, breakMinutes = 60) {
     const workReport = existingReport?.work_report || '';
     const communication = existingReport?.communication || '';
+
+    // 休憩時間の表示（0分の場合は「なし」）
+    const breakDisplay = breakMinutes > 0 ? `${breakMinutes}分` : 'なし';
 
     return `
       <div class="card">
@@ -824,7 +833,7 @@ stopBreakTimer() {
             <div class="col-md-3">
               <div class="info-box">
                 <label class="form-label">休憩時間</label>
-                <div class="info-value">60分</div>
+                <div class="info-value">${breakDisplay}</div>
               </div>
             </div>
             <div class="col-md-3">
