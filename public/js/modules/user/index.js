@@ -425,9 +425,9 @@ export default class UserModule extends BaseModule {
       }
 
       this.updateAttendanceUI();
-      this.loadReportForm();
+      await this.loadReportForm();
 
-      // 退勤時はログアウトボタンを非表示のまま（日報提出後に表示）
+      // 退勤時はログアウトボタンを非表示（日報提出後に表示）
       this.app.hideLogoutButtonForUser();
 
       this.app.showNotification('退勤しました。日報の入力をお願いします。', 'info');
@@ -445,9 +445,13 @@ export default class UserModule extends BaseModule {
     // 日報提出状況に応じて警告を更新
     this.updatePageLeaveWarning();
 
-    // 日報提出済みの場合のみログアウトボタンを表示（ページリロード時用）
+    // 日報提出状況に応じてログアウトボタンを制御
     if (this.state.hasTodayReport) {
+      // 日報提出済みの場合のみログアウトボタンを表示
       this.updateLogoutButtonVisibility();
+    } else if (this.state.hasClockInToday) {
+      // 出勤済みで日報未提出の場合は非表示
+      this.app.hideLogoutButtonForUser();
     }
   }
 

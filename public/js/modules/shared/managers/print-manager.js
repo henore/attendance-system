@@ -378,10 +378,10 @@ export class PrintManager {
                     -webkit-print-color-adjust: exact;
                     print-color-adjust: exact;
                 }
+                /* 正常（bg-success）は印刷時に非表示 */
                 .attendance-table-staff .badge.bg-success,
                 .attendance-table-admin .badge.bg-success {
-                    background-color: #198754 !important;
-                    color: white !important;
+                    display: none !important;
                 }
                 .attendance-table-staff .badge.bg-warning,
                 .attendance-table-admin .badge.bg-warning {
