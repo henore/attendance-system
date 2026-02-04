@@ -363,9 +363,50 @@ export class PrintManager {
                     font-size:6px;
                 }
                 
-                /* バッジのスタイル（非表示対象外の場合） */
-                .badge {
+                /* バッジのスタイル（利用者テーブルでは非表示） */
+                .attendance-table-user .badge {
                     display: none !important;
+                }
+
+                /* スタッフ・管理者テーブルのバッジは表示（印刷用スタイル） */
+                .attendance-table-staff .badge,
+                .attendance-table-admin .badge {
+                    display: inline-block !important;
+                    padding: 2px 6px;
+                    font-size: 8pt;
+                    border-radius: 3px;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                .attendance-table-staff .badge.bg-success,
+                .attendance-table-admin .badge.bg-success {
+                    background-color: #198754 !important;
+                    color: white !important;
+                }
+                .attendance-table-staff .badge.bg-warning,
+                .attendance-table-admin .badge.bg-warning {
+                    background-color: #ffc107 !important;
+                    color: black !important;
+                }
+                .attendance-table-staff .badge.bg-danger,
+                .attendance-table-admin .badge.bg-danger {
+                    background-color: #dc3545 !important;
+                    color: white !important;
+                }
+                .attendance-table-staff .badge.bg-primary,
+                .attendance-table-admin .badge.bg-primary {
+                    background-color: #0d6efd !important;
+                    color: white !important;
+                }
+                .attendance-table-staff .badge.bg-info,
+                .attendance-table-admin .badge.bg-info {
+                    background-color: #0dcaf0 !important;
+                    color: black !important;
+                }
+                .attendance-table-staff .badge.bg-secondary,
+                .attendance-table-admin .badge.bg-secondary {
+                    background-color: #6c757d !important;
+                    color: white !important;
                 }
                 
                 /* 改ページ制御 */
