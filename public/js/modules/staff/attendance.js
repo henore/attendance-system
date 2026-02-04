@@ -2,7 +2,7 @@
 // スタッフの出退勤UI制御（簡潔版）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-import { getCurrentTime, getCurrentDate, calculateWorkHours } from '../../utils/date-time.js';
+import { getCurrentTime, getCurrentDate, calculateWorkHours, calculateBreakDuration } from '../../utils/date-time.js';
 import { ConfirmationModal } from '../user/confirmation-modal.js';
 
 export class StaffAttendanceUI {
@@ -772,8 +772,10 @@ stopBreakTimer() {
       const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY);
       const existingReport = response.report;
 
-      // 休憩時間を判定（break_startがある場合は60分、ない場合は0分）
-      const breakMinutes = this.currentAttendance.break_start ? 60 : 0;
+      // 休憩時間を計算（実際の開始・終了時刻から）
+      const breakMinutes = (this.currentAttendance.break_start && this.currentAttendance.break_end)
+        ? calculateBreakDuration(this.currentAttendance.break_start, this.currentAttendance.break_end)
+        : 0;
 
       // 実働時間を計算
       const workHours = calculateWorkHours(
@@ -803,12 +805,17 @@ stopBreakTimer() {
    * @param {Object} existingReport - 既存の日報
    * @param {number} breakMinutes - 休憩時間（分）
    */
-  generateReportForm(workHours, existingReport, breakMinutes = 60) {
+  generateReportForm(workHours, existingReport, breakMinutes = 0) {
     const workReport = existingReport?.work_report || '';
     const communication = existingReport?.communication || '';
 
-    // 休憩時間の表示（0分の場合は「なし」）
-    const breakDisplay = breakMinutes > 0 ? `${breakMinutes}分` : 'なし';
+    // 休憩時間の表示（時刻と分数を表示）
+    let breakDisplay = 'なし';
+    if (this.currentAttendance.break_start && this.currentAttendance.break_end) {
+      breakDisplay = `${this.currentAttendance.break_start}〜${this.currentAttendance.break_end}（${breakMinutes}分）`;
+    } else if (this.currentAttendance.break_start) {
+      breakDisplay = `${this.currentAttendance.break_start}〜（進行中）`;
+    }
 
     return `
       <div class="card">

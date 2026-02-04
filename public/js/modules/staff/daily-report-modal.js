@@ -2,7 +2,7 @@
 // スタッフ日報モーダル
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-import { getCurrentDate, calculateWorkHours } from '../../utils/date-time.js';
+import { getCurrentDate, calculateWorkHours, calculateBreakDuration } from '../../utils/date-time.js';
 
 export class StaffDailyReportModal {
   constructor(apiCall, showNotification) {
@@ -32,8 +32,10 @@ export class StaffDailyReportModal {
       const existingReport = response.report;
       console.log('[StaffDailyReportModal] 既存日報:', existingReport);
 
-      // 休憩時間を判定（break_startがある場合は60分、ない場合は0分）
-      const breakMinutes = attendance.break_start ? 60 : 0;
+      // 休憩時間を計算（実際の開始・終了時刻から）
+      const breakMinutes = (attendance.break_start && attendance.break_end)
+        ? calculateBreakDuration(attendance.break_start, attendance.break_end)
+        : 0;
       console.log('[StaffDailyReportModal] 休憩時間:', breakMinutes);
 
       // 実働時間を計算
@@ -77,12 +79,17 @@ export class StaffDailyReportModal {
    * @param {Object} existingReport - 既存の日報
    * @param {number} breakMinutes - 休憩時間（分）
    */
-  generateModalHTML(attendance, workHours, existingReport, breakMinutes = 60) {
+  generateModalHTML(attendance, workHours, existingReport, breakMinutes = 0) {
     const workReport = existingReport?.work_report || '';
     const communication = existingReport?.communication || '';
 
-    // 休憩時間の表示（0分の場合は「なし」）
-    const breakDisplay = breakMinutes > 0 ? `${breakMinutes}分` : 'なし';
+    // 休憩時間の表示（時刻と分数を表示）
+    let breakDisplay = 'なし';
+    if (attendance.break_start && attendance.break_end) {
+      breakDisplay = `${attendance.break_start}〜${attendance.break_end}（${breakMinutes}分）`;
+    } else if (attendance.break_start) {
+      breakDisplay = `${attendance.break_start}〜（進行中）`;
+    }
 
     return `
       <div class="modal fade" id="${this.modalId}" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
