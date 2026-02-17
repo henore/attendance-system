@@ -583,7 +583,19 @@ export class ReportDetailModal {
           `}
         </div>
 
-        <!-- 連絡時間（在宅の場合） -->
+        <!-- 連絡時間 -->
+        ${this.userRole === 'admin' ? `
+        <div class="row mb-3">
+          <div class="col-6">
+            <label class="form-label"><i class="fas fa-phone"></i> 連絡時間1回目</label>
+            <input type="time" class="form-control admin-editable" id="editContactTime1" value="${report.contact_time_1 || ''}">
+          </div>
+          <div class="col-6">
+            <label class="form-label"><i class="fas fa-phone"></i> 連絡時間2回目</label>
+            <input type="time" class="form-control admin-editable" id="editContactTime2" value="${report.contact_time_2 || ''}">
+          </div>
+        </div>
+        ` : `
         ${report.contact_time_1 || report.contact_time_2 ? `
         <div class="row mb-3">
           <div class="col-6">
@@ -596,6 +608,7 @@ export class ReportDetailModal {
           </div>
         </div>
         ` : ''}
+        `}
 
         <!-- 健康状態 -->
         <div class="row mb-3">
