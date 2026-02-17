@@ -479,6 +479,20 @@ function generateSquareLayoutHTML(data) {
             ` : ''}
           </div>
 
+          ${data.report.contact_time_1 || data.report.contact_time_2 ? `
+          <!-- 連絡時間 -->
+          <div class="work-info-row">
+            <div class="form-section compact">
+              <label class="past-form-label">📞 連絡時間1回目</label>
+              <div class="past-form-value">${data.report.contact_time_1 || '-'}</div>
+            </div>
+            <div class="form-section compact">
+              <label class="past-form-label">📞 連絡時間2回目</label>
+              <div class="past-form-value">${data.report.contact_time_2 || '-'}</div>
+            </div>
+          </div>
+          ` : ''}
+
           <!-- 健康状態（1行目） -->
           <div class="health-row">
             <div class="form-section compact">
@@ -585,7 +599,9 @@ function normalizeReportData(reportData, userData, commentData, date) {
       wakeup_time: reportData.wakeup_time || null,
       medication_time: reportData.medication_time || null,
       reflection: reportData.reflection || '',
-      interview_request: reportData.interview_request || null
+      interview_request: reportData.interview_request || null,
+      contact_time_1: reportData.contact_time_1 || null,
+      contact_time_2: reportData.contact_time_2 || null
     },
     comment: commentData && commentData.comment ? {
       comment: commentData.comment,

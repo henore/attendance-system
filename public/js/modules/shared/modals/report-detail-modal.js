@@ -583,6 +583,20 @@ export class ReportDetailModal {
           `}
         </div>
 
+        <!-- 連絡時間（在宅の場合） -->
+        ${report.contact_time_1 || report.contact_time_2 ? `
+        <div class="row mb-3">
+          <div class="col-6">
+            <label class="past-form-label"><i class="fas fa-phone"></i> 連絡時間1回目</label>
+            <div class="past-form-value">${report.contact_time_1 || '-'}</div>
+          </div>
+          <div class="col-6">
+            <label class="past-form-label"><i class="fas fa-phone"></i> 連絡時間2回目</label>
+            <div class="past-form-value">${report.contact_time_2 || '-'}</div>
+          </div>
+        </div>
+        ` : ''}
+
         <!-- 健康状態 -->
         <div class="row mb-3">
           <div class="col-3">
@@ -1133,7 +1147,9 @@ export class ReportDetailModal {
     const sleepQualityEl = document.getElementById('editSleepQuality');
     const reflectionEl = document.getElementById('editReflection');
     const interviewRequestEl = document.getElementById('editInterviewRequest');
-    
+    const contactTime1El = document.getElementById('editContactTime1');
+    const contactTime2El = document.getElementById('editContactTime2');
+
     return {
       workContent: workContentEl?.value.trim() || '',
       workLocation: workLocationEl?.value || '',
@@ -1146,7 +1162,9 @@ export class ReportDetailModal {
       wakeupTime: wakeupTimeEl?.value || null,
       sleepQuality: sleepQualityEl?.value || 'good',
       reflection: reflectionEl?.value.trim() || '',
-      interviewRequest: interviewRequestEl?.value || null
+      interviewRequest: interviewRequestEl?.value || null,
+      contactTime1: contactTime1El?.value || null,
+      contactTime2: contactTime2El?.value || null
     };
   }
 

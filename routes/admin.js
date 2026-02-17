@@ -999,7 +999,9 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 wakeupTime,
                 sleepQuality,
                 reflection,
-                interviewRequest
+                interviewRequest,
+                contactTime1,
+                contactTime2
             } = req.body;
 
             // バリデーション
@@ -1038,6 +1040,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     sleep_quality = ?,
                     reflection = ?,
                     interview_request = ?,
+                    contact_time_1 = ?,
+                    contact_time_2 = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ? AND date = ?
             `, [
@@ -1053,6 +1057,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 sleepQuality,
                 reflection,
                 interviewRequest,
+                contactTime1 || null,
+                contactTime2 || null,
                 userId,
                 date
             ]);

@@ -196,7 +196,22 @@ export class UserReportHandler {
             </select>
           </div>
         </div>
-        
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label for="contactTime1" class="form-label">
+              <i class="fas fa-phone"></i> 連絡時間1回目
+            </label>
+            <input type="time" class="form-control" id="contactTime1" value="${report.contact_time_1 || ''}">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label for="contactTime2" class="form-label">
+              <i class="fas fa-phone"></i> 連絡時間2回目
+            </label>
+            <input type="time" class="form-control" id="contactTime2" value="${report.contact_time_2 || ''}">
+          </div>
+        </div>
+
         <div class="row">
           <div class="col-md-4 mb-3">
             <label for="temperature" class="form-label">
@@ -409,6 +424,8 @@ export class UserReportHandler {
   setupWorkLocationValidation() {
     const workLocationSelect = document.getElementById('workLocation');
     const externalWorkCheckbox = document.getElementById('externalWorkLocation');
+    const contactTime1 = document.getElementById('contactTime1');
+    const contactTime2 = document.getElementById('contactTime2');
 
     if (!workLocationSelect || !externalWorkCheckbox) return;
 
@@ -420,16 +437,37 @@ export class UserReportHandler {
         // 通所の場合は必須かつ有効化
         externalWorkCheckbox.required = true;
         externalWorkCheckbox.disabled = false;
+        // 連絡時間はグレーアウト
+        if (contactTime1) {
+          contactTime1.disabled = true;
+          contactTime1.value = '';
+        }
+        if (contactTime2) {
+          contactTime2.disabled = true;
+          contactTime2.value = '';
+        }
       } else if (workLocation === 'home') {
         // 在宅の場合は必須解除、無効化、チェックを外す
         externalWorkCheckbox.required = false;
         externalWorkCheckbox.disabled = true;
         externalWorkCheckbox.checked = false;
+        // 連絡時間を有効化
+        if (contactTime1) contactTime1.disabled = false;
+        if (contactTime2) contactTime2.disabled = false;
       } else {
         // 未選択の場合は必須解除、無効化
         externalWorkCheckbox.required = false;
         externalWorkCheckbox.disabled = true;
         externalWorkCheckbox.checked = false;
+        // 連絡時間もグレーアウト
+        if (contactTime1) {
+          contactTime1.disabled = true;
+          contactTime1.value = '';
+        }
+        if (contactTime2) {
+          contactTime2.disabled = true;
+          contactTime2.value = '';
+        }
       }
     };
 
@@ -488,7 +526,9 @@ export class UserReportHandler {
       wakeupTime: document.getElementById('wakeupTime').value,
       sleepQuality: document.getElementById('sleepQuality').value,
       reflection: document.getElementById('reflection').value,
-      interviewRequest: document.getElementById('interviewRequest').value
+      interviewRequest: document.getElementById('interviewRequest').value,
+      contactTime1: document.getElementById('contactTime1').value || null,
+      contactTime2: document.getElementById('contactTime2').value || null
     };
     
     console.log('[日報フロント] 送信データ:', formData);
@@ -614,7 +654,20 @@ export class UserReportHandler {
           <div class="past-form-value text-info">${report.external_work_location}</div>
         </div>
       ` : ''}
-      
+
+      ${(report.contact_time_1 || report.contact_time_2) ? `
+        <div class="past-health-grid">
+          <div class="past-form-section">
+            <label class="past-form-label"><i class="fas fa-phone"></i> 連絡時間1回目</label>
+            <div class="past-form-value">${report.contact_time_1 || '-'}</div>
+          </div>
+          <div class="past-form-section">
+            <label class="past-form-label"><i class="fas fa-phone"></i> 連絡時間2回目</label>
+            <div class="past-form-value">${report.contact_time_2 || '-'}</div>
+          </div>
+        </div>
+      ` : ''}
+
       <div class="past-health-grid">
         <div class="past-form-section">
           <label class="past-form-label">体温</label>

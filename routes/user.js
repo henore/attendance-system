@@ -49,7 +49,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             
             const {
                 workContent,
-                externalWorkLocation,  // 追加
+                externalWorkLocation,
                 workLocation,
                 pcNumber,
                 temperature,
@@ -59,7 +59,9 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 wakeupTime,
                 sleepQuality,
                 reflection,
-                interviewRequest
+                interviewRequest,
+                contactTime1,
+                contactTime2
             } = req.body;
             
             console.log('[日報API] 分割代入後 - workContent:', workContent);
@@ -81,22 +83,22 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 });
             }
             
-            // 日報登録または更新（作業場所・PC番号対応版）
+            // 日報登録または更新
             const sqlParams = [
                 userId, today, workContent, externalWorkLocation || null, workLocation || null, pcNumber || null,
-                temperature, appetite, medicationTime || null, bedtime || null, wakeupTime || null, 
-                sleepQuality, reflection || '', interviewRequest || null
+                temperature, appetite, medicationTime || null, bedtime || null, wakeupTime || null,
+                sleepQuality, reflection || '', interviewRequest || null,
+                contactTime1 || null, contactTime2 || null
             ];
-            
+
             console.log('[日報API] SQL実行パラメータ:', sqlParams);
-            console.log('[日報API] externalWorkLocation値:', externalWorkLocation || null);
-            
+
             await dbRun(`
                 INSERT OR REPLACE INTO daily_reports (
                     user_id, date, work_content, external_work_location, work_location, pc_number,
                     temperature, appetite, medication_time, bedtime, wakeup_time, sleep_quality,
-                    reflection, interview_request
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    reflection, interview_request, contact_time_1, contact_time_2
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, sqlParams);
             
             // 出勤記録の日報フラグ更新

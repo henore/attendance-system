@@ -83,6 +83,8 @@ db.serialize(() => {
             sleep_quality TEXT CHECK(sleep_quality IN ('good', 'poor', 'bad')),
             reflection TEXT,
             interview_request TEXT CHECK(interview_request IN ('consultation', 'interview')),
+            contact_time_1 TIME,
+            contact_time_2 TIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id),
