@@ -247,7 +247,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         processed.break_end = record.break_end;
       }
       // 利用者の休憩情報
-      else if (record.user_role === 'user' && record.service_type !== 'home') {
+      else if (record.user_role === 'user') {
         if (record.br_start) {
           processed.breakRecord = {
             start_time: record.br_start,

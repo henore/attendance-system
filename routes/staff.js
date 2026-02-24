@@ -33,18 +33,31 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         });
       }
       
+      // 休憩中なら自動終了（開始+60分固定）
+      const attendance = await dbGet(
+        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+        [staffId, today]
+      );
+      if (attendance && attendance.break_start && !attendance.break_end) {
+        const endTime = minutesToTime(timeToMinutes(attendance.break_start) + 60);
+        await dbRun(
+          'UPDATE attendance SET break_end = ? WHERE id = ?',
+          [endTime, attendance.id]
+        );
+      }
+
       // 退勤処理
       await dbRun(
         'UPDATE attendance SET clock_out = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND date = ?',
         [currentTime, staffId, today]
       );
-      
+
       res.json({
         success: true,
         message: '退勤しました',
         time: currentTime
       });
-      
+
     } catch (error) {
       console.error('退勤処理エラー:', error);
       res.status(500).json({ success: false, error: '退勤処理に失敗しました' });
@@ -57,6 +70,19 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       const staffId = req.session.user.id;
       const today = getCurrentDate();
       const currentTime = getCurrentTime();
+
+      // 休憩中なら自動終了（開始+60分固定）
+      const attendance = await dbGet(
+        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+        [staffId, today]
+      );
+      if (attendance && attendance.break_start && !attendance.break_end) {
+        const endTime = minutesToTime(timeToMinutes(attendance.break_start) + 60);
+        await dbRun(
+          'UPDATE attendance SET break_end = ? WHERE id = ?',
+          [endTime, attendance.id]
+        );
+      }
 
       // 未コメントチェックをスキップして退勤処理
       await dbRun(

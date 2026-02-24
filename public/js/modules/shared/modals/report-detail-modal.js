@@ -455,7 +455,7 @@ export class ReportDetailModal {
     
     // 休憩時間の表示
     let breakTimeDisplay = '-';
-    if (user.role === 'user' && user.service_type !== 'home') {
+    if (user.role === 'user') {
       if (breakRecord && breakRecord.start_time) {
         breakTimeDisplay = breakRecord.end_time ? 
           `${breakRecord.start_time}〜${breakRecord.end_time} (${breakRecord.duration || 60}分)` : 
@@ -754,8 +754,8 @@ export class ReportDetailModal {
         <hr>
       ` : ''}
 
-      <!-- スタッフコメントエリア -->
-      ${this.generateCommentSection(comment)}
+      <!-- スタッフコメントエリア（利用者の日報のみ） -->
+      ${user.role === 'user' ? this.generateCommentSection(comment) : ''}
     `;
   }
 

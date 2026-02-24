@@ -13,14 +13,30 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
       const userId = req.session.user.id;
       const today = getCurrentDate();
       
-      const attendance = await dbGet(
+      let attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
         [userId, today]
       );
-      
-      res.json({ 
-        success: true, 
-        attendance: attendance || null 
+
+      // スタッフ・管理者の休憩が60分経過していたら自動終了
+      if (attendance && attendance.break_start && !attendance.break_end) {
+        const userRole = req.session.user.role;
+        if (userRole === 'staff' || userRole === 'admin') {
+          const elapsed = timeToMinutes(getCurrentTime()) - timeToMinutes(attendance.break_start);
+          if (elapsed >= 60) {
+            const endTime = minutesToTime(timeToMinutes(attendance.break_start) + 60);
+            await dbRun(
+              'UPDATE attendance SET break_end = ? WHERE id = ?',
+              [endTime, attendance.id]
+            );
+            attendance.break_end = endTime;
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        attendance: attendance || null
       });
     } catch (error) {
       console.error('出勤状況取得エラー:', error);

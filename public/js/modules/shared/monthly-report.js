@@ -538,7 +538,7 @@ export default class SharedMonthlyReport {
                 };
 
                 // 利用者の休憩記録を含める（APIから直接取得したデータをマッピング）
-                if (user.role === 'user' && user.service_type !== 'home') {
+                if (user.role === 'user') {
                     // break_recordsテーブルからのデータ（admin/staff APIはbreak_start/break_endとして返す）
                     if (record.break_start || record.break_end) {
                         dailyRecord.breakRecord = {
