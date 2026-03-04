@@ -306,18 +306,16 @@ export class PrintManager {
                 }
                 
                 /* 操作列は印刷時非表示 */
-                .attendance-table thead tr th:last-child,
-                .attendance-table tbody tr td:last-child {
+                .operation-col {
                     display: none !important;
                 }
 
-                /* 利用者テーブル: 状態列を非表示 */
-                .attendance-table-user thead tr th.status-col,
-                .attendance-table-user tbody tr td.status-col {
+                /* 利用者テーブル: 状態列を印刷時非表示 */
+                .attendance-table-user .status-col {
                     display: none !important;
                 }
 
-                /* 送迎列のスタイル */
+                /* 送迎列の印刷スタイル */
                 .transportation-col {
                     width: 5% !important;
                     font-size: 8pt;

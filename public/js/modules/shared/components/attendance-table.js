@@ -82,7 +82,7 @@ export class AttendanceTable {
             <th class="text-center" width="8%">実働</th>
             ${showTransportation ? '<th class="text-center transportation-col" width="4%">迎</th><th class="text-center transportation-col" width="4%">送</th>' : ''}
             <th class="text-center status-col" width="8%">状態</th>
-            ${showOperations ? '<th class="text-center" width="20%">操作</th>' : ''}
+            ${showOperations ? '<th class="text-center operation-col" width="20%">操作</th>' : ''}
           </tr>
         </thead>
       `;
@@ -189,10 +189,12 @@ export class AttendanceTable {
     const dayClickAttrs = hasReport ?
       `data-user-id="${record.user_id}" data-user-name="${record.user_name}" data-date="${record.date}" style="cursor: pointer;"` : '';
 
-    // サービス区分表示
+    // サービス区分表示（出勤日のみ）
     let serviceTypeCell = '';
     if (showServiceType) {
-      const serviceLabel = record.service_type === 'commute' ? '通所' : record.service_type === 'home' ? '在宅' : '-';
+      const serviceLabel = record.clock_in
+        ? (record.service_type === 'commute' ? '通所' : record.service_type === 'home' ? '在宅' : '')
+        : '';
       serviceTypeCell = `<td class="text-center">${serviceLabel}</td>`;
     }
 
@@ -214,7 +216,7 @@ export class AttendanceTable {
         <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
         ${transportationCells}
         <td class="text-center status-col">${statusBadge}</td>
-        ${showOperations ? `<td class="text-center">${operations}</td>` : ''}
+        ${showOperations ? `<td class="text-center operation-col">${operations}</td>` : ''}
       </tr>
     `;
   }
