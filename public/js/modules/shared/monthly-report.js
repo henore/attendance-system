@@ -625,7 +625,8 @@ export default class SharedMonthlyReport {
         let transportationCells = '';
         if (showTransportation) {
             const transportationCount = records.filter(r => r.transportation === 1 && r.clock_in).length;
-            transportationCells = `<th class="text-center transportation-col">迎:${transportationCount}</th><th class="text-center transportation-col">送:${transportationCount}</th>`;
+            const totalTransportation = transportationCount * 2; // 迎+送の合算
+            transportationCells = `<th colspan="2" class="text-center transportation-col">送迎:${totalTransportation}</th>`;
         }
 
         // サービス区分列の有無でcolspan調整
