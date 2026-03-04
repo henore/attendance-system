@@ -624,7 +624,12 @@ export default class SharedMonthlyReport {
         const showTransportation = user.role === 'user' && user.service_type === 'commute' && user.transportation === 1 && (this.isAdmin || this.isStaff);
         let transportationCells = '';
         if (showTransportation) {
-            const transportationCount = records.filter(r => r.transportation === 1 && r.clock_in).length;
+            const transportationCount = records.filter(r => {
+                if (!r.transportation || !r.clock_in) return false;
+                const loc = r.work_location;
+                const isHome = loc ? loc === 'home' : r.service_type === 'home';
+                return !isHome;
+            }).length;
             const totalTransportation = transportationCount * 2; // 迎+送の合算
             transportationCells = `<th colspan="2" class="text-center transportation-col">送迎:${totalTransportation}</th>`;
         }

@@ -204,10 +204,12 @@ export class AttendanceTable {
       serviceTypeCell = `<td class="text-center">${serviceLabel}</td>`;
     }
 
-    // 送迎表示（出勤記録がある通所利用者で送迎ありの場合に1を表示）
+    // 送迎表示（出勤記録がある通所日のみ。在宅日は送迎なし）
     let transportationCells = '';
     if (showTransportation) {
-      const hasTransportation = record.transportation === 1 && record.clock_in;
+      const loc = record.work_location;
+      const isHome = loc ? loc === 'home' : record.service_type === 'home';
+      const hasTransportation = record.transportation === 1 && record.clock_in && !isHome;
       transportationCells = `<td class="text-center transportation-col">${hasTransportation ? '1' : ''}</td><td class="text-center transportation-col">${hasTransportation ? '1' : ''}</td>`;
     }
 
