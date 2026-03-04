@@ -189,12 +189,13 @@ export class AttendanceTable {
     const dayClickAttrs = hasReport ?
       `data-user-id="${record.user_id}" data-user-name="${record.user_name}" data-date="${record.date}" style="cursor: pointer;"` : '';
 
-    // サービス区分表示（出勤日のみ）
+    // サービス区分表示（日報のwork_locationから取得、出勤日のみ）
     let serviceTypeCell = '';
     if (showServiceType) {
-      const serviceLabel = record.clock_in
-        ? (record.service_type === 'commute' ? '通所' : record.service_type === 'home' ? '在宅' : '')
-        : '';
+      let serviceLabel = '';
+      if (record.clock_in && record.work_location) {
+        serviceLabel = (record.work_location === 'office' || record.work_location === 'commute') ? '通所' : record.work_location === 'home' ? '在宅' : '';
+      }
       serviceTypeCell = `<td class="text-center">${serviceLabel}</td>`;
     }
 

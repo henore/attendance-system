@@ -475,9 +475,10 @@ router.post('/break/end', async (req, res) => {
       
       // 月次データを取得
       const records = await dbAll(`
-        SELECT 
-          a.*, 
+        SELECT
+          a.*,
           dr.id as report_id,
+          dr.work_location,
           sc.comment as staff_comment,
           sc.id as comment_id,
           sc.staff_id,

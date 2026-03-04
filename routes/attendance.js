@@ -68,14 +68,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         });
       }
       
-      // ユーザーのサービス区分を取得
-      const userInfo = await dbGet('SELECT service_type FROM users WHERE id = ?', [userId]);
-      const serviceType = userInfo ? userInfo.service_type : null;
-
       // 出勤記録作成
       const result = await dbRun(
-        'INSERT INTO attendance (user_id, date, clock_in, service_type) VALUES (?, ?, ?, ?)',
-        [userId, today, currentTime, serviceType]
+        'INSERT INTO attendance (user_id, date, clock_in) VALUES (?, ?, ?)',
+        [userId, today, currentTime]
       );
       
       const attendance = await dbGet(
