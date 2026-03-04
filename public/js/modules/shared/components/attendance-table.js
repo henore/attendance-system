@@ -369,9 +369,10 @@ export class AttendanceTable {
         'data-date': date,
         'data-clock-in': record.clock_in || '',
         'data-clock-out': record.clock_out || '',
-        'data-status': record.status || 'normal'
+        'data-status': record.status || 'normal',
+        'data-service-type': record.service_type || ''
       };
-      
+
       // 休憩データの追加
       if (record.user_role === 'user') {
         editData['data-break-start'] = record.break_start_time || '';
@@ -380,22 +381,22 @@ export class AttendanceTable {
         editData['data-break-start'] = record.break_start || '';
         editData['data-break-end'] = record.break_end || '';
       }
-      
+
       const editAttrs = Object.entries(editData)
         .map(([key, value]) => `${key}="${value}"`)
         .join(' ');
-      
+
       buttons.push(`
-        <button class="btn btn-sm btn-outline-warning btn-edit-attendance" 
+        <button class="btn btn-sm btn-outline-warning btn-edit-attendance"
                 ${editAttrs}
                 title="編集">
           <i class="fas fa-edit"></i>
         </button>
       `);
     }
-    
-    return buttons.length > 0 ? 
-      `<div class="btn-group" role="group">${buttons.join('')}</div>` : 
+
+    return buttons.length > 0 ?
+      `<div class="btn-group" role="group">${buttons.join('')}</div>` :
       '-';
   }
 
@@ -405,7 +406,7 @@ export class AttendanceTable {
   generateMonthlyOperationButtons(record, context, currentDate) {
     const buttons = [];
     const date = currentDate || record.date;
-    
+
     // 編集ボタン（管理者のみ）
     if (this.userRole === 'admin') {
       const editData = {
@@ -416,9 +417,10 @@ export class AttendanceTable {
         'data-date': date,
         'data-clock-in': record.clock_in || '',
         'data-clock-out': record.clock_out || '',
-        'data-status': record.status || 'normal'
+        'data-status': record.status || 'normal',
+        'data-service-type': record.service_type || ''
       };
-      
+
       // 休憩データの追加
       if (record.user_role === 'user') {
         editData['data-break-start'] = record.break_start_time || '';

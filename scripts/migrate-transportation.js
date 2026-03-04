@@ -1,5 +1,5 @@
 // scripts/migrate-transportation.js
-// 本番環境用: usersテーブルにtransportationカラムを追加
+// 本番環境用: カラム追加マイグレーション
 
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
@@ -8,57 +8,61 @@ const dbPath = path.join(__dirname, '..', 'database', 'attendance.db');
 const db = new sqlite3.Database(dbPath);
 
 const migrations = [
-    {
-        name: 'transportation',
-        sql: 'ALTER TABLE users ADD COLUMN transportation INTEGER'
-    },
-    {
-        name: 'workweek',
-        sql: 'ALTER TABLE users ADD COLUMN workweek TEXT'
-    }
+    { table: 'users', name: 'transportation', sql: 'ALTER TABLE users ADD COLUMN transportation INTEGER' },
+    { table: 'users', name: 'workweek', sql: 'ALTER TABLE users ADD COLUMN workweek TEXT' },
+    { table: 'attendance', name: 'service_type', sql: 'ALTER TABLE attendance ADD COLUMN service_type TEXT' }
 ];
 
-console.log(`対象DB: ${dbPath}`);
-console.log('マイグレーション開始...\n');
-
-db.serialize(() => {
-    // 現在のカラム一覧を確認
-    db.all('PRAGMA table_info(users)', (err, columns) => {
-        if (err) {
-            console.error('テーブル情報取得エラー:', err);
-            return;
-        }
-
-        const existingColumns = columns.map(c => c.name);
-        console.log('現在のカラム:', existingColumns.join(', '), '\n');
-
-        let added = 0;
-        let skipped = 0;
-
-        migrations.forEach(({ name, sql }) => {
-            if (existingColumns.includes(name)) {
-                console.log(`  [スキップ] ${name} - 既に存在`);
-                skipped++;
-            } else {
-                db.run(sql, (err) => {
-                    if (err) {
-                        console.error(`  [エラー] ${name}: ${err.message}`);
-                    } else {
-                        console.log(`  [追加] ${name}`);
-                        added++;
-                    }
-                });
-            }
-        });
-
-        // 結果確認
-        db.all('PRAGMA table_info(users)', (err, updatedColumns) => {
-            if (!err) {
-                console.log('\n更新後のカラム:', updatedColumns.map(c => c.name).join(', '));
-            }
-            console.log('\nマイグレーション完了');
-
-            db.close();
+// テーブルのカラム一覧を取得
+function getColumns(table) {
+    return new Promise((resolve, reject) => {
+        db.all(`PRAGMA table_info(${table})`, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows.map(r => r.name));
         });
     });
+}
+
+// ALTER TABLE実行
+function runMigration(sql) {
+    return new Promise((resolve, reject) => {
+        db.run(sql, (err) => {
+            if (err) reject(err);
+            else resolve();
+        });
+    });
+}
+
+async function migrate() {
+    console.log(`対象DB: ${dbPath}`);
+    console.log('マイグレーション開始...\n');
+
+    // テーブルごとのカラム一覧をキャッシュ
+    const columnCache = {};
+
+    for (const { table, name, sql } of migrations) {
+        if (!columnCache[table]) {
+            columnCache[table] = await getColumns(table);
+        }
+
+        if (columnCache[table].includes(name)) {
+            console.log(`  [スキップ] ${table}.${name} - 既に存在`);
+        } else {
+            try {
+                await runMigration(sql);
+                columnCache[table].push(name);
+                console.log(`  [追加] ${table}.${name}`);
+            } catch (err) {
+                console.error(`  [エラー] ${table}.${name}: ${err.message}`);
+            }
+        }
+    }
+
+    console.log('\nマイグレーション完了');
+    db.close();
+}
+
+migrate().catch(err => {
+    console.error('マイグレーションエラー:', err);
+    db.close();
 });

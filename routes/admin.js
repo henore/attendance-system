@@ -270,7 +270,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // 出勤記録訂正（休憩時間編集対応）- 修正版
     router.post('/attendance/correct', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason } = req.body;
+            const { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason, serviceType } = req.body;
 
             // デバッグログ
             console.log('出勤記録修正リクエスト:', { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason });
@@ -310,9 +310,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 const clockOutValue = newClockOut && newClockOut.trim() !== '' ? newClockOut : null;
 
                 // 出勤記録を更新
+                const serviceTypeValue = serviceType || null;
                 await dbRun(
-                    'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    [clockInValue, clockOutValue, status, recordId]
+                    'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, service_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                    [clockInValue, clockOutValue, status, serviceTypeValue, recordId]
                 );
 
                 // 休憩記録の処理（利用者とスタッフで分岐）（空文字列をNULLに変換）
@@ -404,16 +405,20 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 const clockInValue = newClockIn && newClockIn.trim() !== '' ? newClockIn : null;
                 const clockOutValue = newClockOut && newClockOut.trim() !== '' ? newClockOut : null;
 
+                // ユーザーのデフォルトサービス区分を取得
+                const userServiceType = serviceType || (await dbGet('SELECT service_type FROM users WHERE id = ?', [userId]))?.service_type || null;
+
                 // 新規出勤記録を作成
                 const result = await dbRun(
-                    `INSERT INTO attendance (user_id, date, clock_in, clock_out, status)
-                     VALUES (?, ?, ?, ?, ?)
+                    `INSERT INTO attendance (user_id, date, clock_in, clock_out, status, service_type)
+                     VALUES (?, ?, ?, ?, ?, ?)
                      ON CONFLICT(user_id, date) DO UPDATE SET
                         clock_in = excluded.clock_in,
                         clock_out = excluded.clock_out,
                         status = excluded.status,
+                        service_type = excluded.service_type,
                         updated_at = CURRENT_TIMESTAMP`,
-                    [userId, date, clockInValue, clockOutValue, status || 'normal']
+                    [userId, date, clockInValue, clockOutValue, status || 'normal', userServiceType]
                 );
 
                 // 休憩記録の処理（空文字列をNULLに変換）

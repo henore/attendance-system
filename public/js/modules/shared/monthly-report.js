@@ -211,6 +211,15 @@ export default class SharedMonthlyReport {
                     </div>
                 </div>
 
+                <div class="mb-3" id="monthlyEditServiceTypeGroup" style="display: none;">
+                    <label for="monthlyEditServiceType" class="form-label">サービス区分</label>
+                    <select class="form-control" id="monthlyEditServiceType">
+                        <option value="">未設定</option>
+                        <option value="commute">通所</option>
+                        <option value="home">在宅</option>
+                    </select>
+                </div>
+
                 <div class="mb-3">
                     <label for="monthlyEditStatus" class="form-label">状態</label>
                     <select class="form-control" id="monthlyEditStatus">
@@ -534,7 +543,7 @@ export default class SharedMonthlyReport {
                     user_name: user.name,
                     user_role: user.role,
                     service_no: user.service_no,
-                    service_type: user.service_type,
+                    service_type: record.service_type || user.service_type,
                     transportation: user.transportation
                 };
 
@@ -675,7 +684,17 @@ export default class SharedMonthlyReport {
         document.getElementById('monthlyEditBreakEnd').value = data.breakEnd || '';
         document.getElementById('monthlyEditStatus').value = data.status || 'normal';
         document.getElementById('monthlyEditReason').value = '';
-        
+
+        // サービス区分（利用者の場合のみ表示）
+        const serviceTypeGroup = document.getElementById('monthlyEditServiceTypeGroup');
+        const serviceTypeSelect = document.getElementById('monthlyEditServiceType');
+        if (data.userRole === 'user') {
+            serviceTypeGroup.style.display = 'block';
+            serviceTypeSelect.value = data.serviceType || '';
+        } else {
+            serviceTypeGroup.style.display = 'none';
+        }
+
         // 削除セクションの表示制御
         const deleteSection = document.getElementById('monthlyDeleteSection');
         if (deleteSection) {
@@ -699,12 +718,13 @@ export default class SharedMonthlyReport {
             const breakEnd = document.getElementById('monthlyEditBreakEnd').value;
             const status = document.getElementById('monthlyEditStatus').value;
             const reason = document.getElementById('monthlyEditReason').value;
-            
+            const serviceType = document.getElementById('monthlyEditServiceType').value;
+
             if (!reason.trim()) {
                 this.app.showNotification('変更理由を入力してください', 'warning');
                 return;
             }
-            
+
             const requestData = {
                 recordId: recordId || null,
                 userId: userId,
@@ -714,7 +734,8 @@ export default class SharedMonthlyReport {
                 newBreakStart: breakStart,
                 newBreakEnd: breakEnd,
                 status: status,
-                reason: reason
+                reason: reason,
+                serviceType: serviceType || null
             };
             
             await this.app.apiCall(API_ENDPOINTS.ADMIN.ATTENDANCE_CORRECT, {

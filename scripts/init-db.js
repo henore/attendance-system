@@ -63,6 +63,7 @@ db.serialize(() => {
             break_end TIME,
             status TEXT DEFAULT 'normal' CHECK(status IN ('normal', 'late', 'early', 'absence', 'paid_leave')),
             has_report INTEGER DEFAULT 0,
+            service_type TEXT CHECK(service_type IN ('commute', 'home')),
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id),

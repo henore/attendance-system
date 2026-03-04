@@ -56,6 +56,18 @@ db.serialize(() => {
         }
     });
 
+    // attendanceテーブルにservice_typeカラムを追加（日ごとのサービス区分）
+    db.run(`
+        ALTER TABLE attendance
+        ADD COLUMN service_type TEXT
+    `, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('attendance.service_type追加エラー:', err);
+        } else if (!err) {
+            console.log('✅ attendance.service_typeカラムを追加しました');
+        }
+    });
+
     console.log('✅ データベーススキーマ更新完了');
 });
 
