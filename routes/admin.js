@@ -551,7 +551,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 SELECT
                     a.*,
                     dr.id as report_id,
-                    dr.work_location,
+                    COALESCE(dr.work_location, CASE u.service_type WHEN 'commute' THEN 'office' WHEN 'home' THEN 'home' END) as work_location,
                     sdr.id as staff_report_id,
                     sc.comment,
                     CASE

@@ -482,14 +482,14 @@ router.post('/break/end', async (req, res) => {
           sc.comment as staff_comment,
           sc.id as comment_id,
           sc.staff_id,
-          u.name as staff_name,
+          su.name as staff_name,
           br.start_time as break_start_time,
           br.end_time as break_end_time,
           br.duration as break_duration
         FROM attendance a
         LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
         LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
-        LEFT JOIN users u ON sc.staff_id = u.id
+        LEFT JOIN users su ON sc.staff_id = su.id
         LEFT JOIN break_records br ON a.user_id = br.user_id AND a.date = br.date
         WHERE a.user_id = ? 
           AND a.date >= ? 
