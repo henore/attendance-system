@@ -68,16 +68,21 @@ export class AttendanceTable {
     
     // 月別出勤簿用のヘッダー
     if (context === 'monthly') {
+      // サービス区分列と送迎列の表示判定
+      const showServiceType = options.showServiceType || false;
+      const showTransportation = options.showTransportation || false;
       return `
         <thead class="table-primary">
           <tr>
             ${showDate ? '<th class="text-center" width="5%">日</th><th class="text-center" width="5%">曜</th>' : ''}
+            ${showServiceType ? '<th class="text-center" width="6%">区分</th>' : ''}
             <th class="text-center" width="10%">出勤</th>
             <th class="text-center" width="10%">退勤</th>
             <th class="text-center" width="15%">休憩</th>
             <th class="text-center" width="8%">実働</th>
-            <th class="text-center" width="8%">状態</th>
-            ${showOperations ? '<th class="text-center" width="24%">操作</th>' : ''}
+            ${showTransportation ? '<th class="text-center transportation-col" width="4%">迎</th><th class="text-center transportation-col" width="4%">送</th>' : ''}
+            <th class="text-center status-col" width="8%">状態</th>
+            ${showOperations ? '<th class="text-center" width="20%">操作</th>' : ''}
           </tr>
         </thead>
       `;
@@ -149,10 +154,12 @@ export class AttendanceTable {
    */
   generateMonthlyTableRow(record, options) {
     const { showOperations } = options;
-    
+    const showServiceType = options.showServiceType || false;
+    const showTransportation = options.showTransportation || false;
+
     // 休憩時間表示
     const breakDisplay = this.formatBreakTime(record);
-    
+
     // 実働時間計算
     const netHours = this.calculateWorkDurationDay(record);
 
@@ -160,17 +167,14 @@ export class AttendanceTable {
     let statusBadge = '-';
     if (record.user_role !== 'user') {
       if (record.status) {
-        // 明示的にステータスが設定されている場合（欠勤レコードあり）
         statusBadge = this.getStatusBadge(record.status);
       } else if (record.clock_in) {
-        // 出勤記録があるが明示的ステータスがない場合は正常
         statusBadge = this.getStatusBadge('normal');
       }
-      // 出勤記録もステータスもない場合は「-」のまま
     }
-    
+
     // 操作ボタン（日報マークを除去）
-    const operations = showOperations ? 
+    const operations = showOperations ?
       this.generateMonthlyOperationButtons(record, 'monthly', record.date) : '';
 
     // 行クラス（日曜・土曜・祝日の色付け）
@@ -180,21 +184,36 @@ export class AttendanceTable {
     else if (record.dayOfWeek === 6) rowClass = 'table-info';
 
     // 日の列をクリック可能にするためのdata属性を追加
-    // 利用者: report_idがある場合、スタッフ・管理者: staff_report_idがある場合
     const hasReport = (record.user_role === 'user' && record.report_id) ||
                       ((record.user_role === 'staff' || record.user_role === 'admin') && record.staff_report_id);
     const dayClickAttrs = hasReport ?
       `data-user-id="${record.user_id}" data-user-name="${record.user_name}" data-date="${record.date}" style="cursor: pointer;"` : '';
 
+    // サービス区分表示
+    let serviceTypeCell = '';
+    if (showServiceType) {
+      const serviceLabel = record.service_type === 'commute' ? '通所' : record.service_type === 'home' ? '在宅' : '-';
+      serviceTypeCell = `<td class="text-center">${serviceLabel}</td>`;
+    }
+
+    // 送迎表示（出勤記録がある通所利用者で送迎ありの場合に1を表示）
+    let transportationCells = '';
+    if (showTransportation) {
+      const hasTransportation = record.transportation === 1 && record.clock_in;
+      transportationCells = `<td class="text-center transportation-col">${hasTransportation ? '1' : ''}</td><td class="text-center transportation-col">${hasTransportation ? '1' : ''}</td>`;
+    }
+
     return `
       <tr class="${rowClass}">
         <td class="text-center monthly-day-cell" ${dayClickAttrs}>${record.day}</td>
         <td class="text-center">${record.dayName}</td>
+        ${serviceTypeCell}
         <td class="text-center">${record.clock_in || '-'}</td>
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
         <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
-        <td class="text-center">${statusBadge}</td>
+        ${transportationCells}
+        <td class="text-center status-col">${statusBadge}</td>
         ${showOperations ? `<td class="text-center">${operations}</td>` : ''}
       </tr>
     `;

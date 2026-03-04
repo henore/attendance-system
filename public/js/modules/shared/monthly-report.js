@@ -534,7 +534,8 @@ export default class SharedMonthlyReport {
                     user_name: user.name,
                     user_role: user.role,
                     service_no: user.service_no,
-                    service_type: user.service_type
+                    service_type: user.service_type,
+                    transportation: user.transportation
                 };
 
                 // 利用者の休憩記録を含める（APIから直接取得したデータをマッピング）
@@ -565,7 +566,8 @@ export default class SharedMonthlyReport {
                     user_name: user.name,
                     user_role: user.role,
                     service_type: user.service_type,
-                    service_no:user.service_no,
+                    service_no: user.service_no,
+                    transportation: user.transportation,
                     clock_in: null,
                     clock_out: null
                 });
@@ -588,10 +590,12 @@ export default class SharedMonthlyReport {
                     showDate: true,          // 日付列を表示
                     showOperations: true,
                     context: 'monthly',
-                    showFooter: false       // フッターは独自実装
+                    showFooter: false,       // フッターは独自実装
+                    showServiceType: user.role === 'user' && (this.isAdmin || this.isStaff),
+                    showTransportation: user.role === 'user' && user.service_type === 'commute' && user.transportation === 1 && (this.isAdmin || this.isStaff)
                 })}
                 
-                ${this.generateMonthlyFooter(dailyRecords)}
+                ${this.generateMonthlyFooter(dailyRecords, user)}
                 ${this.printManager.generatePrintStyles('monthly')}
             </div>
         `;
@@ -599,40 +603,44 @@ export default class SharedMonthlyReport {
         return html;
     }
 
-    generateMonthlyFooter(records) {
+    generateMonthlyFooter(records, user) {
         // 集計
         const workingDays = records.filter(r => r.clock_in).length;
         let totalWorkHours = 0;
 
         const roundToQuarter = (num) => Math.round(num * 4) / 4;
-        
+
         records.forEach(record => {
             if (record.clock_in && record.clock_out) {
-                // AttendanceTableクラスのcalculateWorkDurationDayメソッドを使用
                 const hours = this.attendanceTable.calculateWorkDurationDay(record);
-                console.log('[DEBUG] calculateWorkDurationDay result:', hours, 'for record:', {
-                    user_name: record.user_name,
-                    date: record.date,
-                    clock_in: record.clock_in,
-                    clock_out: record.clock_out,
-                    break_start_time: record.break_start_time,
-                    break_end_time: record.break_end_time
-                });
                 if (hours) {
                     const roundedHours = roundToQuarter(parseFloat(hours));
                     totalWorkHours += roundedHours;
                 }
             }
         });
-        
+
+        // 送迎合計（送迎ありの通所利用者のみ）
+        const showTransportation = user.role === 'user' && user.service_type === 'commute' && user.transportation === 1 && (this.isAdmin || this.isStaff);
+        let transportationCells = '';
+        if (showTransportation) {
+            const transportationCount = records.filter(r => r.transportation === 1 && r.clock_in).length;
+            transportationCells = `<th class="text-center transportation-col">迎:${transportationCount}</th><th class="text-center transportation-col">送:${transportationCount}</th>`;
+        }
+
+        // サービス区分列の有無でcolspan調整
+        const showServiceType = user.role === 'user' && (this.isAdmin || this.isStaff);
+        const baseColspan = showServiceType ? 3 : 2;
+
         return `
             <div class="table-responsive">
                 <table class="table">
                     <tfoot class="table-secondary">
                         <tr>
-                            <th colspan="2" class="text-center">月間集計</th>
+                            <th colspan="${baseColspan}" class="text-center">月間集計</th>
                             <th colspan="2" class="text-center">出勤日数: ${workingDays}日</th>
-                            <th colspan="4" class="text-center">総実働: ${totalWorkHours.toFixed(2)}時間</th>
+                            <th colspan="2" class="text-center">総実働: ${totalWorkHours.toFixed(2)}時間</th>
+                            ${transportationCells}
                             <th colspan="1" class="stamp print-only">印</th>
                         </tr>
                     </tfoot>

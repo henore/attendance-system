@@ -45,7 +45,9 @@ db.serialize(() => {
             is_active INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            service_no VARCHAR(255)
+            service_no VARCHAR(255),
+            workweek TEXT,
+            transportation INTEGER
         )
     `);
 

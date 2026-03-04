@@ -71,6 +71,19 @@ export default class AdminUserManagement {
                                     <input type="text" class="form-control" id="newServiceNo">
                                     <div class="form-text">受給者番号入力（印刷で使用）</div>
                                 </div>
+                                <div class="mb-3" id="transportationGroup" style="display: none;">
+                                    <label class="form-label">送迎</label>
+                                    <div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="newTransportation" id="newTransportationYes" value="1">
+                                            <label class="form-check-label" for="newTransportationYes">あり</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="newTransportation" id="newTransportationNo" value="0" checked>
+                                            <label class="form-check-label" for="newTransportationNo">なし</label>
+                                        </div>
+                                    </div>
+                                </div>
                                 <button type="submit" class="btn btn-primary w-100" id="registerUserBtn">
                                     <i class="fas fa-user-plus"></i> ユーザー登録
                                 </button>
@@ -180,12 +193,27 @@ export default class AdminUserManagement {
                                         <input type="text" class="form-control" id="editServiceNo">
                                 </div>
                                 <div class="mb-3" id="editWorkWeekGroup" style="display: none;">
-                                <label for="editWorkWeek" class="form-label">出勤予定</label>
+                                <label class="form-label">出勤予定</label><br>
                                 <input type="checkbox" id="editWorkWeek1" value="月"> 月
                                 <input type="checkbox" id="editWorkWeek2" value="火"> 火
                                 <input type="checkbox" id="editWorkWeek3" value="水"> 水
                                 <input type="checkbox" id="editWorkWeek4" value="木"> 木
                                 <input type="checkbox" id="editWorkWeek5" value="金"> 金
+                                <input type="checkbox" id="editWorkWeek6" value="土"> 土
+                                <input type="checkbox" id="editWorkWeek7" value="日"> 日
+                                </div>
+                                <div class="mb-3" id="editTransportationGroup" style="display: none;">
+                                    <label class="form-label">送迎</label>
+                                    <div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="editTransportation" id="editTransportationYes" value="1">
+                                            <label class="form-check-label" for="editTransportationYes">あり</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="editTransportation" id="editTransportationNo" value="0" checked>
+                                            <label class="form-check-label" for="editTransportationNo">なし</label>
+                                        </div>
+                                    </div>
                                 </div>
                             </form>
                         </div>
@@ -213,6 +241,12 @@ export default class AdminUserManagement {
         const roleSelect = this.container.querySelector('#newRole');
         if (roleSelect) {
             roleSelect.addEventListener('change', () => this.toggleServiceTypeField());
+        }
+
+        // サービス区分変更時の送迎フィールド表示切り替え（新規登録）
+        const newServiceType = this.container.querySelector('#newServiceType');
+        if (newServiceType) {
+            newServiceType.addEventListener('change', () => this.toggleServiceTypeField());
         }
 
         // 更新ボタン
@@ -285,6 +319,8 @@ export default class AdminUserManagement {
             const serviceTypeGroup = document.getElementById('editServiceTypeGroup');
             const serviceTypeSelect = document.getElementById('editServiceType');
              
+            const editTransportationGroup = document.getElementById('editTransportationGroup');
+
             if (user.role === 'user') {
                 serviceTypeGroup.style.display = 'block';
                 serviceTypeSelect.value = user.service_type || '';
@@ -299,8 +335,21 @@ export default class AdminUserManagement {
 
                 const workWeekArray = (user?.workweek ?? "").split(',');
                 document.querySelectorAll('input[type="checkbox"][id^="editWorkWeek"]').forEach(cb => {
-                cb.checked = workWeekArray.includes(cb.value);
-                  });
+                    cb.checked = workWeekArray.includes(cb.value);
+                });
+
+                // 送迎フィールド（通所の場合のみ表示）
+                if (user.service_type === 'commute') {
+                    editTransportationGroup.style.display = 'block';
+                    if (user.transportation === 1) {
+                        document.getElementById('editTransportationYes').checked = true;
+                    } else {
+                        document.getElementById('editTransportationNo').checked = true;
+                    }
+                } else {
+                    editTransportationGroup.style.display = 'none';
+                    document.getElementById('editTransportationNo').checked = true;
+                }
 
             } else {
                 serviceTypeGroup.style.display = 'none';
@@ -312,6 +361,8 @@ export default class AdminUserManagement {
 
                 editWorkWeekGroup.style.display = 'none';
                 editWorkWeekGroup.required = false;
+
+                editTransportationGroup.style.display = 'none';
             }
 
             // パスワード生成ボタン
@@ -331,7 +382,8 @@ export default class AdminUserManagement {
                 document.getElementById('editRole').addEventListener('change', (e) => {
                     const editServiceTypeGroup = document.getElementById('editServiceTypeGroup');
                     const editServiceType = document.getElementById('editServiceType');
-                    
+                    const editTransportationGroup = document.getElementById('editTransportationGroup');
+
                     if (e.target.value === 'user') {
                         editServiceTypeGroup.style.display = 'block';
                         editServiceType.required = true;
@@ -343,11 +395,13 @@ export default class AdminUserManagement {
                         editWorkWeekGroup.style.display = 'block';
                         editWorkWeekGroup.required = true;
 
-                        const workWeekArray = (user?.workweek ?? "").split(',');
-                        document.querySelectorAll('input[type="checkbox"][id^="editWorkWeek"]').forEach(cb => {
-                        cb.checked = workWeekArray.includes(cb.value);
-                        });
-                        
+                        // 送迎フィールドはサービス区分に応じて表示
+                        if (editServiceType.value === 'commute') {
+                            editTransportationGroup.style.display = 'block';
+                        } else {
+                            editTransportationGroup.style.display = 'none';
+                        }
+
                     } else {
                         editServiceTypeGroup.style.display = 'none';
                         editServiceType.required = false;
@@ -358,6 +412,23 @@ export default class AdminUserManagement {
 
                         editWorkWeekGroup.style.display = 'none';
                         editWorkWeekGroup.required = false;
+
+                        editTransportationGroup.style.display = 'none';
+                    }
+                });
+            }
+
+            // サービス区分変更時の送迎フィールド表示切り替え
+            const editServiceTypeEl = document.getElementById('editServiceType');
+            if (editServiceTypeEl) {
+                editServiceTypeEl.replaceWith(editServiceTypeEl.cloneNode(true));
+                document.getElementById('editServiceType').addEventListener('change', (e) => {
+                    const editTransportationGroup = document.getElementById('editTransportationGroup');
+                    if (e.target.value === 'commute') {
+                        editTransportationGroup.style.display = 'block';
+                    } else {
+                        editTransportationGroup.style.display = 'none';
+                        document.getElementById('editTransportationNo').checked = true;
                     }
                 });
             }
@@ -436,6 +507,7 @@ export default class AdminUserManagement {
         if (!confirmed) return;
 
         try {
+            const transportationValue = document.querySelector('input[name="editTransportation"]:checked')?.value;
             const requestData = {
                 userId,
                 username,
@@ -443,7 +515,8 @@ export default class AdminUserManagement {
                 role,
                 serviceType: role === 'user' ? serviceType : null,
                 service_no,
-                workweek:workweek.join(',')
+                workweek: workweek.join(','),
+                transportation: (role === 'user' && serviceType === 'commute' && transportationValue === '1') ? 1 : null
             };
 
             if (password) {
@@ -492,36 +565,47 @@ export default class AdminUserManagement {
         const serviceTypeGroup = this.container.querySelector('#serviceTypeGroup');
         const serviceTypeSelect = this.container.querySelector('#newServiceType');
         const ServiesNoGroup = this.container.querySelector('#ServiceNoGroup');
-        
+        const transportationGroup = this.container.querySelector('#transportationGroup');
+
         if (roleSelect.value === 'user') {
             serviceTypeGroup.style.display = 'block';
             serviceTypeSelect.required = true;
 
             ServiesNoGroup.style.display = 'block';
             ServiesNoGroup.required = true;
-            
+
+            // 通所の場合のみ送迎フィールドを表示
+            if (serviceTypeSelect.value === 'commute') {
+                transportationGroup.style.display = 'block';
+            } else {
+                transportationGroup.style.display = 'none';
+            }
 
         } else {
             serviceTypeGroup.style.display = 'none';
             serviceTypeSelect.required = false;
             serviceTypeSelect.value = '';
-            
+
             ServiesNoGroup.style.display = 'none';
             ServiesNoGroup.required = false;
+
+            transportationGroup.style.display = 'none';
         }
     }
 
     async handleUserRegistration(e) {
         e.preventDefault();
 
+        const transportationRadio = this.container.querySelector('input[name="newTransportation"]:checked');
         const formData = {
             username: this.container.querySelector('#newUsername').value.trim(),
             password: this.container.querySelector('#newPassword').value,
             name: this.container.querySelector('#newName').value.trim(),
             role: this.container.querySelector('#newRole').value,
             serviceType: this.container.querySelector('#newServiceType').value,
-            ServiceNo: this.container.querySelector('#newServiceNo').value
-         };
+            ServiceNo: this.container.querySelector('#newServiceNo').value,
+            transportation: transportationRadio?.value === '1' ? 1 : null
+        };
 
         // バリデーション
         if (!this.validateUserRegistration(formData)) {

@@ -10,7 +10,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // ユーザー登録
     router.post('/register', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { username, password, name, role, serviceType, ServiceNo } = req.body;
+            const { username, password, name, role, serviceType, ServiceNo, transportation } = req.body;
             
             // バリデーション
             if (!username || !password || !name || !role) {
@@ -48,9 +48,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 });
             }
 
-            // 受給者番号の処理
+            // 受給者番号・送迎の処理
             const finalServiceNo = role === 'user' ? ServiceNo : null;
             const finalServiceType = role === 'user' ? serviceType : null;
+            const finalTransportation = (role === 'user' && serviceType === 'commute') ? (transportation ? 1 : null) : null;
             
             // パスワードのハッシュ化
             const hashedPassword = await bcrypt.hash(password, 10);
@@ -70,8 +71,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             
             // ユーザー登録
             const result = await dbRun(
-                'INSERT INTO users (username, password, name, role, service_type, service_no) VALUES (?, ?, ?, ?, ?, ?)', 
-                [username, hashedPassword, name, role, finalServiceType, finalServiceNo]
+                'INSERT INTO users (username, password, name, role, service_type, service_no, transportation) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [username, hashedPassword, name, role, finalServiceType, finalServiceNo, finalTransportation]
             );
             
             // 監査ログ記録
@@ -117,7 +118,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         try {
             const { role } = req.query;
             let query = `
-                SELECT id, username, name, role, service_type, created_at ,service_no ,workweek
+                SELECT id, username, name, role, service_type, created_at, service_no, workweek, transportation
                 FROM users 
                 WHERE is_active = 1
             `;
@@ -658,7 +659,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // ユーザー情報更新
     router.put('/user/update', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { userId, username, password, name, role, serviceType, service_no ,workweek } = req.body;
+            const { userId, username, password, name, role, serviceType, service_no, workweek, transportation } = req.body;
             
             // バリデーション
             if (!userId || !username || !name || !role) {
@@ -669,7 +670,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             }
 
             const finalServiceNo = role === 'user' ? service_no : null;
-            
+            const finalTransportation = (role === 'user' && serviceType === 'commute') ? (transportation ? 1 : null) : null;
+
             // 重複チェック（自分以外）
             const existing = await dbGet(
                 'SELECT * FROM users WHERE username = ? AND id != ?', 
@@ -684,8 +686,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             }
             
             // 更新クエリ構築
-            let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, service_no = ?, updated_at = CURRENT_TIMESTAMP';
-            const params = [username, name, role, serviceType, finalServiceNo];
+            let updateQuery = 'UPDATE users SET username = ?, name = ?, role = ?, service_type = ?, service_no = ?, transportation = ?, updated_at = CURRENT_TIMESTAMP';
+            const params = [username, name, role, serviceType, finalServiceNo, finalTransportation];
             
             // パスワード変更がある場合
             if (password) {

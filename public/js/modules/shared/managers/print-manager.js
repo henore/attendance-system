@@ -305,23 +305,27 @@ export class PrintManager {
                     print-color-adjust: exact;
                 }
                 
-                /* 月別出勤簿の印刷時に非表示にしたい列（利用者の場合） */
-                .attendance-table-user thead tr th:nth-child(7),  /* 状態 */
-                .attendance-table-user tbody tr td:nth-child(7),
-                .attendance-table thead tr th:nth-child(8),  /* 日報・コメント */
-                .attendance-table tbody tr td:nth-child(8),
-                .attendance-table thead tr th:nth-child(9),  /* 操作 */
-                .attendance-table tbody tr td:nth-child(9) {
+                /* 操作列は印刷時非表示 */
+                .attendance-table thead tr th:last-child,
+                .attendance-table tbody tr td:last-child {
                     display: none !important;
                 }
 
-                /* カラム幅の調整（利用者: 状態列なしの6列分） */
-                .attendance-table-user thead tr th:nth-child(1) { width: 8%; }  /* 日 */
-                .attendance-table-user thead tr th:nth-child(2) { width: 8%; }  /* 曜 */
-                .attendance-table-user thead tr th:nth-child(3) { width: 15%; } /* 出勤 */
-                .attendance-table-user thead tr th:nth-child(4) { width: 15%; } /* 退勤 */
-                .attendance-table-user thead tr th:nth-child(5) { width: 26%; } /* 休憩 */
-                .attendance-table-user thead tr th:nth-child(6) { width: 12%; } /* 実働 */
+                /* 利用者テーブル: 状態列を非表示 */
+                .attendance-table-user thead tr th.status-col,
+                .attendance-table-user tbody tr td.status-col {
+                    display: none !important;
+                }
+
+                /* 送迎列のスタイル */
+                .transportation-col {
+                    width: 5% !important;
+                    font-size: 8pt;
+                }
+
+                /* カラム幅の調整（利用者: 区分+送迎列あり） */
+                .attendance-table-user thead tr th:nth-child(1) { width: 6%; }  /* 日 */
+                .attendance-table-user thead tr th:nth-child(2) { width: 6%; }  /* 曜 */
 
                 /* カラム幅の調整（スタッフ・管理者: 状態列ありの7列分） */
                 .attendance-table-staff thead tr th:nth-child(1),

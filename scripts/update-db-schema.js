@@ -32,6 +32,30 @@ db.serialize(() => {
         }
     });
 
+    // usersテーブルにworkweekカラムを追加（存在しない場合）
+    db.run(`
+        ALTER TABLE users
+        ADD COLUMN workweek TEXT
+    `, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('workweek追加エラー:', err);
+        } else if (!err) {
+            console.log('✅ workweekカラムを追加しました');
+        }
+    });
+
+    // usersテーブルにtransportationカラムを追加（存在しない場合）
+    db.run(`
+        ALTER TABLE users
+        ADD COLUMN transportation INTEGER
+    `, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('transportation追加エラー:', err);
+        } else if (!err) {
+            console.log('✅ transportationカラムを追加しました');
+        }
+    });
+
     console.log('✅ データベーススキーマ更新完了');
 });
 
