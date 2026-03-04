@@ -141,25 +141,16 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         );
         
         if (breakRecord) {
-          // 休憩中の場合は自動的に休憩を終了
-          const breakEndTime = currentTime;
+          // 休憩中の場合は開始時刻+60分で確定
           const startMinutes = timeToMinutes(breakRecord.start_time);
-          const endMinutes = timeToMinutes(breakEndTime);
-          let duration = endMinutes - startMinutes;
-          
-          // 日をまたぐ場合の処理
-          if (duration < 0) {
-            duration += 24 * 60;
-          }
-          
-          // 最大60分
-          const finalDuration = Math.min(duration, 60);
-          
+          const breakEndTime = minutesToTime(startMinutes + 60);
+          const finalDuration = 60;
+
           await dbRun(
             'UPDATE break_records SET end_time = ?, duration = ? WHERE id = ?',
             [breakEndTime, finalDuration, breakRecord.id]
           );
-          
+
           console.log(`休憩を自動終了しました: ${breakRecord.start_time} - ${breakEndTime} (${finalDuration}分)`);
         }
       }

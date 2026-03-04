@@ -3,7 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { getCurrentDate, getCurrentTime, timeToMinutes } = require('../utils/date-time');
+const { getCurrentDate, getCurrentTime, timeToMinutes, minutesToTime } = require('../utils/date-time');
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
     // 今日の出勤状況取得
@@ -280,30 +280,22 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 });
             }
             
-            // 休憩時間計算（分）
+            // 在宅利用者の休憩は開始時刻+60分で確定
             const startMinutes = timeToMinutes(breakRecord.start_time);
-            const currentMinutes = timeToMinutes(currentTime);
-            let duration = currentMinutes - startMinutes;
-            
-            // 日をまたぐ場合の処理
-            if (duration < 0) {
-                duration += 24 * 60;
-            }
-            
-            // 最大60分
-            const finalDuration = Math.min(duration, 60);
-            
+            const endTime = minutesToTime(startMinutes + 60);
+            const finalDuration = 60;
+
             await dbRun(`
-                UPDATE break_records 
+                UPDATE break_records
                 SET end_time = ?, duration = ?
                 WHERE id = ?
-            `, [currentTime, finalDuration, breakRecord.id]);
-            
-            res.json({ 
+            `, [endTime, finalDuration, breakRecord.id]);
+
+            res.json({
                 success: true,
-                endTime: currentTime,
+                endTime: endTime,
                 duration: finalDuration,
-                message: `休憩終了（${currentTime}）- ${finalDuration}分`
+                message: `休憩終了（${endTime}）- ${finalDuration}分`
             });
             
         } catch (error) {
