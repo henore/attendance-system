@@ -33,16 +33,16 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         });
       }
       
-      // 休憩中なら現在時刻で終了
+      // 休憩中は退勤不可
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
         [staffId, today]
       );
       if (attendance && attendance.break_start && !attendance.break_end) {
-        await dbRun(
-          'UPDATE attendance SET break_end = ? WHERE id = ?',
-          [currentTime, attendance.id]
-        );
+        return res.status(400).json({
+          success: false,
+          error: '休憩を終了してから退勤してください'
+        });
       }
 
       // 退勤処理
@@ -70,16 +70,16 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       const today = getCurrentDate();
       const currentTime = getCurrentTime();
 
-      // 休憩中なら現在時刻で終了
+      // 休憩中は退勤不可
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
         [staffId, today]
       );
       if (attendance && attendance.break_start && !attendance.break_end) {
-        await dbRun(
-          'UPDATE attendance SET break_end = ? WHERE id = ?',
-          [currentTime, attendance.id]
-        );
+        return res.status(400).json({
+          success: false,
+          error: '休憩を終了してから退勤してください'
+        });
       }
 
       // 未コメントチェックをスキップして退勤処理

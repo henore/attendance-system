@@ -19,6 +19,7 @@ export class StaffAttendanceUI {
     this.currentAttendance = null;
     this.breakStartTime = null;
     this.breakButtonUpdateInterval = null;
+    this.breakOverAlerted = false; // 60分超過アラート済みフラグ
   }
 
   /**
@@ -66,12 +67,10 @@ export class StaffAttendanceUI {
    */
   async handleClockOut() {
     try {
-      // 休憩中の場合は確認
+      // 休憩中は退勤不可
       if (this.isOnBreak) {
-        const confirmMessage = '現在休憩中です。\n急病・早退等の理由で退勤する場合は「OK」を押してください。\n休憩を終了してから退勤する場合は「キャンセル」を押してください。';
-        if (!confirm(confirmMessage)) {
-          return false;
-        }
+        this.app.showNotification('休憩を終了してから退勤してください', 'warning');
+        return false;
       }
 
       const currentTime = getCurrentTime();
@@ -242,9 +241,22 @@ export class StaffAttendanceUI {
   }
 
   /**
-   * 休憩タイマー開始（経過時間表示の定期更新のみ）
+   * 休憩タイマー開始（経過時間表示の定期更新＋60分超過アラート）
    */
   startBreakTimer() {
+    this.breakOverAlerted = false;
+
+    // 60分超過時のアラートをスケジュール
+    const elapsed = this.getElapsedBreakMinutes();
+    const remainingToAlert = Math.max(0, 60 - elapsed);
+    this.breakAlertTimeout = setTimeout(() => {
+      if (this.isOnBreak) {
+        this.breakOverAlerted = true;
+        alert('休憩時間が60分を超えています。管理者、上長に確認、報告をしてください。');
+        this.updateBreakStatusDisplay();
+      }
+    }, remainingToAlert * 60 * 1000);
+
     // 30秒ごとにボタン状態と休憩ステータスを更新
     this.breakButtonUpdateInterval = setInterval(() => {
       this.updateButtonStates();
@@ -262,6 +274,10 @@ export class StaffAttendanceUI {
     if (this.breakButtonUpdateInterval) {
       clearInterval(this.breakButtonUpdateInterval);
       this.breakButtonUpdateInterval = null;
+    }
+    if (this.breakAlertTimeout) {
+      clearTimeout(this.breakAlertTimeout);
+      this.breakAlertTimeout = null;
     }
   }
 
@@ -297,11 +313,8 @@ export class StaffAttendanceUI {
           this.isOnBreak = true;
           this.breakStartTime = response.attendance.break_start;
 
-          // 経過時間表示の定期更新を開始
-          this.breakButtonUpdateInterval = setInterval(() => {
-            this.updateButtonStates();
-            this.updateBreakStatusDisplay();
-          }, 30 * 1000);
+          // タイマー開始（60分超過アラート＋定期更新）
+          this.startBreakTimer();
         }
       }
 
@@ -394,20 +407,38 @@ export class StaffAttendanceUI {
 
     if (this.isOnBreak) {
       const elapsed = this.getElapsedBreakMinutes();
+      const isOver = elapsed >= 60;
 
-      html = `
-        <div class="break-status-content">
-          <div class="break-status-icon text-warning">
-            <i class="fas fa-coffee fa-2x"></i>
+      if (isOver) {
+        html = `
+          <div class="break-status-content text-danger">
+            <div class="break-status-icon">
+              <i class="fas fa-exclamation-triangle fa-2x"></i>
+            </div>
+            <div class="break-status-text">
+              <p class="mb-1 fw-bold">休憩時間が60分を超えています（${elapsed} 分経過）</p>
+              <p class="mb-1">管理者、上長に確認、報告をしてください</p>
+              <small class="text-muted">
+                <i class="fas fa-clock"></i> ${this.breakStartTime} から休憩開始
+              </small>
+            </div>
           </div>
-          <div class="break-status-text">
-            <p class="mb-1 fw-bold">休憩中（${elapsed} 分経過）</p>
-            <small class="text-muted">
-              <i class="fas fa-clock"></i> ${this.breakStartTime} から休憩開始
-            </small>
+        `;
+      } else {
+        html = `
+          <div class="break-status-content">
+            <div class="break-status-icon text-warning">
+              <i class="fas fa-coffee fa-2x"></i>
+            </div>
+            <div class="break-status-text">
+              <p class="mb-1 fw-bold">休憩中（${elapsed} 分経過）</p>
+              <small class="text-muted">
+                <i class="fas fa-clock"></i> ${this.breakStartTime} から休憩開始
+              </small>
+            </div>
           </div>
-        </div>
-      `;
+        `;
+      }
     }
 
     breakStatusElement.innerHTML = html;
@@ -430,7 +461,8 @@ export class StaffAttendanceUI {
 
     if (this.isWorking) {
       if (clockInBtn) clockInBtn.disabled = true;
-      if (clockOutBtn) clockOutBtn.disabled = false;
+      // 休憩中は退勤ボタンを無効化
+      if (clockOutBtn) clockOutBtn.disabled = this.isOnBreak;
 
       if (this.isOnBreak) {
         if (breakStartBtn) breakStartBtn.disabled = true;
