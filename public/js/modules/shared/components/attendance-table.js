@@ -1,7 +1,7 @@
 // public/js/modules/shared/components/attendance-table.js
 // 出勤記録テーブル表示の一元管理コンポーネント（修正版）
 
-import { calculateWorkHours ,getJapaneseDayOfWeek} from '../../../utils/date-time.js';
+import { calculateWorkHours, calculateBreakDuration, getJapaneseDayOfWeek } from '../../../utils/date-time.js';
 import { isJapaneseHoliday } from '../../../utils/holidays.js';
 
 export class AttendanceTable {
@@ -269,38 +269,35 @@ export class AttendanceTable {
   
   calculateWorkDurationDay(record) {
     if (!record.clock_in || !record.clock_out) return null;
-    
+
     try {
       // 基本の勤務時間を計算
       const workHours = calculateWorkHours(
-        record.clock_in, 
-        record.clock_out, 
+        record.clock_in,
+        record.clock_out,
         0 // 休憩時間は後で引く
       );
-      console.log('[DEBUG] 実働のスタッフ休憩:', record.break_start, record.break_end);
-      console.log('[DEBUG] 実働のUSER休憩:', record.break_start_time, record.break_end_time);
       if (!workHours) return null;
-      
-        // 休憩時間の取得
-        let breakMinutes = 0;
-        
-        // スタッフ・管理者（固定60分）
-        if (record.user_role === 'staff') {
-          if (record.break_start && record.break_end) {
-            breakMinutes = 60;
-          }
+
+      // 休憩時間の取得（実際の打刻時間から計算）
+      let breakMinutes = 0;
+
+      // スタッフ・管理者（実際の休憩開始・終了から計算）
+      if (record.user_role === 'staff' || record.user_role === 'admin') {
+        if (record.break_start && record.break_end) {
+          breakMinutes = calculateBreakDuration(record.break_start, record.break_end);
         }
-        // 利用者（実際の休憩時間）
-        if (record.user_role === 'user') {
-          if (record.break_start_time && record.break_end_time){
-            breakMinutes = 60; // デフォルト
-          }
+      }
+      // 利用者（実際の休憩時間）
+      if (record.user_role === 'user') {
+        if (record.break_start_time && record.break_end_time) {
+          breakMinutes = calculateBreakDuration(record.break_start_time, record.break_end_time);
         }
-      
+      }
+
       const netHours = workHours - (breakMinutes / 60);
-      console.log('[DEBUG] 実働時間:', netHours);
       return netHours.toFixed(2);
-      
+
     } catch (error) {
       console.error('勤務時間計算エラー:', error);
       return null;

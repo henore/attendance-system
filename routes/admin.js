@@ -564,11 +564,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     END as break_end,
                     CASE
                         WHEN u.role = 'user' THEN br.duration
-                        ELSE CASE
-                            WHEN a.break_start IS NOT NULL AND a.break_end IS NOT NULL
-                            THEN 60
-                            ELSE NULL
-                        END
+                        ELSE NULL
                     END as break_duration
                 FROM attendance a
                 JOIN users u ON a.user_id = u.id
