@@ -173,7 +173,6 @@ app.use('/api/handover', requireAuth, handoverRouter);
 app.use('/api/trial-visits', requireAuth, requireRole(['staff', 'admin']), trialVisitsRouter);
 app.use('/api/line', requireAuth, lineRouter); 
 app.use('/api/holidays', holidaysRouter);
-app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
 // サーバー日付取得エンドポイント（JST統一モジュール使用）
 app.get('/api/server-date', requireAuth, (req, res) => {

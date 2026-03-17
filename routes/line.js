@@ -10,22 +10,37 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
-// 必要なディレクトリを作成
-async function ensureDirectories() {
-  const dirs = ['temp', 'public/temp', 'public/images']; 
-  for (const dir of dirs) {
-    const fullPath = path.join(__dirname, '..', dir);
-    try {
-      await fs.mkdir(fullPath, { recursive: true });
-      console.log(`📁 ディレクトリ作成/確認: ${fullPath}`);
-    } catch (error) {
-      console.error(`ディレクトリ作成エラー ${dir}:`, error.message);
+// tempディレクトリの作成と古いファイルのクリーンアップ
+const TEMP_DIR = path.join(__dirname, '..', 'temp');
+
+async function initTempDirectory() {
+  await fs.mkdir(TEMP_DIR, { recursive: true });
+
+  // 1時間以上前の古いファイルを一括削除
+  try {
+    const files = await fs.readdir(TEMP_DIR);
+    const now = Date.now();
+    const ONE_HOUR = 60 * 60 * 1000;
+
+    for (const file of files) {
+      try {
+        const filePath = path.join(TEMP_DIR, file);
+        const stat = await fs.stat(filePath);
+        if (now - stat.mtimeMs > ONE_HOUR) {
+          await fs.unlink(filePath);
+          console.log(`[temp cleanup] 削除: ${file}`);
+        }
+      } catch (err) {
+        if (err.code !== 'ENOENT') console.error(`[temp cleanup] エラー: ${file}`, err.message);
+      }
     }
+  } catch (err) {
+    console.error('[temp cleanup] ディレクトリ読み取りエラー:', err.message);
   }
 }
 
-// 起動時にディレクトリを作成
-ensureDirectories();
+// 起動時に実行
+initTempDirectory();
 
 /**
  * 日報画像生成（LINE API要件対応版）
@@ -107,10 +122,8 @@ router.post('/generate-report-image', async (req, res) => {
 
     // sharpを使用して画像を処理
     const imageId = `report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-    const imageDir = path.join(__dirname, '..', 'public', 'images');
-
-    // 1024x1024のオリジナル画像（JPEG変換）
-    const originalPath = path.join(imageDir, `${imageId}_original.jpg`);
+    const fileName = `${imageId}_original.jpg`;
+    const originalPath = path.join(TEMP_DIR, fileName);
     await sharp(pngBuffer)
       .resize(1024, 1024, {
         fit: 'cover',
@@ -122,17 +135,13 @@ router.post('/generate-report-image', async (req, res) => {
       })
       .toFile(originalPath);
 
-
-    console.log('[画像生成] 完了:', {
-      imageId,
-    });
+    console.log('[画像生成] 完了:', { imageId });
 
     res.json({
       success: true,
       imageId,
-      originalSize: originalPath,
-      imageUrl: `/images/${imageId}_original.jpg`,
-      fileName: `${imageId}_original.jpg`,
+      imageUrl: `/api/line/download-image/${encodeURIComponent(fileName)}`,
+      fileName,
       message: '画像生成完了'
     });
 
@@ -148,57 +157,31 @@ router.post('/generate-report-image', async (req, res) => {
 });
 
 /**
- * 画像キャッシュクリーンアップ（ダウンロード完了後の即削除）
+ * 画像ダウンロード（ダウンロード完了後に自動削除）
  */
-router.post('/cleanup-image', async (req, res) => {
-  try {
-    const { fileName } = req.body;
+router.get('/download-image/:fileName', (req, res) => {
+  const { fileName } = req.params;
 
-    if (!fileName) {
-      return res.status(400).json({
-        success: false,
-        message: 'ファイル名が指定されていません'
-      });
-    }
-
-    // セキュリティチェック: パストラバーサル攻撃を防ぐ
-    if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
-      return res.status(400).json({
-        success: false,
-        message: '無効なファイル名です'
-      });
-    }
-
-    const imageDir = path.join(__dirname, '..', 'public', 'images');
-    const filePath = path.join(imageDir, fileName);
-
-    // ファイルが存在するか確認
-    try {
-      await fs.access(filePath);
-    } catch (error) {
-      console.log(`[画像削除] ファイルが既に削除されているか存在しません: ${fileName}`);
-      return res.json({
-        success: true,
-        message: 'ファイルは既に削除されています'
-      });
-    }
-
-    // ファイルを削除
-    await fs.unlink(filePath);
-    console.log(`[画像削除] 成功: ${fileName}`);
-
-    res.json({
-      success: true,
-      message: '画像キャッシュをクリーンアップしました'
-    });
-
-  } catch (error) {
-    console.error('[画像削除] エラー:', error);
-    res.status(500).json({
-      success: false,
-      message: '画像の削除に失敗しました: ' + error.message
-    });
+  // セキュリティチェック: パストラバーサル攻撃を防ぐ
+  if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+    return res.status(400).json({ success: false, message: '無効なファイル名です' });
   }
+
+  const filePath = path.join(TEMP_DIR, fileName);
+
+  res.download(filePath, fileName, (err) => {
+    // ダウンロード完了後（成功・失敗問わず）ファイルを削除
+    fs.unlink(filePath).catch(unlinkErr => {
+      if (unlinkErr.code !== 'ENOENT') {
+        console.error('[画像削除] エラー:', unlinkErr.message);
+      }
+    });
+
+    if (err && !res.headersSent) {
+      console.error('[画像ダウンロード] エラー:', err.message);
+      res.status(404).json({ success: false, message: 'ファイルが見つかりません' });
+    }
+  });
 });
 
 /**
@@ -777,10 +760,8 @@ router.post('/generate-staff-report-image', async (req, res) => {
 
     // sharpを使用して画像を処理
     const imageId = `staff_report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-    const imageDir = path.join(__dirname, '..', 'public', 'images');
-
-    // JPEG変換
-    const originalPath = path.join(imageDir, `${imageId}_original.jpg`);
+    const fileName = `${imageId}_original.jpg`;
+    const originalPath = path.join(TEMP_DIR, fileName);
     await sharp(pngBuffer)
       .resize(1024, 1024, {
         fit: 'cover',
@@ -792,15 +773,13 @@ router.post('/generate-staff-report-image', async (req, res) => {
       })
       .toFile(originalPath);
 
-    console.log('[スタッフ日報画像生成] 完了:', {
-      imageId
-    });
+    console.log('[スタッフ日報画像生成] 完了:', { imageId });
 
     res.json({
       success: true,
       imageId,
-      imageUrl: `/images/${imageId}_original.jpg`,
-      fileName: `${imageId}_original.jpg`
+      imageUrl: `/api/line/download-image/${encodeURIComponent(fileName)}`,
+      fileName
     });
 
   } catch (error) {

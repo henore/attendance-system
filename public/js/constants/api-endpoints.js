@@ -26,7 +26,6 @@ export const API_ENDPOINTS = {
   // LINE連携
   LINE: {
     GENERATE_IMAGE: '/api/line/generate-report-image',
-    CLEANUP_IMAGE: '/api/line/cleanup-image',
   },
   
   // 利用者用

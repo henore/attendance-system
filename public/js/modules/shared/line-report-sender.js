@@ -55,7 +55,7 @@ export class LineReportSender {
       const safeUserName = userData.name.replace(/[\\/:*?"<>|]/g, '_');
       const safeDate = (reportData?.date || new Date().toISOString().split('T')[0]).replace(/[:]/g, '-');
 
-      // 自動ダウンロード処理を追加
+      // 自動ダウンロード（サーバー側でダウンロード完了後に自動削除される）
       if (imageResponse.imageUrl) {
         console.log('[画像生成] ダウンロード開始:', imageResponse.imageUrl);
 
@@ -66,30 +66,6 @@ export class LineReportSender {
         link.click();
         document.body.removeChild(link);
 
-        console.log('[画像生成] ダウンロード完了');
-
-        // ダウンロード完了後、即座にサーバー側の画像キャッシュを削除
-        setTimeout(async () => {
-          try {
-            if (imageResponse.fileName) {
-              console.log('[画像削除] キャッシュクリーンアップ開始:', imageResponse.fileName);
-
-              await this.app.apiCall(API_ENDPOINTS.LINE.CLEANUP_IMAGE, {
-                method: 'POST',
-                body: JSON.stringify({
-                  fileName: imageResponse.fileName
-                })
-              });
-
-              console.log('[画像削除] キャッシュクリーンアップ完了');
-            }
-          } catch (cleanupError) {
-            // クリーンアップエラーはログのみ（ユーザーには通知しない）
-            console.error('[画像削除] クリーンアップエラー:', cleanupError);
-          }
-        }, 1000); // 1秒待ってからクリーンアップ（ダウンロード完了を確実にするため）
-
-        // 成功メッセージ
         this.app.showNotification('日報画像を保存しました', 'success');
       } else {
         throw new Error('画像URLが返されませんでした');
@@ -156,7 +132,7 @@ export class LineReportSender {
       const safeUserName = userData.name.replace(/[\\/:*?"<>|]/g, '_');
       const safeDate = (staffReportData?.date || new Date().toISOString().split('T')[0]).replace(/[:]/g, '-');
 
-      // 自動ダウンロード処理
+      // 自動ダウンロード（サーバー側でダウンロード完了後に自動削除される）
       if (imageResponse.imageUrl) {
         console.log('[スタッフ日報画像生成] ダウンロード開始:', imageResponse.imageUrl);
 
@@ -167,29 +143,6 @@ export class LineReportSender {
         link.click();
         document.body.removeChild(link);
 
-        console.log('[スタッフ日報画像生成] ダウンロード完了');
-
-        // ダウンロード完了後、即座にサーバー側の画像キャッシュを削除
-        setTimeout(async () => {
-          try {
-            if (imageResponse.fileName) {
-              console.log('[画像削除] キャッシュクリーンアップ開始:', imageResponse.fileName);
-
-              await this.app.apiCall(API_ENDPOINTS.LINE.CLEANUP_IMAGE, {
-                method: 'POST',
-                body: JSON.stringify({
-                  fileName: imageResponse.fileName
-                })
-              });
-
-              console.log('[画像削除] キャッシュクリーンアップ完了');
-            }
-          } catch (cleanupError) {
-            console.error('[画像削除] クリーンアップエラー:', cleanupError);
-          }
-        }, 1000);
-
-        // 成功メッセージ
         this.app.showNotification('スタッフ日報画像を保存しました', 'success');
       } else {
         throw new Error('画像URLが返されませんでした');
