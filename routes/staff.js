@@ -474,7 +474,7 @@ router.post('/break/end', async (req, res) => {
         SELECT
           a.*,
           dr.id as report_id,
-          dr.work_location,
+          u.service_type,
           sc.comment as staff_comment,
           sc.id as comment_id,
           sc.staff_id,
@@ -483,6 +483,7 @@ router.post('/break/end', async (req, res) => {
           br.end_time as break_end_time,
           br.duration as break_duration
         FROM attendance a
+        JOIN users u ON a.user_id = u.id
         LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
         LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
         LEFT JOIN users su ON sc.staff_id = su.id

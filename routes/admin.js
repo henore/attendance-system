@@ -389,7 +389,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             else if (userId && date) {
                 // ユーザー情報取得
                 const user = await dbGet(
-                    'SELECT id, role FROM users WHERE id = ?',
+                    'SELECT id, role, service_type FROM users WHERE id = ?',
                     [userId]
                 );
 
@@ -442,32 +442,37 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     );
 
                     if (!existingReport) {
-                        // 日報を自動生成
+                        // 在宅・通所でデフォルト値を分岐
+                        const isHome = user.service_type === 'home';
+
                         await dbRun(
                             `INSERT INTO daily_reports (
                                 user_id, date, work_content, work_location, pc_number,
                                 external_work_location, temperature, appetite, medication_time,
-                                bedtime, wakeup_time, sleep_quality, reflection, interview_request
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                bedtime, wakeup_time, sleep_quality, reflection, interview_request,
+                                contact_time_1, contact_time_2
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                             [
                                 userId,
                                 date,
-                                'PC作業', // 作業内容
-                                'office', // 作業場所：通所
-                                '15', // PC番号：15
-                                '施設外就労先名（佐藤美幸）', // 施設外就労先チェック済み
-                                36.5, // デフォルト体温
-                                'good', // デフォルト食欲
-                                null, // 頓服なし
-                                '23:00', // 就寝時間
-                                '07:00', // 起床時間
-                                'good', // 睡眠状態：good
-                                '今日も一日お疲れ様でした', // 振り返り
-                                null // 面談希望なし
+                                'PC作業',
+                                isHome ? 'home' : 'office',
+                                isHome ? '13' : '15',
+                                isHome ? null : '施設外就労先名（佐藤美幸）',
+                                isHome ? 36.1 : 35.9,
+                                'good',
+                                null,
+                                '23:00',
+                                '07:00',
+                                'good',
+                                '今日も一日お疲れ様でした',
+                                null,
+                                isHome ? clockInValue : null,
+                                isHome ? clockOutValue : null
                             ]
                         );
 
-                        console.log(`[日報自動生成] ユーザーID: ${userId}, 日付: ${date}`);
+                        console.log(`[日報自動生成] ユーザーID: ${userId}, 日付: ${date}, 区分: ${isHome ? '在宅' : '通所'}`);
                     }
                 }
 
@@ -551,7 +556,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 SELECT
                     a.*,
                     dr.id as report_id,
-                    COALESCE(dr.work_location, CASE u.service_type WHEN 'commute' THEN 'office' WHEN 'home' THEN 'home' END) as work_location,
+                    u.service_type,
                     sdr.id as staff_report_id,
                     sc.comment,
                     CASE

@@ -189,27 +189,20 @@ export class AttendanceTable {
     const dayClickAttrs = hasReport ?
       `data-user-id="${record.user_id}" data-user-name="${record.user_name}" data-date="${record.date}" style="cursor: pointer;"` : '';
 
-    // サービス区分表示（日報のwork_locationを優先、なければユーザーのservice_typeで判定、出勤日のみ）
+    // サービス区分表示（ユーザーのservice_typeで判定、出勤日のみ）
     let serviceTypeCell = '';
     if (showServiceType) {
       let serviceLabel = '';
       if (record.clock_in) {
-        const loc = record.work_location;
-        if (loc) {
-          serviceLabel = (loc === 'office' || loc === 'commute') ? '通所' : loc === 'home' ? '在宅' : '';
-        } else {
-          serviceLabel = record.service_type === 'commute' ? '通所' : record.service_type === 'home' ? '在宅' : '';
-        }
+        serviceLabel = record.service_type === 'commute' ? '通所' : record.service_type === 'home' ? '在宅' : '';
       }
       serviceTypeCell = `<td class="text-center">${serviceLabel}</td>`;
     }
 
-    // 送迎表示（出勤記録がある通所日のみ。在宅日は送迎なし）
+    // 送迎表示（出勤記録がある通所利用者のみ）
     let transportationCells = '';
     if (showTransportation) {
-      const loc = record.work_location;
-      const isHome = loc ? loc === 'home' : record.service_type === 'home';
-      const hasTransportation = record.transportation === 1 && record.clock_in && !isHome;
+      const hasTransportation = record.transportation === 1 && record.clock_in;
       transportationCells = `<td class="text-center transportation-col">${hasTransportation ? '1' : ''}</td><td class="text-center transportation-col">${hasTransportation ? '1' : ''}</td>`;
     }
 

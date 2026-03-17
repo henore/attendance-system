@@ -625,10 +625,7 @@ export default class SharedMonthlyReport {
         let transportationCells = '';
         if (showTransportation) {
             const transportationCount = records.filter(r => {
-                if (!r.transportation || !r.clock_in) return false;
-                const loc = r.work_location;
-                const isHome = loc ? loc === 'home' : r.service_type === 'home';
-                return !isHome;
+                return r.transportation && r.clock_in;
             }).length;
             const totalTransportation = transportationCount * 2; // 迎+送の合算
             transportationCells = `<th colspan="2" class="text-center transportation-col">送迎:${totalTransportation}</th>`;
