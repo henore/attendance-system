@@ -437,37 +437,25 @@ export class UserReportHandler {
         // 通所の場合は必須かつ有効化
         externalWorkCheckbox.required = true;
         externalWorkCheckbox.disabled = false;
-        // 連絡時間はグレーアウト
-        if (contactTime1) {
-          contactTime1.disabled = true;
-          contactTime1.value = '';
-        }
-        if (contactTime2) {
-          contactTime2.disabled = true;
-          contactTime2.value = '';
-        }
+        // 連絡時間はグレーアウト・必須解除
+        if (contactTime1) { contactTime1.disabled = true; contactTime1.required = false; contactTime1.value = ''; }
+        if (contactTime2) { contactTime2.disabled = true; contactTime2.required = false; contactTime2.value = ''; }
       } else if (workLocation === 'home') {
         // 在宅の場合は必須解除、無効化、チェックを外す
         externalWorkCheckbox.required = false;
         externalWorkCheckbox.disabled = true;
         externalWorkCheckbox.checked = false;
-        // 連絡時間を有効化
-        if (contactTime1) contactTime1.disabled = false;
-        if (contactTime2) contactTime2.disabled = false;
+        // 連絡時間を有効化・必須化
+        if (contactTime1) { contactTime1.disabled = false; contactTime1.required = true; }
+        if (contactTime2) { contactTime2.disabled = false; contactTime2.required = true; }
       } else {
         // 未選択の場合は必須解除、無効化
         externalWorkCheckbox.required = false;
         externalWorkCheckbox.disabled = true;
         externalWorkCheckbox.checked = false;
-        // 連絡時間もグレーアウト
-        if (contactTime1) {
-          contactTime1.disabled = true;
-          contactTime1.value = '';
-        }
-        if (contactTime2) {
-          contactTime2.disabled = true;
-          contactTime2.value = '';
-        }
+        // 連絡時間もグレーアウト・必須解除
+        if (contactTime1) { contactTime1.disabled = true; contactTime1.required = false; contactTime1.value = ''; }
+        if (contactTime2) { contactTime2.disabled = true; contactTime2.required = false; contactTime2.value = ''; }
       }
     };
 
