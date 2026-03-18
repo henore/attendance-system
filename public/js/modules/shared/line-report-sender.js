@@ -57,11 +57,11 @@ export class LineReportSender {
 
       // 自動ダウンロード（サーバー側でダウンロード完了後に自動削除される）
       if (imageResponse.imageUrl) {
-        console.log('[画像生成] ダウンロード開始:', imageResponse.imageUrl);
+        const downloadName = `${safeUserName}_${safeDate}.jpg`;
+        const downloadUrl = `${imageResponse.imageUrl}?name=${encodeURIComponent(downloadName)}`;
 
         const link = document.createElement('a');
-        link.href = imageResponse.imageUrl;
-        link.download = `${safeUserName}_${safeDate}.jpg`;
+        link.href = downloadUrl;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -134,11 +134,11 @@ export class LineReportSender {
 
       // 自動ダウンロード（サーバー側でダウンロード完了後に自動削除される）
       if (imageResponse.imageUrl) {
-        console.log('[スタッフ日報画像生成] ダウンロード開始:', imageResponse.imageUrl);
+        const downloadName = `staff_${safeUserName}_${safeDate}.jpg`;
+        const downloadUrl = `${imageResponse.imageUrl}?name=${encodeURIComponent(downloadName)}`;
 
         const link = document.createElement('a');
-        link.href = imageResponse.imageUrl;
-        link.download = `staff_${safeUserName}_${safeDate}.jpg`;
+        link.href = downloadUrl;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

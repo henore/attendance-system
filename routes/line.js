@@ -168,8 +168,10 @@ router.get('/download-image/:fileName', (req, res) => {
   }
 
   const filePath = path.join(TEMP_DIR, fileName);
+  // クエリパラメータで表示用ファイル名を指定可能
+  const downloadName = req.query.name || fileName;
 
-  res.download(filePath, fileName, (err) => {
+  res.download(filePath, downloadName, (err) => {
     // ダウンロード完了後（成功・失敗問わず）ファイルを削除
     fs.unlink(filePath).catch(unlinkErr => {
       if (unlinkErr.code !== 'ENOENT') {
