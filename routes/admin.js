@@ -75,22 +75,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 [username, hashedPassword, name, role, finalServiceType, finalServiceNo, finalTransportation]
             );
             
-            // 監査ログ記録
-            await dbRun(
-                'INSERT INTO audit_log (admin_id, action_type, new_value, ip_address) VALUES (?, ?, ?, ?)',
-                [
-                    req.session.user.id, 
-                    'account_create', 
-                    JSON.stringify({ 
-                        username, 
-                        name, 
-                        role, 
-                        serviceType: finalServiceType,
-                        hasServiceNo: !!finalServiceNo 
-                    }), 
-                    req.ip
-                ]
-            );
+            // 管理者操作は監査ログに記録しない
             
             res.json({ 
                 success: true, 
@@ -530,11 +515,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 ORDER BY a.date
             `, [userId, startDate, endDate]);
             
-            // 監査ログ記録
-            await dbRun(
-                'INSERT INTO audit_log (admin_id, action_type, target_id, target_type, ip_address) VALUES (?, ?, ?, ?, ?)',
-                [req.session.user.id, 'monthly_attendance_view', userId, 'user', req.ip]
-            );
+            // 管理者操作は監査ログに記録しない
             
             res.json({ 
                 success: true,
@@ -658,22 +639,11 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             
             await dbRun(updateQuery, params);
             
-            // 監査ログ記録
-            await dbRun(
-                'INSERT INTO audit_log (admin_id, action_type, target_id, target_type, new_value, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
-                [
-                    req.session.user.id, 
-                    'user_update', 
-                    userId, 
-                    'user',
-                    JSON.stringify({ username, name, role, serviceType, passwordChanged: !!password }),
-                    req.ip
-                ]
-            );
-            
-            res.json({ 
-                success: true, 
-                message: 'ユーザー情報を更新しました' 
+            // 管理者操作は監査ログに記録しない
+
+            res.json({
+                success: true,
+                message: 'ユーザー情報を更新しました'
             });
             
         } catch (error) {
@@ -718,18 +688,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 [userId]
             );
             
-            // 監査ログ記録
-            await dbRun(
-                'INSERT INTO audit_log (admin_id, action_type, target_id, target_type, new_value, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
-                [
-                    req.session.user.id, 
-                    'user_deactivation', 
-                    userId, 
-                    'user',
-                    JSON.stringify({ username: user.username, name: user.name }),
-                    req.ip
-                ]
-            );
+            // 管理者操作は監査ログに記録しない
             
             res.json({ 
                 success: true, 
@@ -847,6 +806,146 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 });
             }
 
+            const newValues = JSON.parse(log.new_value);
+
+            // 訂正の場合：既存レコードを更新
+            if (log.action_type === 'staff_attendance_correction' && log.target_id) {
+                const record = await dbGet(
+                    'SELECT * FROM attendance WHERE id = ?',
+                    [log.target_id]
+                );
+
+                if (!record) {
+                    return res.status(404).json({
+                        success: false,
+                        error: '対象の出勤記録が見つかりません'
+                    });
+                }
+
+                const clockInValue = newValues.clock_in && newValues.clock_in.trim() !== '' ? newValues.clock_in : null;
+                const clockOutValue = newValues.clock_out && newValues.clock_out.trim() !== '' ? newValues.clock_out : null;
+
+                await dbRun(
+                    'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                    [clockInValue, clockOutValue, newValues.status, log.target_id]
+                );
+
+                // 休憩記録の処理
+                const user = await dbGet('SELECT role FROM users WHERE id = ?', [record.user_id]);
+                const breakStartValue = newValues.break_start && newValues.break_start.trim() !== '' ? newValues.break_start : null;
+                const breakEndValue = newValues.break_end && newValues.break_end.trim() !== '' ? newValues.break_end : null;
+
+                if (user && user.role === 'user') {
+                    if (breakStartValue) {
+                        const existingBreak = await dbGet(
+                            'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
+                            [record.user_id, record.date]
+                        );
+                        if (existingBreak) {
+                            await dbRun(
+                                'UPDATE break_records SET start_time = ?, end_time = ?, duration = ? WHERE id = ?',
+                                [breakStartValue, breakEndValue, breakEndValue ? 60 : null, existingBreak.id]
+                            );
+                        } else {
+                            await dbRun(
+                                'INSERT INTO break_records (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)',
+                                [record.user_id, record.date, breakStartValue, breakEndValue, breakEndValue ? 60 : null]
+                            );
+                        }
+                    } else {
+                        await dbRun(
+                            'DELETE FROM break_records WHERE user_id = ? AND date = ?',
+                            [record.user_id, record.date]
+                        );
+                    }
+                } else {
+                    await dbRun(
+                        'UPDATE attendance SET break_start = ?, break_end = ? WHERE id = ?',
+                        [breakStartValue, breakEndValue, log.target_id]
+                    );
+                }
+            }
+            // 新規作成の場合：出勤記録を挿入
+            else if (log.action_type === 'staff_attendance_creation') {
+                const targetUserId = newValues.user_id;
+                const targetDate = newValues.date;
+
+                const user = await dbGet(
+                    'SELECT id, role, service_type FROM users WHERE id = ?',
+                    [targetUserId]
+                );
+
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        error: '対象ユーザーが見つかりません'
+                    });
+                }
+
+                const clockInValue = newValues.clock_in && newValues.clock_in.trim() !== '' ? newValues.clock_in : null;
+                const clockOutValue = newValues.clock_out && newValues.clock_out.trim() !== '' ? newValues.clock_out : null;
+
+                const result = await dbRun(
+                    `INSERT INTO attendance (user_id, date, clock_in, clock_out, status)
+                     VALUES (?, ?, ?, ?, ?)
+                     ON CONFLICT(user_id, date) DO UPDATE SET
+                        clock_in = excluded.clock_in,
+                        clock_out = excluded.clock_out,
+                        status = excluded.status,
+                        updated_at = CURRENT_TIMESTAMP`,
+                    [targetUserId, targetDate, clockInValue, clockOutValue, newValues.status || 'normal']
+                );
+
+                // 休憩記録
+                const breakStartValue = newValues.break_start && newValues.break_start.trim() !== '' ? newValues.break_start : null;
+                const breakEndValue = newValues.break_end && newValues.break_end.trim() !== '' ? newValues.break_end : null;
+
+                if (breakStartValue && user.role === 'user') {
+                    await dbRun(
+                        `INSERT OR REPLACE INTO break_records (user_id, date, start_time, end_time, duration)
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [targetUserId, targetDate, breakStartValue, breakEndValue, breakEndValue ? 60 : null]
+                    );
+                }
+
+                // 日報自動生成
+                if (user.role === 'user' && clockInValue && clockOutValue && newValues.status !== 'absence' && newValues.status !== 'paid_leave') {
+                    const existingReport = await dbGet(
+                        'SELECT id FROM daily_reports WHERE user_id = ? AND date = ?',
+                        [targetUserId, targetDate]
+                    );
+
+                    if (!existingReport) {
+                        const isHome = user.service_type === 'home';
+                        await dbRun(
+                            `INSERT INTO daily_reports (
+                                user_id, date, work_content, work_location, pc_number,
+                                external_work_location, temperature, appetite, medication_time,
+                                bedtime, wakeup_time, sleep_quality, reflection, interview_request,
+                                contact_time_1, contact_time_2
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [
+                                targetUserId, targetDate, 'PC作業',
+                                isHome ? 'home' : 'office',
+                                isHome ? '13' : '15',
+                                isHome ? null : '施設外就労先名（佐藤美幸）',
+                                isHome ? 36.1 : 35.9,
+                                'good', null, '23:00', '07:00', 'good',
+                                '今日も一日お疲れ様でした', null,
+                                isHome ? clockInValue : null,
+                                isHome ? clockOutValue : null
+                            ]
+                        );
+                    }
+                }
+
+                // target_idを更新
+                await dbRun(
+                    'UPDATE audit_log SET target_id = ? WHERE id = ?',
+                    [result.lastID || result.id, id]
+                );
+            }
+
             await dbRun(
                 `UPDATE audit_log SET
                     approval_status = 'approved',
@@ -858,7 +957,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
             res.json({
                 success: true,
-                message: '承認しました'
+                message: '承認しました（出勤記録に反映しました）'
             });
 
         } catch (error) {
@@ -870,7 +969,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
-    // 監査ログ非承認（スタッフの出勤記録操作を差し戻す）
+    // 監査ログ非承認（申請を却下）
     router.post('/audit-log/:id/reject', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
             const { id } = req.params;
@@ -895,60 +994,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 });
             }
 
-            // 変更を差し戻す
-            if (log.old_value && log.target_id) {
-                const oldValues = JSON.parse(log.old_value);
-
-                // 出勤記録を元に戻す
-                const record = await dbGet(
-                    'SELECT * FROM attendance WHERE id = ?',
-                    [log.target_id]
-                );
-
-                if (record) {
-                    await dbRun(
-                        'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                        [oldValues.clock_in, oldValues.clock_out, oldValues.status, log.target_id]
-                    );
-
-                    // 利用者の休憩記録も戻す
-                    const user = await dbGet('SELECT role FROM users WHERE id = ?', [record.user_id]);
-                    if (user && user.role === 'user') {
-                        if (oldValues.break_start) {
-                            await dbRun(
-                                `INSERT OR REPLACE INTO break_records (user_id, date, start_time, end_time, duration)
-                                 VALUES (?, ?, ?, ?, ?)`,
-                                [record.user_id, record.date, oldValues.break_start, oldValues.break_end, oldValues.break_end ? 60 : null]
-                            );
-                        } else {
-                            await dbRun(
-                                'DELETE FROM break_records WHERE user_id = ? AND date = ?',
-                                [record.user_id, record.date]
-                            );
-                        }
-                    }
-                }
-            } else if (!log.old_value && log.target_id && log.action_type === 'staff_attendance_creation') {
-                // 新規作成の差し戻し：レコードを削除
-                const record = await dbGet(
-                    'SELECT * FROM attendance WHERE id = ?',
-                    [log.target_id]
-                );
-
-                if (record) {
-                    // 関連する休憩記録を削除
-                    await dbRun(
-                        'DELETE FROM break_records WHERE user_id = ? AND date = ?',
-                        [record.user_id, record.date]
-                    );
-                    // 出勤記録を削除
-                    await dbRun(
-                        'DELETE FROM attendance WHERE id = ?',
-                        [log.target_id]
-                    );
-                }
-            }
-
+            // 承認前なのでDB変更は不要、ステータスを更新するだけ
             await dbRun(
                 `UPDATE audit_log SET
                     approval_status = 'rejected',
@@ -960,7 +1006,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
             res.json({
                 success: true,
-                message: '非承認にしました（変更を差し戻しました）'
+                message: '非承認にしました'
             });
 
         } catch (error) {
@@ -1143,36 +1189,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 date
             ]);
 
-            // 監査ログ記録
-            await dbRun(
-                `INSERT INTO audit_log (
-                    admin_id, action_type, target_id, target_type,
-                    old_value, new_value, reason, ip_address
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    req.session.user.id,
-                    'report_edit',
-                    existingReport.id,
-                    'daily_report',
-                    JSON.stringify({
-                        work_content: existingReport.work_content,
-                        work_location: existingReport.work_location,
-                        pc_number: existingReport.pc_number,
-                        external_work_location: existingReport.external_work_location,
-                        temperature: existingReport.temperature,
-                        appetite: existingReport.appetite,
-                        medication_time: existingReport.medication_time,
-                        bedtime: existingReport.bedtime,
-                        wakeup_time: existingReport.wakeup_time,
-                        sleep_quality: existingReport.sleep_quality,
-                        reflection: existingReport.reflection,
-                        interview_request: existingReport.interview_request
-                    }),
-                    JSON.stringify(req.body),
-                    '管理者による日報編集',
-                    req.ip
-                ]
-            );
+            // 管理者操作は監査ログに記録しない
 
             res.json({
                 success: true,
@@ -1306,21 +1323,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 [adminId, id]
             );
 
-            // 監査ログ記録
-            await dbRun(
-                `INSERT INTO audit_log (
-                    admin_id, action_type, target_id, target_type,
-                    new_value, ip_address
-                ) VALUES (?, ?, ?, ?, ?, ?)`,
-                [
-                    adminId,
-                    'approval_approve',
-                    id,
-                    'approval_request',
-                    JSON.stringify({ title: approval.title, staff_id: approval.staff_id }),
-                    req.ip
-                ]
-            );
+            // 管理者操作は監査ログに記録しない
 
             res.json({
                 success: true,
@@ -1379,22 +1382,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 [adminId, reason.trim(), id]
             );
 
-            // 監査ログ記録
-            await dbRun(
-                `INSERT INTO audit_log (
-                    admin_id, action_type, target_id, target_type,
-                    new_value, reason, ip_address
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    adminId,
-                    'approval_reject',
-                    id,
-                    'approval_request',
-                    JSON.stringify({ title: approval.title, staff_id: approval.staff_id }),
-                    reason.trim(),
-                    req.ip
-                ]
-            );
+            // 管理者操作は監査ログに記録しない
 
             res.json({
                 success: true,
@@ -1441,21 +1429,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 [id]
             );
 
-            // 監査ログ記録
-            await dbRun(
-                `INSERT INTO audit_log (
-                    admin_id, action_type, target_id, target_type,
-                    new_value, ip_address
-                ) VALUES (?, ?, ?, ?, ?, ?)`,
-                [
-                    req.session.user.id,
-                    'approval_complete',
-                    id,
-                    'approval_request',
-                    JSON.stringify({ title: approval.title, staff_id: approval.staff_id }),
-                    req.ip
-                ]
-            );
+            // 管理者操作は監査ログに記録しない
 
             res.json({
                 success: true,

@@ -176,16 +176,40 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       return processed;
     });
     
-    res.json({ 
-      success: true, 
-      records: processedRecords 
+    // 承認待ちの申請を取得してレコードに付与
+    const pendingLogs = await dbAll(
+      `SELECT target_id, new_value FROM audit_log
+       WHERE approval_status = 'pending'
+         AND action_type IN ('staff_attendance_correction', 'staff_attendance_creation')`,
+      []
+    );
+
+    // target_id(既存訂正)とnew_value内のuser_id+date(新規作成)でマッピング
+    const pendingByRecordId = new Set(pendingLogs.filter(l => l.target_id).map(l => l.target_id));
+    const pendingByUserDate = new Set();
+    pendingLogs.forEach(l => {
+      try {
+        const nv = JSON.parse(l.new_value);
+        if (nv.user_id && nv.date) {
+          pendingByUserDate.add(`${nv.user_id}_${nv.date}`);
+        }
+      } catch (e) { /* ignore */ }
     });
-    
+
+    processedRecords.forEach(r => {
+      r.has_pending_correction = pendingByRecordId.has(r.id) || pendingByUserDate.has(`${r.user_id}_${r.date}`);
+    });
+
+    res.json({
+      success: true,
+      records: processedRecords
+    });
+
   } catch (error) {
     console.error('出勤記録検索エラー:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: '出勤記録の検索に失敗しました: ' + error.message 
+    res.status(500).json({
+      success: false,
+      error: '出勤記録の検索に失敗しました: ' + error.message
     });
   }
 });
@@ -505,16 +529,39 @@ router.post('/break/end', async (req, res) => {
         return record;
       });
       
-      res.json({ 
-        success: true, 
+      // 承認待ちの申請を取得
+      const pendingLogs = await dbAll(
+        `SELECT target_id, new_value FROM audit_log
+         WHERE approval_status = 'pending'
+           AND action_type IN ('staff_attendance_correction', 'staff_attendance_creation')`,
+        []
+      );
+
+      const pendingByRecordId = new Set(pendingLogs.filter(l => l.target_id).map(l => l.target_id));
+      const pendingByUserDate = new Set();
+      pendingLogs.forEach(l => {
+        try {
+          const nv = JSON.parse(l.new_value);
+          if (nv.user_id && nv.date) {
+            pendingByUserDate.add(`${nv.user_id}_${nv.date}`);
+          }
+        } catch (e) { /* ignore */ }
+      });
+
+      processedRecords.forEach(r => {
+        r.has_pending_correction = pendingByRecordId.has(r.id) || pendingByUserDate.has(`${r.user_id}_${r.date}`);
+      });
+
+      res.json({
+        success: true,
         records: processedRecords,
-        user: targetUser 
+        user: targetUser
       });
     } catch (error) {
       console.error('月別出勤簿取得エラー:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: '月別出勤簿の取得に失敗しました' 
+      res.status(500).json({
+        success: false,
+        error: '月別出勤簿の取得に失敗しました'
       });
     }
   });
@@ -542,7 +589,7 @@ router.post('/break/end', async (req, res) => {
 
   // ===== 出勤記録訂正（承認待ち） =====
 
-  // スタッフによる出勤記録訂正（admin承認が必要）
+  // スタッフによる出勤記録訂正申請（承認後に反映）
   router.post('/attendance/correct', requireAuth, requireRole(['staff']), async (req, res) => {
     try {
       const { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason } = req.body;
@@ -555,7 +602,7 @@ router.post('/break/end', async (req, res) => {
         });
       }
 
-      // recordIdがある場合は既存記録の更新
+      // 既存記録の訂正申請
       if (recordId) {
         const oldRecord = await dbGet(
           'SELECT * FROM attendance WHERE id = ?',
@@ -582,45 +629,13 @@ router.post('/break/end', async (req, res) => {
           });
         }
 
-        // 空文字列をNULLに変換
-        const clockInValue = newClockIn && newClockIn.trim() !== '' ? newClockIn : null;
-        const clockOutValue = newClockOut && newClockOut.trim() !== '' ? newClockOut : null;
-
-        // 出勤記録を更新
-        await dbRun(
-          'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-          [clockInValue, clockOutValue, status, recordId]
+        // 利用者の現在の休憩データも取得
+        const currentBreak = await dbGet(
+          'SELECT start_time, end_time FROM break_records WHERE user_id = ? AND date = ?',
+          [oldRecord.user_id, oldRecord.date]
         );
 
-        // 休憩記録の処理（利用者のみ）
-        const breakStartValue = newBreakStart && newBreakStart.trim() !== '' ? newBreakStart : null;
-        const breakEndValue = newBreakEnd && newBreakEnd.trim() !== '' ? newBreakEnd : null;
-
-        if (breakStartValue) {
-          const existingBreak = await dbGet(
-            'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
-            [oldRecord.user_id, oldRecord.date]
-          );
-
-          if (existingBreak) {
-            await dbRun(
-              'UPDATE break_records SET start_time = ?, end_time = ?, duration = ? WHERE id = ?',
-              [breakStartValue, breakEndValue, breakEndValue ? 60 : null, existingBreak.id]
-            );
-          } else {
-            await dbRun(
-              'INSERT INTO break_records (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)',
-              [oldRecord.user_id, oldRecord.date, breakStartValue, breakEndValue, breakEndValue ? 60 : null]
-            );
-          }
-        } else {
-          await dbRun(
-            'DELETE FROM break_records WHERE user_id = ? AND date = ?',
-            [oldRecord.user_id, oldRecord.date]
-          );
-        }
-
-        // 監査ログ（承認待ち）
+        // 監査ログに申請を記録（実際のDB変更はしない）
         await dbRun(
           `INSERT INTO audit_log (
             admin_id, action_type, target_id, target_type,
@@ -635,8 +650,8 @@ router.post('/break/end', async (req, res) => {
               clock_in: oldRecord.clock_in,
               clock_out: oldRecord.clock_out,
               status: oldRecord.status,
-              break_start: oldRecord.break_start,
-              break_end: oldRecord.break_end
+              break_start: currentBreak ? currentBreak.start_time : oldRecord.break_start,
+              break_end: currentBreak ? currentBreak.end_time : oldRecord.break_end
             }),
             JSON.stringify({
               clock_in: newClockIn,
@@ -651,7 +666,7 @@ router.post('/break/end', async (req, res) => {
           ]
         );
       }
-      // recordIdがない場合は新規記録の作成
+      // 新規記録の作成申請
       else if (userId && date) {
         const user = await dbGet(
           'SELECT id, role, service_type FROM users WHERE id = ?',
@@ -665,64 +680,7 @@ router.post('/break/end', async (req, res) => {
           });
         }
 
-        const clockInValue = newClockIn && newClockIn.trim() !== '' ? newClockIn : null;
-        const clockOutValue = newClockOut && newClockOut.trim() !== '' ? newClockOut : null;
-
-        const result = await dbRun(
-          `INSERT INTO attendance (user_id, date, clock_in, clock_out, status)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(user_id, date) DO UPDATE SET
-              clock_in = excluded.clock_in,
-              clock_out = excluded.clock_out,
-              status = excluded.status,
-              updated_at = CURRENT_TIMESTAMP`,
-          [userId, date, clockInValue, clockOutValue, status || 'normal']
-        );
-
-        // 休憩記録の処理
-        const breakStartValue = newBreakStart && newBreakStart.trim() !== '' ? newBreakStart : null;
-        const breakEndValue = newBreakEnd && newBreakEnd.trim() !== '' ? newBreakEnd : null;
-
-        if (breakStartValue) {
-          await dbRun(
-            `INSERT OR REPLACE INTO break_records (user_id, date, start_time, end_time, duration)
-             VALUES (?, ?, ?, ?, ?)`,
-            [userId, date, breakStartValue, breakEndValue, breakEndValue ? 60 : null]
-          );
-        }
-
-        // 利用者の場合、日報を自動生成
-        if (clockInValue && clockOutValue && status !== 'absence' && status !== 'paid_leave') {
-          const existingReport = await dbGet(
-            'SELECT id FROM daily_reports WHERE user_id = ? AND date = ?',
-            [userId, date]
-          );
-
-          if (!existingReport) {
-            const isHome = user.service_type === 'home';
-            await dbRun(
-              `INSERT INTO daily_reports (
-                user_id, date, work_content, work_location, pc_number,
-                external_work_location, temperature, appetite, medication_time,
-                bedtime, wakeup_time, sleep_quality, reflection, interview_request,
-                contact_time_1, contact_time_2
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              [
-                userId, date, 'PC作業',
-                isHome ? 'home' : 'office',
-                isHome ? '13' : '15',
-                isHome ? null : '施設外就労先名（佐藤美幸）',
-                isHome ? 36.1 : 35.9,
-                'good', null, '23:00', '07:00', 'good',
-                '今日も一日お疲れ様でした', null,
-                isHome ? clockInValue : null,
-                isHome ? clockOutValue : null
-              ]
-            );
-          }
-        }
-
-        // 監査ログ（承認待ち）
+        // 監査ログに申請を記録（実際のDB変更はしない）
         await dbRun(
           `INSERT INTO audit_log (
             admin_id, action_type, target_id, target_type,
@@ -731,7 +689,7 @@ router.post('/break/end', async (req, res) => {
           [
             req.session.user.id,
             'staff_attendance_creation',
-            result.lastID || result.id,
+            null,
             'attendance',
             JSON.stringify({
               user_id: userId,
@@ -740,7 +698,8 @@ router.post('/break/end', async (req, res) => {
               clock_out: newClockOut,
               status: status || 'normal',
               break_start: newBreakStart,
-              break_end: newBreakEnd
+              break_end: newBreakEnd,
+              service_type: user.service_type
             }),
             reason,
             req.ip,
@@ -756,14 +715,14 @@ router.post('/break/end', async (req, res) => {
 
       res.json({
         success: true,
-        message: '出勤記録を更新しました（管理者の承認待ち）'
+        message: '訂正申請を送信しました（管理者の承認待ち）'
       });
 
     } catch (error) {
-      console.error('スタッフ出勤記録訂正エラー:', error);
+      console.error('スタッフ出勤記録訂正申請エラー:', error);
       res.status(500).json({
         success: false,
-        error: '出勤記録の訂正に失敗しました'
+        error: '訂正申請に失敗しました'
       });
     }
   });

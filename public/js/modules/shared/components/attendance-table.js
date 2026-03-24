@@ -129,8 +129,9 @@ export class AttendanceTable {
     const breakDisplay = this.formatBreakTime(record);
     const netHours = this.calculateWorkDurationDay(record);
     const statusBadge = this.getStatusBadge(record.status || 'normal');
+    const pendingBadge = record.has_pending_correction ? '<br><span class="badge bg-warning text-dark mt-1"><i class="fas fa-clock"></i> 承認待ち</span>' : '';
     const reportStatus = this.getReportCommentStatus(record);
-    const operations = showOperations ? 
+    const operations = showOperations ?
       this.generateOperationButtons(record, context, currentDate) : '';
 
     return `
@@ -142,7 +143,7 @@ export class AttendanceTable {
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
         <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
-        <td class="text-center">${statusBadge}</td>
+        <td class="text-center">${statusBadge}${pendingBadge}</td>
         <td class="text-center">${reportStatus}</td>
         ${showOperations ? `<td class="text-center">${operations}</td>` : ''}
       </tr>
@@ -216,7 +217,7 @@ export class AttendanceTable {
         <td class="text-center small">${breakDisplay}</td>
         <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
         ${transportationCells}
-        <td class="text-center status-col">${statusBadge}</td>
+        <td class="text-center status-col">${statusBadge}${record.has_pending_correction ? '<br><span class="badge bg-warning text-dark mt-1" style="font-size:0.65em;"><i class="fas fa-clock"></i> 承認待ち</span>' : ''}</td>
         ${showOperations ? `<td class="text-center operation-col">${operations}</td>` : ''}
       </tr>
     `;

@@ -138,7 +138,7 @@ export class SharedAttendanceManagement {
             <div class="modal-header bg-warning text-dark">
               <h5 class="modal-title">
                 <i class="fas fa-edit"></i> 出勤記録編集
-                ${this.userRole === 'staff' ? '<small class="ms-2">（管理者承認待ち）</small>' : ''}
+                ${this.userRole === 'staff' ? '<small class="ms-2">（承認後に反映）</small>' : ''}
               </h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -708,7 +708,7 @@ async searchAttendanceRecords() {
       });
 
       const message = this.userRole === 'staff'
-        ? '出勤記録を更新しました（管理者の承認待ち）'
+        ? '訂正申請を送信しました（管理者の承認後に反映されます）'
         : '出勤記録を更新しました';
       this.parent.showNotification(message, 'success');
       

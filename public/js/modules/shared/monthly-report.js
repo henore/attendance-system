@@ -154,7 +154,7 @@ export default class SharedMonthlyReport {
                             <div class="modal-header bg-warning text-dark">
                                 <h5 class="modal-title">
                                     <i class="fas fa-edit"></i> 出勤記録編集
-                                    ${this.isStaff ? '<small class="ms-2">（管理者承認待ち）</small>' : ''}
+                                    ${this.isStaff ? '<small class="ms-2">（承認後に反映）</small>' : ''}
                                 </h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
@@ -737,7 +737,7 @@ export default class SharedMonthlyReport {
             });
 
             const message = this.isStaff
-                ? '出勤記録を更新しました（管理者の承認待ち）'
+                ? '訂正申請を送信しました（管理者の承認後に反映されます）'
                 : '出勤記録を更新しました';
             this.app.showNotification(message, 'success');
             modalManager.hide('monthlyAttendanceEditModal');

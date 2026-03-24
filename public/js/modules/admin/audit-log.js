@@ -681,7 +681,7 @@ export default class AdminAuditLog {
 
     async approveLog(logId) {
         try {
-            if (!confirm('このスタッフの操作を承認しますか？')) return;
+            if (!confirm('このスタッフの申請を承認しますか？\n出勤記録に反映されます。')) return;
 
             await this.parent.callApi(API_ENDPOINTS.ADMIN.AUDIT_APPROVE(logId), {
                 method: 'POST'
@@ -698,13 +698,13 @@ export default class AdminAuditLog {
 
     async rejectLog(logId) {
         try {
-            if (!confirm('このスタッフの操作を非承認にしますか？\n変更は差し戻されます。')) return;
+            if (!confirm('このスタッフの申請を非承認にしますか？')) return;
 
             await this.parent.callApi(API_ENDPOINTS.ADMIN.AUDIT_REJECT(logId), {
                 method: 'POST'
             });
 
-            this.parent.showNotification('非承認にしました（変更を差し戻しました）', 'warning');
+            this.parent.showNotification('非承認にしました', 'warning');
             await this.searchLogs();
 
         } catch (error) {
