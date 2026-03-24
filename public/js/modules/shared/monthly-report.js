@@ -26,7 +26,7 @@ export default class SharedMonthlyReport {
         this.isStaff = this.userRole === 'staff';
         
         // 表示モード
-        this.canEdit = this.isAdmin; // 管理者のみ編集可能
+        this.canEdit = this.isAdmin || this.isStaff; // 管理者・スタッフ編集可能
         this.canViewAllUsers = this.isAdmin; // 管理者は全ユーザー表示
         this.canPrint = true; // 全権限で印刷可能
         
@@ -154,6 +154,7 @@ export default class SharedMonthlyReport {
                             <div class="modal-header bg-warning text-dark">
                                 <h5 class="modal-title">
                                     <i class="fas fa-edit"></i> 出勤記録編集
+                                    ${this.isStaff ? '<small class="ms-2">（管理者承認待ち）</small>' : ''}
                                 </h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
@@ -228,7 +229,8 @@ export default class SharedMonthlyReport {
                               placeholder="変更理由を入力してください..." required></textarea>
                 </div>
 
-                <!-- 削除セクション -->
+                <!-- 削除セクション（管理者のみ） -->
+                ${this.isAdmin ? `
                 <div class="border-top pt-3 mt-3" id="monthlyDeleteSection" style="display: none;">
                     <div class="alert alert-danger">
                         <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> 危険な操作</h6>
@@ -238,6 +240,7 @@ export default class SharedMonthlyReport {
                         </button>
                     </div>
                 </div>
+                ` : ''}
             </form>
         `;
     }
@@ -260,22 +263,25 @@ export default class SharedMonthlyReport {
             printBtn.addEventListener('click', () => this.printManager.printMonthlyReport());
         }
         
-        // 管理者用のイベントリスナー
+        // 編集可能ユーザーのイベントリスナー
         if (this.canEdit) {
             const exportBtn = this.container.querySelector('#exportExcelBtn');
             const saveAttendanceBtn = this.container.querySelector('#saveMonthlyAttendanceEditBtn');
-            const deleteBtn = this.container.querySelector('#monthlyDeleteBtn');
-            
+
             if (exportBtn) {
                 exportBtn.addEventListener('click', () => this.exportToExcel());
             }
-            
+
             if (saveAttendanceBtn) {
                 saveAttendanceBtn.addEventListener('click', () => this.saveAttendanceEdit());
             }
-            
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', () => this.deleteAttendance());
+
+            // 削除は管理者のみ
+            if (this.isAdmin) {
+                const deleteBtn = this.container.querySelector('#monthlyDeleteBtn');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', () => this.deleteAttendance());
+                }
             }
         }
         
@@ -302,7 +308,7 @@ export default class SharedMonthlyReport {
                 }
             }
             
-            // 編集ボタン（管理者のみ）
+            // 編集ボタン（管理者・スタッフ）
             if (this.canEdit && e.target.closest('.btn-edit-attendance')) {
                 const btn = e.target.closest('.btn-edit-attendance');
                 this.editAttendance(btn.dataset);
@@ -653,7 +659,7 @@ export default class SharedMonthlyReport {
     }
 
 
-    // 以下、編集関連のメソッド（管理者のみ使用）
+    // 以下、編集関連のメソッド
     async editAttendance(data) {
         if (!this.canEdit) return;
         
@@ -679,10 +685,10 @@ export default class SharedMonthlyReport {
         document.getElementById('monthlyEditStatus').value = data.status || 'normal';
         document.getElementById('monthlyEditReason').value = '';
 
-        // 削除セクションの表示制御
+        // 削除セクションの表示制御（管理者のみ）
         const deleteSection = document.getElementById('monthlyDeleteSection');
         if (deleteSection) {
-            deleteSection.style.display = data.recordId ? 'block' : 'none';
+            deleteSection.style.display = (this.isAdmin && data.recordId) ? 'block' : 'none';
         }
         
         // モーダル表示
@@ -720,12 +726,20 @@ export default class SharedMonthlyReport {
                 reason: reason
             };
             
-            await this.app.apiCall(API_ENDPOINTS.ADMIN.ATTENDANCE_CORRECT, {
+            // 権限に応じてAPIエンドポイントを切り替え
+            const endpoint = this.isAdmin
+                ? API_ENDPOINTS.ADMIN.ATTENDANCE_CORRECT
+                : API_ENDPOINTS.STAFF.ATTENDANCE_CORRECT;
+
+            await this.app.apiCall(endpoint, {
                 method: 'POST',
                 body: JSON.stringify(requestData)
             });
-            
-            this.app.showNotification('出勤記録を更新しました', 'success');
+
+            const message = this.isStaff
+                ? '出勤記録を更新しました（管理者の承認待ち）'
+                : '出勤記録を更新しました';
+            this.app.showNotification(message, 'success');
             modalManager.hide('monthlyAttendanceEditModal');
             
             // 再表示

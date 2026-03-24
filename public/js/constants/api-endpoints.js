@@ -61,6 +61,7 @@ export const API_ENDPOINTS = {
     REPORT: (userId, date) => `/api/staff/reports/${userId}/${date}`,
     MONTHLY_ATTENDANCE: (year, month, userId) =>
         `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`,
+    ATTENDANCE_CORRECT: '/api/staff/attendance/correct',
     // スタッフ日報
     DAILY_REPORT_SUBMIT: '/api/staff/daily-report',
     DAILY_REPORT_TODAY: '/api/staff/daily-report-today',
@@ -91,6 +92,8 @@ export const API_ENDPOINTS = {
     MONTHLY_REPORT: '/api/admin/monthly-report',
     EXPORT_CSV: '/api/admin/export/csv',
     AUDIT_LOG: '/api/admin/audit-log',
+    AUDIT_APPROVE: (id) => `/api/admin/audit-log/${id}/approve`,
+    AUDIT_REJECT: (id) => `/api/admin/audit-log/${id}/reject`,
     REGISTER: '/api/admin/register', // 追加
     ATTENDANCE_DELETE: (recordId) => `/api/admin/attendance/${recordId}`,//出勤記録削除用
     BREAK_STATUS: (userId, date) => 

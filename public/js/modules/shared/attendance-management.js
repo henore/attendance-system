@@ -122,22 +122,23 @@ export class SharedAttendanceManagement {
       </div>
     </div>
 
-    ${this.userRole === 'admin' ? this.renderAdminModals() : ''}
+    ${(this.userRole === 'admin' || this.userRole === 'staff') ? this.renderEditModals() : ''}
   `;
   
   // デフォルト値を明示的に設定
   this.showOnlyWorking = true;
 }
 
-  renderAdminModals() {
+  renderEditModals() {
     return `
-      <!-- 出勤記録編集モーダル（管理者のみ） -->
+      <!-- 出勤記録編集モーダル -->
       <div class="modal fade" id="attendanceEditModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
           <div class="modal-content">
             <div class="modal-header bg-warning text-dark">
               <h5 class="modal-title">
                 <i class="fas fa-edit"></i> 出勤記録編集
+                ${this.userRole === 'staff' ? '<small class="ms-2">（管理者承認待ち）</small>' : ''}
               </h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -209,7 +210,8 @@ export class SharedAttendanceManagement {
                             placeholder="変更理由を入力してください..." required></textarea>
                 </div>
 
-                <!-- 削除セクション -->
+                <!-- 削除セクション（管理者のみ） -->
+                ${this.userRole === 'admin' ? `
                 <div class="border-top pt-3 mt-3" id="deleteAttendanceSection" style="display: none;">
                   <div class="alert alert-danger">
                     <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> 危険な操作</h6>
@@ -219,6 +221,7 @@ export class SharedAttendanceManagement {
                     </button>
                   </div>
                 </div>
+                ` : ''}
               </form>
             </div>
             <div class="modal-footer">
@@ -264,16 +267,19 @@ export class SharedAttendanceManagement {
     this.updateUserSelectOptions();
   });
 
-  // 管理者のみの機能
-  if (this.userRole === 'admin') {
+  // 編集機能（管理者・スタッフ共通）
+  if (this.userRole === 'admin' || this.userRole === 'staff') {
     const editStatusSelect = this.container.querySelector('#editStatus');
     editStatusSelect?.addEventListener('change', () => this.toggleAbsenceTypeField());
 
     const saveEditBtn = this.container.querySelector('#saveAttendanceEditBtn');
     saveEditBtn?.addEventListener('click', () => this.saveAttendanceEdit());
-    
-    const deleteBtn = this.container.querySelector('#deleteAttendanceBtn');
-    deleteBtn?.addEventListener('click', () => this.deleteAttendance());
+
+    // 削除は管理者のみ
+    if (this.userRole === 'admin') {
+      const deleteBtn = this.container.querySelector('#deleteAttendanceBtn');
+      deleteBtn?.addEventListener('click', () => this.deleteAttendance());
+    }
   }
 
   // 日付変更時の自動検索
@@ -305,8 +311,8 @@ export class SharedAttendanceManagement {
       this.showStaffReportModal(userId, userName, date);
     }
 
-    // 編集ボタン（管理者のみ）
-    if (this.userRole === 'admin' && e.target.closest('.btn-edit-attendance')) {
+    // 編集ボタン（管理者・スタッフ）
+    if ((this.userRole === 'admin' || this.userRole === 'staff') && e.target.closest('.btn-edit-attendance')) {
       const btn = e.target.closest('.btn-edit-attendance');
       this.editAttendance(btn.dataset);
     }
@@ -362,7 +368,7 @@ async updateUserSelectOptions() {
 
   registerModals() {
     try {
-      if (this.userRole === 'admin') {
+      if (this.userRole === 'admin' || this.userRole === 'staff') {
         modalManager.register('attendanceEditModal');
       }
     } catch (error) {
@@ -598,9 +604,9 @@ async searchAttendanceRecords() {
     `;
   }
 
-  // 管理者のみのメソッド
+  // 編集関連メソッド
   toggleAbsenceTypeField() {
-    if (this.userRole !== 'admin') return;
+    if (this.userRole !== 'admin' && this.userRole !== 'staff') return;
     
     const statusSelect = this.container.querySelector('#editStatus');
     const absenceTypeGroup = this.container.querySelector('#absenceTypeGroup');
@@ -619,7 +625,7 @@ async searchAttendanceRecords() {
   }
 
   async editAttendance(data) {
-    if (this.userRole !== 'admin') return;
+    if (this.userRole !== 'admin' && this.userRole !== 'staff') return;
 
     // フォーム要素に値設定
     this.container.querySelector('#editRecordId').value = data.recordId || '';
@@ -634,10 +640,10 @@ async searchAttendanceRecords() {
     this.container.querySelector('#editStatus').value = data.status || 'normal';
     this.container.querySelector('#editReason').value = '';
 
-    // 削除セクションの表示制御
+    // 削除セクションの表示制御（管理者のみ）
     const deleteSection = this.container.querySelector('#deleteAttendanceSection');
     if (deleteSection) {
-      deleteSection.style.display = data.recordId ? 'block' : 'none';
+      deleteSection.style.display = (this.userRole === 'admin' && data.recordId) ? 'block' : 'none';
     }
 
     // スタッフの場合のみ欠勤種別表示
@@ -653,7 +659,7 @@ async searchAttendanceRecords() {
   }
 
   async saveAttendanceEdit() {
-    if (this.userRole !== 'admin') return;
+    if (this.userRole !== 'admin' && this.userRole !== 'staff') return;
 
     try {
       const recordId = this.container.querySelector('#editRecordId').value;
@@ -691,12 +697,20 @@ async searchAttendanceRecords() {
         reason: reason
       };
 
-      await this.parent.callApi(API_ENDPOINTS.ADMIN.ATTENDANCE_CORRECT, {
+      // 権限に応じてAPIエンドポイントを切り替え
+      const endpoint = this.userRole === 'admin'
+        ? API_ENDPOINTS.ADMIN.ATTENDANCE_CORRECT
+        : API_ENDPOINTS.STAFF.ATTENDANCE_CORRECT;
+
+      await this.parent.callApi(endpoint, {
         method: 'POST',
         body: JSON.stringify(requestData)
       });
 
-      this.parent.showNotification('出勤記録を更新しました', 'success');
+      const message = this.userRole === 'staff'
+        ? '出勤記録を更新しました（管理者の承認待ち）'
+        : '出勤記録を更新しました';
+      this.parent.showNotification(message, 'success');
       
       modalManager.hide('attendanceEditModal');
       await this.searchAttendanceRecords();

@@ -357,8 +357,9 @@ export class AttendanceTable {
       `);
     }
     
-    // 編集ボタン（管理者のみ）
-    if (this.userRole === 'admin') {
+    // 編集ボタン（管理者またはスタッフ）
+    // スタッフは利用者の出勤記録のみ編集可能
+    if (this.userRole === 'admin' || (this.userRole === 'staff' && record.user_role === 'user')) {
       const editData = {
         'data-record-id': record.id || '',
         'data-user-id': record.user_id,
@@ -405,8 +406,9 @@ export class AttendanceTable {
     const buttons = [];
     const date = currentDate || record.date;
 
-    // 編集ボタン（管理者のみ）
-    if (this.userRole === 'admin') {
+    // 編集ボタン（管理者またはスタッフ）
+    // スタッフは利用者の出勤記録のみ編集可能
+    if (this.userRole === 'admin' || (this.userRole === 'staff' && record.user_role === 'user')) {
       const editData = {
         'data-record-id': record.id || '',
         'data-user-id': record.user_id,
@@ -427,13 +429,13 @@ export class AttendanceTable {
         editData['data-break-start'] = record.break_start || '';
         editData['data-break-end'] = record.break_end || '';
       }
-      
+
       const editAttrs = Object.entries(editData)
         .map(([key, value]) => `${key}="${value}"`)
         .join(' ');
-      
+
       buttons.push(`
-        <button class="btn btn-sm btn-outline-warning btn-edit-attendance" 
+        <button class="btn btn-sm btn-outline-warning btn-edit-attendance"
                 ${editAttrs}
                 title="編集">
           <i class="fas fa-edit"></i>

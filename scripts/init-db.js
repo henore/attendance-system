@@ -148,8 +148,12 @@ db.serialize(() => {
             new_value TEXT,
             reason TEXT,
             ip_address TEXT,
+            approval_status TEXT DEFAULT NULL,
+            approved_by INTEGER DEFAULT NULL,
+            approved_at DATETIME DEFAULT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (admin_id) REFERENCES users(id)
+            FOREIGN KEY (admin_id) REFERENCES users(id),
+            FOREIGN KEY (approved_by) REFERENCES users(id)
         )
     `);
 

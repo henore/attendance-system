@@ -355,35 +355,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     );
                 }
                 
-                // 監査ログ
-                await dbRun(
-                    `INSERT INTO audit_log (
-                        admin_id, action_type, target_id, target_type,
-                        old_value, new_value, reason, ip_address
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                        req.session.user.id,
-                        'attendance_correction',
-                        recordId,
-                        'attendance',
-                        JSON.stringify({
-                            clock_in: oldRecord.clock_in,
-                            clock_out: oldRecord.clock_out,
-                            status: oldRecord.status,
-                            break_start: oldRecord.break_start,
-                            break_end: oldRecord.break_end
-                        }),
-                        JSON.stringify({
-                            clock_in: newClockIn,
-                            clock_out: newClockOut,
-                            status: status,
-                            break_start: newBreakStart,
-                            break_end: newBreakEnd
-                        }),
-                        reason,
-                        req.ip
-                    ]
-                );
+                // 管理者操作は監査ログに記録しない
             }
             // recordIdがない場合は新規記録の作成（欠勤の場合もnewClockInが空でもOK）
             else if (userId && date) {
@@ -476,30 +448,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     }
                 }
 
-                // 監査ログ
-                await dbRun(
-                    `INSERT INTO audit_log (
-                        admin_id, action_type, target_id, target_type,
-                        new_value, reason, ip_address
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                        req.session.user.id,
-                        'attendance_creation',
-                        result.lastID || result.id,
-                        'attendance',
-                        JSON.stringify({
-                            user_id: userId,
-                            date: date,
-                            clock_in: newClockIn,
-                            clock_out: newClockOut,
-                            status: status || 'normal',
-                            break_start: newBreakStart,
-                            break_end: newBreakEnd
-                        }),
-                        reason,
-                        req.ip
-                    ]
-                );
+                // 管理者操作は監査ログに記録しない
             } else {
                 console.log('パラメータ不足エラー:', { recordId, userId, date, newClockIn });
                 return res.status(400).json({
@@ -809,11 +758,13 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             } = req.query;
             
             let query = `
-                SELECT 
+                SELECT
                     a.*,
-                    u.name as admin_name
+                    u.name as admin_name,
+                    approver.name as approver_name
                 FROM audit_log a
                 JOIN users u ON a.admin_id = u.id
+                LEFT JOIN users approver ON a.approved_by = approver.id
                 WHERE 1=1
             `;
             
@@ -871,6 +822,156 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
+    // 監査ログ承認（スタッフの出勤記録操作）
+    router.post('/audit-log/:id/approve', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { id } = req.params;
+            const adminId = req.session.user.id;
+
+            const log = await dbGet(
+                'SELECT * FROM audit_log WHERE id = ?',
+                [id]
+            );
+
+            if (!log) {
+                return res.status(404).json({
+                    success: false,
+                    error: '監査ログが見つかりません'
+                });
+            }
+
+            if (log.approval_status !== 'pending') {
+                return res.status(400).json({
+                    success: false,
+                    error: '承認待ちのログのみ承認できます'
+                });
+            }
+
+            await dbRun(
+                `UPDATE audit_log SET
+                    approval_status = 'approved',
+                    approved_by = ?,
+                    approved_at = CURRENT_TIMESTAMP
+                WHERE id = ?`,
+                [adminId, id]
+            );
+
+            res.json({
+                success: true,
+                message: '承認しました'
+            });
+
+        } catch (error) {
+            console.error('監査ログ承認エラー:', error);
+            res.status(500).json({
+                success: false,
+                error: '承認処理に失敗しました'
+            });
+        }
+    });
+
+    // 監査ログ非承認（スタッフの出勤記録操作を差し戻す）
+    router.post('/audit-log/:id/reject', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { id } = req.params;
+            const adminId = req.session.user.id;
+
+            const log = await dbGet(
+                'SELECT * FROM audit_log WHERE id = ?',
+                [id]
+            );
+
+            if (!log) {
+                return res.status(404).json({
+                    success: false,
+                    error: '監査ログが見つかりません'
+                });
+            }
+
+            if (log.approval_status !== 'pending') {
+                return res.status(400).json({
+                    success: false,
+                    error: '承認待ちのログのみ非承認にできます'
+                });
+            }
+
+            // 変更を差し戻す
+            if (log.old_value && log.target_id) {
+                const oldValues = JSON.parse(log.old_value);
+
+                // 出勤記録を元に戻す
+                const record = await dbGet(
+                    'SELECT * FROM attendance WHERE id = ?',
+                    [log.target_id]
+                );
+
+                if (record) {
+                    await dbRun(
+                        'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                        [oldValues.clock_in, oldValues.clock_out, oldValues.status, log.target_id]
+                    );
+
+                    // 利用者の休憩記録も戻す
+                    const user = await dbGet('SELECT role FROM users WHERE id = ?', [record.user_id]);
+                    if (user && user.role === 'user') {
+                        if (oldValues.break_start) {
+                            await dbRun(
+                                `INSERT OR REPLACE INTO break_records (user_id, date, start_time, end_time, duration)
+                                 VALUES (?, ?, ?, ?, ?)`,
+                                [record.user_id, record.date, oldValues.break_start, oldValues.break_end, oldValues.break_end ? 60 : null]
+                            );
+                        } else {
+                            await dbRun(
+                                'DELETE FROM break_records WHERE user_id = ? AND date = ?',
+                                [record.user_id, record.date]
+                            );
+                        }
+                    }
+                }
+            } else if (!log.old_value && log.target_id && log.action_type === 'staff_attendance_creation') {
+                // 新規作成の差し戻し：レコードを削除
+                const record = await dbGet(
+                    'SELECT * FROM attendance WHERE id = ?',
+                    [log.target_id]
+                );
+
+                if (record) {
+                    // 関連する休憩記録を削除
+                    await dbRun(
+                        'DELETE FROM break_records WHERE user_id = ? AND date = ?',
+                        [record.user_id, record.date]
+                    );
+                    // 出勤記録を削除
+                    await dbRun(
+                        'DELETE FROM attendance WHERE id = ?',
+                        [log.target_id]
+                    );
+                }
+            }
+
+            await dbRun(
+                `UPDATE audit_log SET
+                    approval_status = 'rejected',
+                    approved_by = ?,
+                    approved_at = CURRENT_TIMESTAMP
+                WHERE id = ?`,
+                [adminId, id]
+            );
+
+            res.json({
+                success: true,
+                message: '非承認にしました（変更を差し戻しました）'
+            });
+
+        } catch (error) {
+            console.error('監査ログ非承認エラー:', error);
+            res.status(500).json({
+                success: false,
+                error: '非承認処理に失敗しました'
+            });
+        }
+    });
+
     // 出勤記録削除（管理者のみ）
     router.delete('/attendance/:recordId', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
@@ -905,33 +1006,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             await dbRun('BEGIN TRANSACTION');
             
             try {
-                // 監査ログに記録（削除前）
-                await dbRun(
-                    `INSERT INTO audit_log (
-                        admin_id, action_type, target_id, target_type,
-                        old_value, reason, ip_address
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                        req.session.user.id,
-                        'attendance_deletion',
-                        recordId,
-                        'attendance',
-                        JSON.stringify({
-                            user_id: attendance.user_id,
-                            user_name: attendance.user_name,
-                            user_role: attendance.user_role,
-                            date: attendance.date,
-                            clock_in: attendance.clock_in,
-                            clock_out: attendance.clock_out,
-                            status: attendance.status,
-                            break_start: attendance.break_start,
-                            break_end: attendance.break_end
-                        }),
-                        reason,
-                        req.ip
-                    ]
-                );
-                
+                // 管理者操作は監査ログに記録しない
+
                 // 関連する休憩記録も削除（利用者の場合）
                 if (attendance.user_role === 'user') {
                     await dbRun(

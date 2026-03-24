@@ -67,7 +67,9 @@ export default class AdminAuditLog {
                             <select class="form-control" id="actionTypeFilter">
                                 <option value="">全てのアクション</option>
                                 <option value="account_create">アカウント作成</option>
-                                <option value="attendance_correction">出勤記録訂正</option>
+                                <option value="attendance_correction">出勤記録訂正（管理者）</option>
+                                <option value="staff_attendance_correction">出勤記録訂正（スタッフ）</option>
+                                <option value="staff_attendance_creation">出勤記録作成（スタッフ）</option>
                                 <option value="user_deactivation">ユーザー無効化</option>
                                 <option value="monthly_attendance_view">月次出勤簿閲覧</option>
                             </select>
@@ -75,8 +77,8 @@ export default class AdminAuditLog {
                         <div class="col-md-3">
                             <label for="adminFilter" class="form-label">実行者</label>
                             <select class="form-control" id="adminFilter">
-                                <option value="">全ての管理者</option>
-                                <!-- 管理者一覧が動的に追加される -->
+                                <option value="">全ての実行者</option>
+                                <!-- 実行者一覧が動的に追加される -->
                             </select>
                         </div>
                     </div>
@@ -195,7 +197,21 @@ export default class AdminAuditLog {
                 const logId = btn.getAttribute('data-log-id');
                 this.showLogDetail(logId);
             }
-            
+
+            // 承認ボタン
+            if (e.target.closest('.btn-approve-log')) {
+                const btn = e.target.closest('.btn-approve-log');
+                const logId = btn.getAttribute('data-log-id');
+                this.approveLog(logId);
+            }
+
+            // 非承認ボタン
+            if (e.target.closest('.btn-reject-log')) {
+                const btn = e.target.closest('.btn-reject-log');
+                const logId = btn.getAttribute('data-log-id');
+                this.rejectLog(logId);
+            }
+
             // ページネーションボタン
             if (e.target.closest('.page-link')) {
                 const btn = e.target.closest('.page-link');
@@ -229,18 +245,21 @@ export default class AdminAuditLog {
 
     async loadAdminUsers() {
         try {
-            const response = await this.parent.callApi(API_ENDPOINTS.ADMIN.USERS + '?role=admin');
+            const response = await this.parent.callApi(API_ENDPOINTS.ADMIN.USERS);
             const adminFilter = this.container.querySelector('#adminFilter');
-            
+
             if (adminFilter && response.users) {
-                let html = '<option value="">全ての管理者</option>';
-                response.users.forEach(admin => {
-                    html += `<option value="${admin.id}">${admin.name}</option>`;
+                let html = '<option value="">全ての実行者</option>';
+                // 管理者とスタッフを表示（監査ログの実行者となりうるユーザー）
+                const staffAndAdmin = response.users.filter(u => u.role === 'admin' || u.role === 'staff');
+                staffAndAdmin.forEach(user => {
+                    const roleLabel = user.role === 'admin' ? '管理者' : 'スタッフ';
+                    html += `<option value="${user.id}">${user.name} (${roleLabel})</option>`;
                 });
                 adminFilter.innerHTML = html;
             }
         } catch (error) {
-            console.error('管理者一覧読み込みエラー:', error);
+            console.error('実行者一覧読み込みエラー:', error);
         }
     }
 
@@ -370,13 +389,14 @@ export default class AdminAuditLog {
                 <table class="table table-hover table-sm">
                     <thead class="table-light">
                         <tr>
-                            <th width="15%">日時</th>
-                            <th width="10%">管理者</th>
-                            <th width="15%">アクション</th>
-                            <th width="15%">対象</th>
-                            <th width="30%">詳細</th>
-                            <th width="10%">IP</th>
-                            <th width="5%">操作</th>
+                            <th width="12%">日時</th>
+                            <th width="8%">実行者</th>
+                            <th width="12%">アクション</th>
+                            <th width="10%">承認状態</th>
+                            <th width="12%">対象</th>
+                            <th width="24%">詳細</th>
+                            <th width="7%">IP</th>
+                            <th width="15%">操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -387,28 +407,32 @@ export default class AdminAuditLog {
             const timestamp = formatDateTime(log.created_at);
             const targetInfo = this.getTargetInfo(log);
             const details = this.getLogDetails(log);
-            
+            const approvalBadge = this.getApprovalStatusBadge(log);
+
             html += `
                 <tr>
                     <td><small>${timestamp}</small></td>
                     <td>
                         <strong>${log.admin_name}</strong>
-                        <br><small class="text-muted">${log.admin_id}</small>
                     </td>
                     <td>
                         <span class="badge ${this.getActionTypeBadgeClass(log.action_type)}">
                             ${actionType}
                         </span>
                     </td>
+                    <td>${approvalBadge}</td>
                     <td><small>${targetInfo}</small></td>
                     <td><small>${details}</small></td>
                     <td><small class="text-muted">${log.ip_address || '-'}</small></td>
                     <td>
-                        <button class="btn btn-sm btn-outline-info btn-log-detail" 
-                                data-log-id="${log.id}"
-                                title="詳細表示">
-                            <i class="fas fa-eye"></i>
-                        </button>
+                        <div class="btn-group btn-group-sm" role="group">
+                            ${this.getApprovalButtons(log)}
+                            <button class="btn btn-sm btn-outline-info btn-log-detail"
+                                    data-log-id="${log.id}"
+                                    title="詳細表示">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -423,12 +447,52 @@ export default class AdminAuditLog {
         return html;
     }
 
+    getApprovalStatusBadge(log) {
+        if (!log.approval_status) {
+            return '<small class="text-muted">-</small>';
+        }
+
+        const statusMap = {
+            'pending': '<span class="badge bg-warning text-dark"><i class="fas fa-clock"></i> 承認待ち</span>',
+            'approved': `<span class="badge bg-success"><i class="fas fa-check"></i> 承認済</span>${log.approver_name ? `<br><small class="text-muted">${log.approver_name}</small>` : ''}`,
+            'rejected': `<span class="badge bg-danger"><i class="fas fa-times"></i> 非承認</span>${log.approver_name ? `<br><small class="text-muted">${log.approver_name}</small>` : ''}`
+        };
+
+        return statusMap[log.approval_status] || log.approval_status;
+    }
+
+    getApprovalButtons(log) {
+        // 承認待ちのスタッフ操作のみボタンを表示
+        if (log.approval_status !== 'pending') {
+            return '';
+        }
+
+        return `
+            <button class="btn btn-sm btn-success btn-approve-log"
+                    data-log-id="${log.id}"
+                    title="承認">
+                <i class="fas fa-check"></i>
+            </button>
+            <button class="btn btn-sm btn-danger btn-reject-log"
+                    data-log-id="${log.id}"
+                    title="非承認">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+    }
+
     getActionTypeDisplayName(actionType) {
         const actionTypes = {
             'account_create': 'アカウント作成',
             'attendance_correction': '出勤記録訂正',
+            'attendance_creation': '出勤記録作成',
+            'attendance_deletion': '出勤記録削除',
+            'staff_attendance_correction': '出勤記録訂正（スタッフ）',
+            'staff_attendance_creation': '出勤記録作成（スタッフ）',
             'user_deactivation': 'ユーザー無効化',
+            'user_update': 'ユーザー更新',
             'monthly_attendance_view': '月次出勤簿閲覧',
+            'report_edit': '日報編集',
             'login': 'ログイン',
             'logout': 'ログアウト'
         };
@@ -439,8 +503,14 @@ export default class AdminAuditLog {
         const badgeClasses = {
             'account_create': 'bg-success',
             'attendance_correction': 'bg-warning text-dark',
+            'attendance_creation': 'bg-warning text-dark',
+            'attendance_deletion': 'bg-danger',
+            'staff_attendance_correction': 'bg-warning',
+            'staff_attendance_creation': 'bg-warning',
             'user_deactivation': 'bg-danger',
+            'user_update': 'bg-info',
             'monthly_attendance_view': 'bg-info',
+            'report_edit': 'bg-info',
             'login': 'bg-primary',
             'logout': 'bg-secondary'
         };
@@ -510,8 +580,8 @@ export default class AdminAuditLog {
                                 <small>削除</small>
                             </div>
                             <div class="col-3">
-                                <strong class="text-info">${summary.views}</strong><br>
-                                <small>閲覧</small>
+                                <strong class="text-info">${summary.pending}</strong><br>
+                                <small>承認待ち</small>
                             </div>
                         </div>
                     </div>
@@ -523,26 +593,29 @@ export default class AdminAuditLog {
     }
 
     calculateLogsSummary() {
-        let creates = 0, corrections = 0, deletions = 0, views = 0;
-        
+        let creates = 0, corrections = 0, deletions = 0, pending = 0;
+
         this.currentLogs.forEach(log => {
             switch (log.action_type) {
                 case 'account_create':
                     creates++;
                     break;
                 case 'attendance_correction':
+                case 'staff_attendance_correction':
+                case 'staff_attendance_creation':
                     corrections++;
                     break;
                 case 'user_deactivation':
+                case 'attendance_deletion':
                     deletions++;
                     break;
-                case 'monthly_attendance_view':
-                    views++;
-                    break;
+            }
+            if (log.approval_status === 'pending') {
+                pending++;
             }
         });
-        
-        return { creates, corrections, deletions, views };
+
+        return { creates, corrections, deletions, pending };
     }
 
     updatePagination() {
@@ -604,6 +677,40 @@ export default class AdminAuditLog {
         
         paginationContainer.innerHTML = html;
         paginationContainer.style.display = 'block';
+    }
+
+    async approveLog(logId) {
+        try {
+            if (!confirm('このスタッフの操作を承認しますか？')) return;
+
+            await this.parent.callApi(API_ENDPOINTS.ADMIN.AUDIT_APPROVE(logId), {
+                method: 'POST'
+            });
+
+            this.parent.showNotification('承認しました', 'success');
+            await this.searchLogs();
+
+        } catch (error) {
+            console.error('承認エラー:', error);
+            this.parent.showNotification(error.message || '承認処理に失敗しました', 'danger');
+        }
+    }
+
+    async rejectLog(logId) {
+        try {
+            if (!confirm('このスタッフの操作を非承認にしますか？\n変更は差し戻されます。')) return;
+
+            await this.parent.callApi(API_ENDPOINTS.ADMIN.AUDIT_REJECT(logId), {
+                method: 'POST'
+            });
+
+            this.parent.showNotification('非承認にしました（変更を差し戻しました）', 'warning');
+            await this.searchLogs();
+
+        } catch (error) {
+            console.error('非承認エラー:', error);
+            this.parent.showNotification(error.message || '非承認処理に失敗しました', 'danger');
+        }
     }
 
     async showLogDetail(logId) {
@@ -680,6 +787,18 @@ export default class AdminAuditLog {
                             <th>IPアドレス:</th>
                             <td><code>${log.ip_address || '-'}</code></td>
                         </tr>
+                        ${log.approval_status ? `
+                        <tr>
+                            <th>承認状態:</th>
+                            <td>${this.getApprovalStatusBadge(log)}</td>
+                        </tr>
+                        ${log.approved_at ? `
+                        <tr>
+                            <th>承認日時:</th>
+                            <td>${new Date(log.approved_at).toLocaleString('ja-JP')}</td>
+                        </tr>
+                        ` : ''}
+                        ` : ''}
                     </table>
                 </div>
                 <div class="col-md-6">
