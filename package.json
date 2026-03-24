@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "init-db": "node scripts/init-db.js"
+    "init-db": "node scripts/init-db.js",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
   "dependencies": {
     "@line/bot-sdk": "^10.0.0",
