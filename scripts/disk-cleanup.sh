@@ -40,5 +40,9 @@ log "snap古いリビジョン削除完了"
 find /tmp -type f -mtime +1 -delete 2>/dev/null
 log "/tmpクリーンアップ完了"
 
+# 古いローテーション済みログ（7日以上前の.gz/.1等）
+find /var/log -type f \( -name "*.gz" -o -name "*.1" -o -name "*.old" \) -mtime +7 -delete 2>/dev/null
+log "古いローテーションログ削除完了"
+
 AVAIL=$(df / --output=avail -h | tail -1 | tr -d ' ')
 log "=== クリーンアップ完了: 空き容量 ${AVAIL} ==="
