@@ -14,6 +14,9 @@ const { getCurrentDate, getCurrentTime } = require('./utils/date-time');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// プロキシ経由のクライアントIP取得を有効化
+app.set('trust proxy', true);
+
 // CORS設定
 app.use(cors({
   origin: 'https://happytime-web.com',

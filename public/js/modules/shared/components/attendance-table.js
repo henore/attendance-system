@@ -71,6 +71,8 @@ export class AttendanceTable {
       // サービス区分列と送迎列の表示判定
       const showServiceType = options.showServiceType || false;
       const showTransportation = options.showTransportation || false;
+      // userの場合は「日報」、staffの場合は「操作」
+      const operationLabel = options.targetUserRole === 'user' ? '日報' : '操作';
       return `
         <thead class="table-primary">
           <tr>
@@ -82,7 +84,7 @@ export class AttendanceTable {
             <th class="text-center" width="8%">実働</th>
             ${showTransportation ? '<th class="text-center transportation-col" width="4%">迎</th><th class="text-center transportation-col" width="4%">送</th>' : ''}
             <th class="text-center status-col" width="8%">状態</th>
-            ${showOperations ? '<th class="text-center operation-col" width="20%">操作</th>' : ''}
+            ${showOperations ? `<th class="text-center operation-col" width="20%">${operationLabel}</th>` : ''}
           </tr>
         </thead>
       `;
@@ -185,10 +187,34 @@ export class AttendanceTable {
     else if (record.dayOfWeek === 6) rowClass = 'table-info';
 
     // 日の列をクリック可能にするためのdata属性を追加
-    const hasReport = (record.user_role === 'user' && record.report_id) ||
-                      ((record.user_role === 'staff' || record.user_role === 'admin') && record.staff_report_id);
-    const dayClickAttrs = hasReport ?
-      `data-user-id="${record.user_id}" data-user-name="${record.user_name}" data-date="${record.date}" style="cursor: pointer;"` : '';
+    let dayCellClass = 'text-center';
+    let dayCellAttrs = '';
+
+    if (record.user_role === 'user') {
+      // 利用者：日付クリックで編集モーダルを開く（視覚変化なし）
+      const editData = {
+        'data-record-id': record.id || '',
+        'data-user-id': record.user_id,
+        'data-user-name': record.user_name,
+        'data-user-role': record.user_role,
+        'data-date': record.date,
+        'data-clock-in': record.clock_in || '',
+        'data-clock-out': record.clock_out || '',
+        'data-break-start': record.break_start_time || '',
+        'data-break-end': record.break_end_time || '',
+        'data-status': record.status || 'normal',
+        'data-service-type': record.service_type || ''
+      };
+      dayCellAttrs = Object.entries(editData).map(([k, v]) => `${k}="${v}"`).join(' ');
+      dayCellClass = 'text-center monthly-user-day-edit';
+    } else {
+      // スタッフ：日付クリックで日報表示（現状通り）
+      const hasReport = ((record.user_role === 'staff' || record.user_role === 'admin') && record.staff_report_id);
+      if (hasReport) {
+        dayCellAttrs = `data-user-id="${record.user_id}" data-user-name="${record.user_name}" data-date="${record.date}" style="cursor: pointer;"`;
+        dayCellClass = 'text-center monthly-day-cell';
+      }
+    }
 
     // サービス区分表示（ユーザーのservice_typeで判定、出勤日のみ）
     let serviceTypeCell = '';
@@ -209,7 +235,7 @@ export class AttendanceTable {
 
     return `
       <tr class="${rowClass}">
-        <td class="text-center monthly-day-cell" ${dayClickAttrs}>${record.day}</td>
+        <td class="${dayCellClass}" ${dayCellAttrs}>${record.day}</td>
         <td class="text-center">${record.dayName}</td>
         ${serviceTypeCell}
         <td class="text-center">${record.clock_in || '-'}</td>
@@ -332,6 +358,11 @@ export class AttendanceTable {
     const buttons = [];
     const date = currentDate || record.date;
 
+    // 出勤記録管理一覧：admin画面ではuserの操作アイコンを非表示（staffのみ表示）
+    if (this.userRole === 'admin' && record.user_role === 'user') {
+      return '-';
+    }
+
     // 日報詳細ボタン（利用者の日報がある場合）
     if (record.user_role === 'user' && record.report_id) {
       buttons.push(`
@@ -407,8 +438,32 @@ export class AttendanceTable {
     const buttons = [];
     const date = currentDate || record.date;
 
-    // 編集ボタン（管理者またはスタッフ）
-    // スタッフは利用者の出勤記録のみ編集可能
+    // 利用者の場合：日報マーク表示
+    if (record.user_role === 'user') {
+      // 日報ボタン（日報がある場合）
+      if (record.report_id) {
+        buttons.push(`
+          <button class="btn btn-sm btn-outline-primary btn-show-report"
+                  data-user-id="${record.user_id}"
+                  data-user-name="${record.user_name}"
+                  data-date="${date}"
+                  title="日報">
+            <i class="fas fa-file-alt"></i>
+          </button>
+        `);
+      }
+
+      // admin画面：日報マークのみ（操作は日付クリックで行う）
+      if (this.userRole === 'admin') {
+        return buttons.length > 0 ?
+          `<div class="btn-group" role="group">${buttons.join('')}</div>` :
+          '-';
+      }
+
+      // staff画面：日報マーク＋編集ボタンを並べて表示
+    }
+
+    // 編集ボタン（admin→staff記録、staff→user記録）
     if (this.userRole === 'admin' || (this.userRole === 'staff' && record.user_role === 'user')) {
       const editData = {
         'data-record-id': record.id || '',
@@ -422,7 +477,7 @@ export class AttendanceTable {
         'data-service-type': record.service_type || ''
       };
 
-      // 休憩データの追加
+      // 休憩データ（利用者とスタッフで参照先が異なる）
       if (record.user_role === 'user') {
         editData['data-break-start'] = record.break_start_time || '';
         editData['data-break-end'] = record.break_end_time || '';
@@ -443,9 +498,9 @@ export class AttendanceTable {
         </button>
       `);
     }
-    
-    return buttons.length > 0 ? 
-      `<div class="btn-group" role="group">${buttons.join('')}</div>` : 
+
+    return buttons.length > 0 ?
+      `<div class="btn-group" role="group">${buttons.join('')}</div>` :
       '-';
   }
 

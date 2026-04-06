@@ -723,17 +723,17 @@ async searchAttendanceRecords() {
 
   async deleteAttendance() {
     if (this.userRole !== 'admin') return;
-    
+
     try {
       const recordId = this.container.querySelector('#editRecordId').value;
       const userName = this.container.querySelector('#editUserName').value;
       const date = this.container.querySelector('#editDate').value;
-      
+
       if (!recordId) {
         this.parent.showNotification('削除する記録が選択されていません', 'warning');
         return;
       }
-      
+
       // 確認ダイアログ
       const confirmed = await this.parent.showConfirm({
         title: '出勤記録の削除確認',
@@ -742,46 +742,31 @@ async searchAttendanceRecords() {
         confirmClass: 'btn-danger',
         cancelText: 'キャンセル'
       });
-      
+
       if (!confirmed) return;
-      
-      // 削除理由の入力（簡易版）
-      const reason = prompt('削除理由を入力してください（必須）');
-      
-      if (!reason || !reason.trim()) {
-        this.parent.showNotification('削除理由を入力してください', 'warning');
-        return;
-      }
-      
+
       // 削除API呼び出し
       const response = await this.parent.callApi(
         `/api/admin/attendance/${recordId}`,
         {
           method: 'DELETE',
-          body: JSON.stringify({ reason: reason.trim() })
+          body: JSON.stringify({})
         }
       );
-      
+
       // 成功メッセージ
       this.parent.showNotification(response.message, 'success');
-      
-      // 警告がある場合は表示
-      if (response.warnings && response.warnings.length > 0) {
-        response.warnings.forEach(warning => {
-          this.parent.showNotification(warning, 'warning');
-        });
-      }
-      
+
       // モーダルを閉じる
       modalManager.hide('attendanceEditModal');
-      
+
       // リスト更新
       await this.searchAttendanceRecords();
-      
+
     } catch (error) {
       console.error('出勤記録削除エラー:', error);
       this.parent.showNotification(
-        error.message || '出勤記録の削除に失敗しました', 
+        error.message || '出勤記録の削除に失敗しました',
         'danger'
       );
     }

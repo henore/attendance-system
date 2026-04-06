@@ -6,6 +6,66 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 const { getCurrentDate } = require('../utils/date-time');
 
+// 日報自動���成用のランダムデータ生成
+function generateRandomReportData(isHome, clockInValue, clockOutValue) {
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    // 体温: 35.3〜36.4（0.1刻み）
+    const temperature = +(35.3 + Math.floor(Math.random() * 12) * 0.1).toFixed(1);
+
+    // 食欲: 良好 or なし
+    const appetite = pick(['good', 'none']);
+
+    // PC番号
+    const pcNumber = isHome ? pick(['8', '9']) : pick(['8', '9']);
+
+    // 就寝時間: 21:00〜24:00（15分刻み）
+    const bedMinutes = 21 * 60 + Math.floor(Math.random() * 13) * 15; // 21:00〜24:00
+    const bedH = Math.floor(bedMinutes / 60);
+    const bedM = bedMinutes % 60;
+    const bedtime = `${String(bedH).padStart(2, '0')}:${String(bedM).padStart(2, '0')}`;
+
+    // 起床時間: 06:00〜08:00（15分刻み）
+    const wakeMinutes = 6 * 60 + Math.floor(Math.random() * 9) * 15; // 06:00〜08:00
+    const wakeH = Math.floor(wakeMinutes / 60);
+    const wakeM = wakeMinutes % 60;
+    const wakeupTime = `${String(wakeH).padStart(2, '0')}:${String(wakeM).padStart(2, '0')}`;
+
+    // ���眠状態: 3パターン
+    const sleepQuality = pick(['good', 'normal', 'poor']);
+
+    // 振り返り・感想
+    const reflections = [
+        '今日も一日お疲れ様でした',
+        '次回も頑張ります',
+        '今日は上手くできませんでした',
+        '今日は調子が良かったです',
+        'うまくできてよかったです',
+        '学習が少し進みました',
+        '今日は疲れました',
+        '集中できました',
+        '難しかったです',
+        '前回の復習をしました',
+        '前回の続きをやりました'
+    ];
+    const reflection = pick(reflections);
+
+    return {
+        workContent: 'PC作業',
+        workLocation: isHome ? 'home' : 'office',
+        pcNumber,
+        externalWorkLocation: isHome ? null : '施設外就労先名（佐藤美幸）',
+        temperature,
+        appetite,
+        bedtime,
+        wakeupTime,
+        sleepQuality,
+        reflection,
+        contactTime1: isHome ? clockInValue : null,
+        contactTime2: isHome ? clockOutValue : null
+    };
+}
+
 module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // ユーザー登録
     router.post('/register', requireAuth, requireRole(['admin']), async (req, res) => {
@@ -339,8 +399,34 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                         [breakStartValue, breakEndValue, recordId]
                     );
                 }
-                
-                // 管理者操作は監査ログに記録しない
+
+                // スタッフの出勤記録訂正は監査ログに記録
+                if (user.role === 'staff') {
+                    await dbRun(
+                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, old_value, new_value, reason, ip_address)
+                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?, ?, ?)`,
+                        [
+                            req.session.user.id,
+                            oldRecord.user_id,
+                            JSON.stringify({
+                                clock_in: oldRecord.clock_in,
+                                clock_out: oldRecord.clock_out,
+                                break_start: oldRecord.break_start,
+                                break_end: oldRecord.break_end,
+                                status: oldRecord.status
+                            }),
+                            JSON.stringify({
+                                clock_in: clockInValue,
+                                clock_out: clockOutValue,
+                                break_start: breakStartValue,
+                                break_end: breakEndValue,
+                                status: status
+                            }),
+                            reason,
+                            req.ip
+                        ]
+                    );
+                }
             }
             // recordIdがない場合は新規記録の作成（欠勤の場合もnewClockInが空でもOK）
             else if (userId && date) {
@@ -399,8 +485,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     );
 
                     if (!existingReport) {
-                        // 在宅・通所でデフォルト値を分岐
                         const isHome = user.service_type === 'home';
+                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
 
                         await dbRun(
                             `INSERT INTO daily_reports (
@@ -410,22 +496,11 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                                 contact_time_1, contact_time_2
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                             [
-                                userId,
-                                date,
-                                'PC作業',
-                                isHome ? 'home' : 'office',
-                                isHome ? '13' : '15',
-                                isHome ? null : '施設外就労先名（佐藤美幸）',
-                                isHome ? 36.1 : 35.9,
-                                'good',
-                                null,
-                                '23:00',
-                                '07:00',
-                                'good',
-                                '今日も一日お疲れ様でした',
-                                null,
-                                isHome ? clockInValue : null,
-                                isHome ? clockOutValue : null
+                                userId, date,
+                                rd.workContent, rd.workLocation, rd.pcNumber,
+                                rd.externalWorkLocation, rd.temperature, rd.appetite,
+                                null, rd.bedtime, rd.wakeupTime, rd.sleepQuality,
+                                rd.reflection, null, rd.contactTime1, rd.contactTime2
                             ]
                         );
 
@@ -433,7 +508,27 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     }
                 }
 
-                // 管理者操作は監査ログに記録しない
+                // スタッフの出勤記録新規作成は監査ログに記録
+                if (user.role === 'staff') {
+                    await dbRun(
+                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, new_value, reason, ip_address)
+                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?, ?)`,
+                        [
+                            req.session.user.id,
+                            userId,
+                            JSON.stringify({
+                                date: date,
+                                clock_in: clockInValue,
+                                clock_out: clockOutValue,
+                                break_start: breakStartValue,
+                                break_end: breakEndValue,
+                                status: status || 'normal'
+                            }),
+                            reason,
+                            req.ip
+                        ]
+                    );
+                }
             } else {
                 console.log('パラメータ不足エラー:', { recordId, userId, date, newClockIn });
                 return res.status(400).json({
@@ -917,6 +1012,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                     if (!existingReport) {
                         const isHome = user.service_type === 'home';
+                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
                         await dbRun(
                             `INSERT INTO daily_reports (
                                 user_id, date, work_content, work_location, pc_number,
@@ -925,15 +1021,11 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                                 contact_time_1, contact_time_2
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                             [
-                                targetUserId, targetDate, 'PC作業',
-                                isHome ? 'home' : 'office',
-                                isHome ? '13' : '15',
-                                isHome ? null : '施設外就労先名（佐藤美幸）',
-                                isHome ? 36.1 : 35.9,
-                                'good', null, '23:00', '07:00', 'good',
-                                '今日も一日お疲れ様でした', null,
-                                isHome ? clockInValue : null,
-                                isHome ? clockOutValue : null
+                                targetUserId, targetDate,
+                                rd.workContent, rd.workLocation, rd.pcNumber,
+                                rd.externalWorkLocation, rd.temperature, rd.appetite,
+                                null, rd.bedtime, rd.wakeupTime, rd.sleepQuality,
+                                rd.reflection, null, rd.contactTime1, rd.contactTime2
                             ]
                         );
                     }
@@ -1024,14 +1116,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             const { recordId } = req.params;
             const { reason } = req.body;
             
-            // バリデーション
-            if (!reason || reason.trim() === '') {
-                return res.status(400).json({ 
-                    success: false,
-                    error: '削除理由を入力してください' 
-                });
-            }
-            
             // 既存記録の確認
             const attendance = await dbGet(
                 `SELECT a.*, u.name as user_name, u.role as user_role 
@@ -1052,48 +1136,59 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             await dbRun('BEGIN TRANSACTION');
             
             try {
-                // 管理者操作は監査ログに記録しない
+                // スタッフの出勤記録操作は監査ログに記録
+                if (attendance.user_role === 'staff') {
+                    await dbRun(
+                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, old_value, ip_address)
+                         VALUES (?, 'attendance_deletion', ?, 'user', ?, ?)`,
+                        [
+                            req.session.user.id,
+                            attendance.user_id,
+                            JSON.stringify({
+                                date: attendance.date,
+                                clock_in: attendance.clock_in,
+                                clock_out: attendance.clock_out,
+                                break_start: attendance.break_start,
+                                break_end: attendance.break_end,
+                                status: attendance.status,
+                                user_name: attendance.user_name
+                            }),
+                            req.ip
+                        ]
+                    );
+                }
 
-                // 関連する休憩記録も削除（利用者の場合）
+                // 関連する休憩記録を削除（利用者の場合）
                 if (attendance.user_role === 'user') {
                     await dbRun(
                         'DELETE FROM break_records WHERE user_id = ? AND date = ?',
                         [attendance.user_id, attendance.date]
                     );
                 }
-                
-                // 関連する日報がある場合は警告（削除はしない）
-                const report = await dbGet(
-                    'SELECT id FROM daily_reports WHERE user_id = ? AND date = ?',
+
+                // 関連する日報を削除
+                await dbRun(
+                    'DELETE FROM daily_reports WHERE user_id = ? AND date = ?',
                     [attendance.user_id, attendance.date]
                 );
-                
-                const comment = await dbGet(
-                    'SELECT id FROM staff_comments WHERE user_id = ? AND date = ?',
+
+                // 関連するスタッフコメントを削除
+                await dbRun(
+                    'DELETE FROM staff_comments WHERE user_id = ? AND date = ?',
                     [attendance.user_id, attendance.date]
                 );
-                
+
                 // 出勤記録を削除
                 await dbRun('DELETE FROM attendance WHERE id = ?', [recordId]);
-                
+
                 // トランザクションコミット
                 await dbRun('COMMIT');
-                
-                // レスポンス
-                const warnings = [];
-                if (report) {
-                    warnings.push('関連する日報が存在します。日報は削除されていません。');
-                }
-                if (comment) {
-                    warnings.push('関連するスタッフコメントが存在します。コメントは削除されていません。');
-                }
-                
-                res.json({ 
-                    success: true, 
-                    message: `${attendance.user_name}さんの${attendance.date}の出勤記録を削除しました`,
-                    warnings: warnings.length > 0 ? warnings : undefined
+
+                res.json({
+                    success: true,
+                    message: `${attendance.user_name}さんの${attendance.date}の出勤記録を削除しました`
                 });
-                
+
             } catch (error) {
                 // ロールバック
                 await dbRun('ROLLBACK');

@@ -295,19 +295,26 @@ export default class SharedMonthlyReport {
                 const date = btn.getAttribute('data-date');
                 this.reportDetailModal.show(userId, userName, date);
             }
-            
-            // 月別出勤簿の日の列クリック
+
+            // 月別出勤簿：利用者の日付クリックで編集モーダルを開く
+            if (this.canEdit && e.target.closest('.monthly-user-day-edit')) {
+                const cell = e.target.closest('.monthly-user-day-edit');
+                this.editAttendance(cell.dataset);
+                return;
+            }
+
+            // 月別出勤簿：スタッフの日付クリックで日報表示
             if (e.target.closest('.monthly-day-cell')) {
                 const cell = e.target.closest('.monthly-day-cell');
                 const userId = cell.getAttribute('data-user-id');
                 const userName = cell.getAttribute('data-user-name');
                 const date = cell.getAttribute('data-date');
-                
+
                 if (userId && date) {
                     this.reportDetailModal.show(userId, userName, date);
                 }
             }
-            
+
             // 編集ボタン（管理者・スタッフ）
             if (this.canEdit && e.target.closest('.btn-edit-attendance')) {
                 const btn = e.target.closest('.btn-edit-attendance');
@@ -598,7 +605,8 @@ export default class SharedMonthlyReport {
                     context: 'monthly',
                     showFooter: false,       // フッターは独自実装
                     showServiceType: user.role === 'user' && (this.isAdmin || this.isStaff),
-                    showTransportation: user.role === 'user' && user.service_type === 'commute' && user.transportation === 1 && (this.isAdmin || this.isStaff)
+                    showTransportation: user.role === 'user' && user.service_type === 'commute' && user.transportation === 1 && (this.isAdmin || this.isStaff),
+                    targetUserRole: user.role
                 })}
                 
                 ${this.generateMonthlyFooter(dailyRecords, user)}
@@ -753,16 +761,16 @@ export default class SharedMonthlyReport {
 
     async deleteAttendance() {
         if (!this.canEdit) return;
-        
+
         try {
             const recordId = document.getElementById('monthlyEditRecordId').value;
             const dateDisplay = document.getElementById('monthlyEditDateDisplay').value;
-            
+
             if (!recordId) {
                 this.app.showNotification('削除する記録が選択されていません', 'warning');
                 return;
             }
-            
+
             // 確認ダイアログ
             const confirmed = await modalManager.confirm({
                 title: '出勤記録の削除確認',
@@ -771,46 +779,31 @@ export default class SharedMonthlyReport {
                 confirmClass: 'btn-danger',
                 cancelText: 'キャンセル'
             });
-            
+
             if (!confirmed) return;
-            
-            // 削除理由の入力
-            const reason = prompt('削除理由を入力してください（必須）');
-            
-            if (!reason || !reason.trim()) {
-                this.app.showNotification('削除理由を入力してください', 'warning');
-                return;
-            }
-            
+
             // 削除API呼び出し
             const response = await this.app.apiCall(
                 `/api/admin/attendance/${recordId}`,
                 {
                     method: 'DELETE',
-                    body: JSON.stringify({ reason: reason.trim() })
+                    body: JSON.stringify({})
                 }
             );
-            
+
             // 成功メッセージ
             this.app.showNotification(response.message, 'success');
-            
-            // 警告がある場合は表示
-            if (response.warnings && response.warnings.length > 0) {
-                response.warnings.forEach(warning => {
-                    this.app.showNotification(warning, 'warning');
-                });
-            }
-            
+
             // モーダルを閉じる
             modalManager.hide('monthlyAttendanceEditModal');
-            
+
             // リスト更新
             await this.showMonthlyReport();
-            
+
         } catch (error) {
             console.error('出勤記録削除エラー:', error);
             this.app.showNotification(
-                error.message || '出勤記録の削除に失敗しました', 
+                error.message || '出勤記録の削除に失敗しました',
                 'danger'
             );
         }
