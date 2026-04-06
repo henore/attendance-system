@@ -32,7 +32,7 @@ function generateRandomReportData(isHome, clockInValue, clockOutValue) {
     const wakeupTime = `${String(wakeH).padStart(2, '0')}:${String(wakeM).padStart(2, '0')}`;
 
     // ���眠状態: 3パターン
-    const sleepQuality = pick(['good', 'normal', 'poor']);
+    const sleepQuality = pick(['good', 'poor', 'bad']);
 
     // 振り返り・感想
     const reflections = [
