@@ -241,6 +241,23 @@ export default class SharedMonthlyReport {
                     </div>
                 </div>
                 ` : ''}
+
+                <!-- 削除要望セクション（スタッフのみ） -->
+                ${this.isStaff ? `
+                <div class="border-top pt-3 mt-3" id="monthlyDeleteRequestSection" style="display: none;">
+                    <div class="alert alert-warning">
+                        <h6 class="alert-heading"><i class="fas fa-trash-alt"></i> 記録削除要望</h6>
+                        <p class="mb-2">この出勤記録の削除を管理者に要望します。承認後に削除されます。</p>
+                        <div class="mb-2">
+                            <textarea class="form-control" id="monthlyDeleteRequestReason" rows="2"
+                                      placeholder="削除理由を入力してください..." required></textarea>
+                        </div>
+                        <button type="button" class="btn btn-danger btn-sm" id="monthlyDeleteRequestBtn">
+                            <i class="fas fa-paper-plane"></i> 削除要望を送信
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
             </form>
         `;
     }
@@ -281,6 +298,14 @@ export default class SharedMonthlyReport {
                 const deleteBtn = this.container.querySelector('#monthlyDeleteBtn');
                 if (deleteBtn) {
                     deleteBtn.addEventListener('click', () => this.deleteAttendance());
+                }
+            }
+
+            // 削除要望はスタッフのみ
+            if (this.isStaff) {
+                const deleteRequestBtn = this.container.querySelector('#monthlyDeleteRequestBtn');
+                if (deleteRequestBtn) {
+                    deleteRequestBtn.addEventListener('click', () => this.requestDeleteAttendance());
                 }
             }
         }
@@ -698,7 +723,15 @@ export default class SharedMonthlyReport {
         if (deleteSection) {
             deleteSection.style.display = (this.isAdmin && data.recordId) ? 'block' : 'none';
         }
-        
+
+        // 削除要望セクションの表示制御（スタッフのみ）
+        const deleteRequestSection = document.getElementById('monthlyDeleteRequestSection');
+        if (deleteRequestSection) {
+            deleteRequestSection.style.display = (this.isStaff && data.recordId) ? 'block' : 'none';
+            const reasonField = document.getElementById('monthlyDeleteRequestReason');
+            if (reasonField) reasonField.value = '';
+        }
+
         // モーダル表示
         modalManager.show('monthlyAttendanceEditModal');
     }
@@ -804,6 +837,41 @@ export default class SharedMonthlyReport {
             console.error('出勤記録削除エラー:', error);
             this.app.showNotification(
                 error.message || '出勤記録の削除に失敗しました',
+                'danger'
+            );
+        }
+    }
+
+    async requestDeleteAttendance() {
+        if (!this.isStaff) return;
+
+        try {
+            const recordId = document.getElementById('monthlyEditRecordId').value;
+            const reason = document.getElementById('monthlyDeleteRequestReason').value;
+
+            if (!recordId) {
+                this.app.showNotification('削除する記録が選択されていません', 'warning');
+                return;
+            }
+
+            if (!reason || !reason.trim()) {
+                this.app.showNotification('削除理由を入力してください', 'warning');
+                return;
+            }
+
+            await this.app.apiCall('/api/staff/attendance/delete-request', {
+                method: 'POST',
+                body: JSON.stringify({ recordId, reason: reason.trim() })
+            });
+
+            this.app.showNotification('削除要望を送信しました（管理者の承認待ち）', 'success');
+            modalManager.hide('monthlyAttendanceEditModal');
+            await this.showMonthlyReport();
+
+        } catch (error) {
+            console.error('削除要望エラー:', error);
+            this.app.showNotification(
+                error.message || '削除要望の送信に失敗しました',
                 'danger'
             );
         }

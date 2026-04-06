@@ -1037,6 +1037,48 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     [result.lastID || result.id, id]
                 );
             }
+            // 削除要望の場合：出勤記録・日報・休憩記録・コメントを削除
+            else if (log.action_type === 'staff_attendance_deletion' && log.target_id) {
+                const record = await dbGet(
+                    `SELECT a.*, u.role as user_role
+                     FROM attendance a JOIN users u ON a.user_id = u.id
+                     WHERE a.id = ?`,
+                    [log.target_id]
+                );
+
+                if (!record) {
+                    return res.status(404).json({
+                        success: false,
+                        error: '対象の出勤記録が見つかりません（既に削除済みの可能性）'
+                    });
+                }
+
+                // 休憩記録を削除（利用者の場合）
+                if (record.user_role === 'user') {
+                    await dbRun(
+                        'DELETE FROM break_records WHERE user_id = ? AND date = ?',
+                        [record.user_id, record.date]
+                    );
+                }
+
+                // 日報を削除
+                await dbRun(
+                    'DELETE FROM daily_reports WHERE user_id = ? AND date = ?',
+                    [record.user_id, record.date]
+                );
+
+                // スタッフコメントを削除
+                await dbRun(
+                    'DELETE FROM staff_comments WHERE user_id = ? AND date = ?',
+                    [record.user_id, record.date]
+                );
+
+                // 出勤記録を削除
+                await dbRun(
+                    'DELETE FROM attendance WHERE id = ?',
+                    [log.target_id]
+                );
+            }
 
             await dbRun(
                 `UPDATE audit_log SET

@@ -727,6 +727,94 @@ router.post('/break/end', async (req, res) => {
     }
   });
 
+  // 出勤記録削除要望（スタッフ→管理者承認待ち）
+  router.post('/attendance/delete-request', requireAuth, requireRole(['staff']), async (req, res) => {
+    try {
+      const { recordId, reason } = req.body;
+
+      if (!reason || reason.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: '削除理由を入力してください'
+        });
+      }
+
+      if (!recordId) {
+        return res.status(400).json({
+          success: false,
+          error: '対象の出勤記録が指定されていません'
+        });
+      }
+
+      // 対象記録を取得
+      const record = await dbGet(
+        `SELECT a.*, u.name as user_name, u.role as user_role
+         FROM attendance a JOIN users u ON a.user_id = u.id
+         WHERE a.id = ?`,
+        [recordId]
+      );
+
+      if (!record) {
+        return res.status(404).json({
+          success: false,
+          error: '出勤記録が見つかりません'
+        });
+      }
+
+      if (record.user_role !== 'user') {
+        return res.status(403).json({
+          success: false,
+          error: '利用者の出勤記録のみ削除要望できます'
+        });
+      }
+
+      // 利用者の休憩データも取得
+      const currentBreak = await dbGet(
+        'SELECT start_time, end_time FROM break_records WHERE user_id = ? AND date = ?',
+        [record.user_id, record.date]
+      );
+
+      // 監査ログに削除要望を記録
+      await dbRun(
+        `INSERT INTO audit_log (
+          admin_id, action_type, target_id, target_type,
+          old_value, reason, ip_address, approval_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          req.session.user.id,
+          'staff_attendance_deletion',
+          recordId,
+          'attendance',
+          JSON.stringify({
+            user_id: record.user_id,
+            user_name: record.user_name,
+            date: record.date,
+            clock_in: record.clock_in,
+            clock_out: record.clock_out,
+            status: record.status,
+            break_start: currentBreak ? currentBreak.start_time : record.break_start,
+            break_end: currentBreak ? currentBreak.end_time : record.break_end
+          }),
+          reason,
+          req.ip,
+          'pending'
+        ]
+      );
+
+      res.json({
+        success: true,
+        message: '削除要望を送信しました（管理者の承認待ち）'
+      });
+
+    } catch (error) {
+      console.error('出勤記録削除要望エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '削除要望の送信に失敗しました'
+      });
+    }
+  });
+
   // ===== 稟議承認システム =====
 
   // 稟議作成/更新（下書き保存）

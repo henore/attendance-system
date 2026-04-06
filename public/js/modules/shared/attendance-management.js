@@ -222,6 +222,23 @@ export class SharedAttendanceManagement {
                   </div>
                 </div>
                 ` : ''}
+
+                <!-- 削除要望セクション（スタッフのみ） -->
+                ${this.userRole === 'staff' ? `
+                <div class="border-top pt-3 mt-3" id="deleteRequestSection" style="display: none;">
+                  <div class="alert alert-warning">
+                    <h6 class="alert-heading"><i class="fas fa-trash-alt"></i> 記録削除要望</h6>
+                    <p class="mb-2">この出勤記録の削除を管理者に要望します。承認後に削除されます。</p>
+                    <div class="mb-2">
+                      <textarea class="form-control" id="deleteRequestReason" rows="2"
+                                placeholder="削除理由を入力してください..." required></textarea>
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm" id="deleteRequestBtn">
+                      <i class="fas fa-paper-plane"></i> 削除要望を送信
+                    </button>
+                  </div>
+                </div>
+                ` : ''}
               </form>
             </div>
             <div class="modal-footer">
@@ -279,6 +296,12 @@ export class SharedAttendanceManagement {
     if (this.userRole === 'admin') {
       const deleteBtn = this.container.querySelector('#deleteAttendanceBtn');
       deleteBtn?.addEventListener('click', () => this.deleteAttendance());
+    }
+
+    // 削除要望はスタッフのみ
+    if (this.userRole === 'staff') {
+      const deleteRequestBtn = this.container.querySelector('#deleteRequestBtn');
+      deleteRequestBtn?.addEventListener('click', () => this.requestDeleteAttendance());
     }
   }
 
@@ -646,6 +669,14 @@ async searchAttendanceRecords() {
       deleteSection.style.display = (this.userRole === 'admin' && data.recordId) ? 'block' : 'none';
     }
 
+    // 削除要望セクションの表示制御（スタッフのみ、既存記録がある場合）
+    const deleteRequestSection = this.container.querySelector('#deleteRequestSection');
+    if (deleteRequestSection) {
+      deleteRequestSection.style.display = (this.userRole === 'staff' && data.recordId) ? 'block' : 'none';
+      const reasonField = this.container.querySelector('#deleteRequestReason');
+      if (reasonField) reasonField.value = '';
+    }
+
     // スタッフの場合のみ欠勤種別表示
     const absenceTypeGroup = this.container.querySelector('#absenceTypeGroup');
     if (data.userRole === 'staff') {
@@ -767,6 +798,41 @@ async searchAttendanceRecords() {
       console.error('出勤記録削除エラー:', error);
       this.parent.showNotification(
         error.message || '出勤記録の削除に失敗しました',
+        'danger'
+      );
+    }
+  }
+
+  async requestDeleteAttendance() {
+    if (this.userRole !== 'staff') return;
+
+    try {
+      const recordId = this.container.querySelector('#editRecordId').value;
+      const reason = this.container.querySelector('#deleteRequestReason').value;
+
+      if (!recordId) {
+        this.parent.showNotification('削除する記録が選択されていません', 'warning');
+        return;
+      }
+
+      if (!reason || !reason.trim()) {
+        this.parent.showNotification('削除理由を入力してください', 'warning');
+        return;
+      }
+
+      await this.parent.callApi('/api/staff/attendance/delete-request', {
+        method: 'POST',
+        body: JSON.stringify({ recordId, reason: reason.trim() })
+      });
+
+      this.parent.showNotification('削除要望を送信しました（管理者の承認待ち）', 'success');
+      modalManager.hide('attendanceEditModal');
+      await this.searchAttendanceRecords();
+
+    } catch (error) {
+      console.error('削除要望エラー:', error);
+      this.parent.showNotification(
+        error.message || '削除要望の送信に失敗しました',
         'danger'
       );
     }

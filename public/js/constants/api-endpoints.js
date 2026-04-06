@@ -62,6 +62,7 @@ export const API_ENDPOINTS = {
     MONTHLY_ATTENDANCE: (year, month, userId) =>
         `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`,
     ATTENDANCE_CORRECT: '/api/staff/attendance/correct',
+    ATTENDANCE_DELETE_REQUEST: '/api/staff/attendance/delete-request',
     // スタッフ日報
     DAILY_REPORT_SUBMIT: '/api/staff/daily-report',
     DAILY_REPORT_TODAY: '/api/staff/daily-report-today',
