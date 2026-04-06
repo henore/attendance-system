@@ -358,11 +358,6 @@ export class AttendanceTable {
     const buttons = [];
     const date = currentDate || record.date;
 
-    // 出勤記録管理一覧：admin画面ではuserの操作アイコンを非表示（staffのみ表示）
-    if (this.userRole === 'admin' && record.user_role === 'user') {
-      return '-';
-    }
-
     // 日報詳細ボタン（利用者の日報がある場合）
     if (record.user_role === 'user' && record.report_id) {
       buttons.push(`
@@ -390,8 +385,9 @@ export class AttendanceTable {
     }
     
     // 編集ボタン（管理者またはスタッフ）
+    // admin画面ではuserの編集ボタンは非表示（staffのみ表示）
     // スタッフは利用者の出勤記録のみ編集可能
-    if (this.userRole === 'admin' || (this.userRole === 'staff' && record.user_role === 'user')) {
+    if ((this.userRole === 'admin' && record.user_role !== 'user') || (this.userRole === 'staff' && record.user_role === 'user')) {
       const editData = {
         'data-record-id': record.id || '',
         'data-user-id': record.user_id,
