@@ -417,8 +417,8 @@ export default class SharedMonthlyReport {
                     }
                 });
                 
-                // 各グループを追加
-                ['user', 'staff', 'admin'].forEach(role => {
+                // 各グループを追加（管理者は除外）
+                ['user', 'staff'].forEach(role => {
                     if (usersByRole[role].length > 0) {
                         const groupLabel = this.parent.getRoleDisplayName(role);
                         html += `<optgroup label="${groupLabel}">`;
