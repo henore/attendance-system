@@ -521,10 +521,32 @@ export default class AdminAuditLog {
     }
 
     getTargetInfo(log) {
+        const roleNames = { 'user': '利用者', 'staff': 'スタッフ', 'admin': '管理者' };
+
+        if (log.target_name) {
+            const roleName = roleNames[log.target_role] || log.target_role || '';
+            let info = `${log.target_name} <small class="text-muted">(${roleName})</small>`;
+            if (log.target_type === 'attendance' && log.target_id) {
+                info += `<br><small class="text-muted">記録ID: ${log.target_id}</small>`;
+            }
+            return info;
+        }
+        // JOINで取れなかった場合、old_value/new_valueから取得を試みる
+        try {
+            const data = log.old_value ? JSON.parse(log.old_value) : (log.new_value ? JSON.parse(log.new_value) : null);
+            if (data && data.user_name) {
+                let info = `${data.user_name}`;
+                if (log.target_type === 'attendance' && log.target_id) {
+                    info += `<br><small class="text-muted">記録ID: ${log.target_id}</small>`;
+                }
+                return info;
+            }
+        } catch (e) { /* ignore */ }
+
         if (log.target_type && log.target_id) {
             return `${log.target_type} (ID: ${log.target_id})`;
         }
-        return log.target_type || '-';
+        return '-';
     }
 
     getLogDetails(log) {
@@ -779,12 +801,8 @@ export default class AdminAuditLog {
                             </td>
                         </tr>
                         <tr>
-                            <th>対象タイプ:</th>
-                            <td>${log.target_type || '-'}</td>
-                        </tr>
-                        <tr>
-                            <th>対象ID:</th>
-                            <td>${log.target_id || '-'}</td>
+                            <th>対象:</th>
+                            <td>${this.getTargetInfo(log)}</td>
                         </tr>
                         <tr>
                             <th>IPアドレス:</th>

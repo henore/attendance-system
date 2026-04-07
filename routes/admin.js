@@ -815,10 +815,15 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 SELECT
                     a.*,
                     u.name as admin_name,
-                    approver.name as approver_name
+                    approver.name as approver_name,
+                    COALESCE(target_user.name, att_user.name) as target_name,
+                    COALESCE(target_user.role, att_user.role) as target_role
                 FROM audit_log a
                 JOIN users u ON a.admin_id = u.id
                 LEFT JOIN users approver ON a.approved_by = approver.id
+                LEFT JOIN users target_user ON a.target_id = target_user.id AND a.target_type = 'user'
+                LEFT JOIN attendance att ON a.target_id = att.id AND a.target_type = 'attendance'
+                LEFT JOIN users att_user ON att.user_id = att_user.id
                 WHERE 1=1
             `;
             
