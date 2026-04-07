@@ -68,6 +68,8 @@ export default class AdminAuditLog {
                                 <option value="">全てのアクション</option>
                                 <option value="account_create">アカウント作成</option>
                                 <option value="attendance_correction">出勤記録訂正（管理者）</option>
+                                <option value="attendance_creation">出勤記録作成（管理者）</option>
+                                <option value="attendance_deletion">出勤記録削除（管理者）</option>
                                 <option value="staff_attendance_correction">出勤記録訂正（スタッフ）</option>
                                 <option value="staff_attendance_creation">出勤記録作成（スタッフ）</option>
                                 <option value="staff_attendance_deletion">出勤記録削除要望（スタッフ）</option>
@@ -485,9 +487,9 @@ export default class AdminAuditLog {
     getActionTypeDisplayName(actionType) {
         const actionTypes = {
             'account_create': 'アカウント作成',
-            'attendance_correction': '出勤記録訂正',
-            'attendance_creation': '出勤記録作成',
-            'attendance_deletion': '出勤記録削除',
+            'attendance_correction': '出勤記録訂正（管理者）',
+            'attendance_creation': '出勤記録作成（管理者）',
+            'attendance_deletion': '出勤記録削除（管理者）',
             'staff_attendance_correction': '出勤記録訂正（スタッフ）',
             'staff_attendance_creation': '出勤記録作成（スタッフ）',
             'staff_attendance_deletion': '出勤記録削除要望（スタッフ）',
