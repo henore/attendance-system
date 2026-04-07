@@ -205,9 +205,9 @@ export class SharedAttendanceManagement {
                 </div>
 
                 <div class="mb-3">
-                  <label for="editReason" class="form-label">変更理由</label>
-                  <textarea class="form-control" id="editReason" rows="3" 
-                            placeholder="変更理由を入力してください..." required></textarea>
+                  <label for="editReason" class="form-label">変更理由${this.userRole === 'staff' ? ' <span class="text-danger">*</span>' : '（任意）'}</label>
+                  <textarea class="form-control" id="editReason" rows="3"
+                            placeholder="変更理由を入力してください..."${this.userRole === 'staff' ? ' required' : ''}></textarea>
                 </div>
 
                 <!-- 削除セクション（管理者のみ） -->
@@ -711,7 +711,8 @@ async searchAttendanceRecords() {
         }
       }
 
-      if (!reason.trim()) {
+      // staffは理由必須、adminは任意
+      if (this.userRole === 'staff' && !reason.trim()) {
         this.parent.showNotification('変更理由を入力してください', 'warning');
         return;
       }

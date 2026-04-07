@@ -224,9 +224,9 @@ export default class SharedMonthlyReport {
                 </div>
 
                 <div class="mb-3">
-                    <label for="monthlyEditReason" class="form-label">変更理由 <span class="text-danger">*</span></label>
-                    <textarea class="form-control" id="monthlyEditReason" rows="3" 
-                              placeholder="変更理由を入力してください..." required></textarea>
+                    <label for="monthlyEditReason" class="form-label">変更理由${this.isStaff ? ' <span class="text-danger">*</span>' : '（任意）'}</label>
+                    <textarea class="form-control" id="monthlyEditReason" rows="3"
+                              placeholder="変更理由を入力してください..."${this.isStaff ? ' required' : ''}></textarea>
                 </div>
 
                 <!-- 削除セクション（管理者のみ） -->
@@ -750,7 +750,8 @@ export default class SharedMonthlyReport {
             const status = document.getElementById('monthlyEditStatus').value;
             const reason = document.getElementById('monthlyEditReason').value;
 
-            if (!reason.trim()) {
+            // staffは理由必須、adminは任意
+            if (this.isStaff && !reason.trim()) {
                 this.app.showNotification('変更理由を入力してください', 'warning');
                 return;
             }

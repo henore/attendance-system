@@ -321,14 +321,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             console.log('出勤記録修正リクエスト:', { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason });
 
             // バリデーション
-            if (!reason || reason.trim() === '') {
-                console.log('バリデーションエラー: 変更理由が空です');
-                return res.status(400).json({
-                    success: false,
-                    error: '変更理由を入力してください'
-                });
-            }
-            
             // recordIdがある場合は既存記録の更新
             if (recordId) {
                 // 現在の値を取得
@@ -403,8 +395,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 // スタッフの出勤記録訂正は監査ログに記録
                 if (user.role === 'staff') {
                     await dbRun(
-                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, old_value, new_value, reason, ip_address)
-                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?, ?, ?)`,
+                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, old_value, new_value, ip_address)
+                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?, ?)`,
                         [
                             req.session.user.id,
                             oldRecord.user_id,
@@ -422,7 +414,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                                 break_end: breakEndValue,
                                 status: status
                             }),
-                            reason,
                             req.ip
                         ]
                     );
@@ -511,8 +502,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 // スタッフの出勤記録新規作成は監査ログに記録
                 if (user.role === 'staff') {
                     await dbRun(
-                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, new_value, reason, ip_address)
-                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?, ?)`,
+                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, new_value, ip_address)
+                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?)`,
                         [
                             req.session.user.id,
                             userId,
@@ -524,7 +515,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                                 break_end: breakEndValue,
                                 status: status || 'normal'
                             }),
-                            reason,
                             req.ip
                         ]
                     );
