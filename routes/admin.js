@@ -46,7 +46,13 @@ function generateRandomReportData(isHome, clockInValue, clockOutValue) {
         '集中できました',
         '難しかったです',
         '前回の復習をしました',
-        '前回の続きをやりました'
+        '前回の続きをやりました',
+        '次回も宜しくお願いします',
+        'お疲れさまでした',
+        '今日はいつもより頑張れました',
+        '今日もありがとうございました',
+        '無理せずやっていこうと思います'
+
     ];
     const reflection = pick(reflections);
 
