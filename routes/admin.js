@@ -52,10 +52,21 @@ function generateRandomReportData(isHome, clockInValue, clockOutValue) {
         '今日はいつもより頑張れました',
         '今日もありがとうございました',
         '無理せずやっていこうと思います',
-        'この調子で進めていきたいです'
+        'この調子で進めていきたいです',
+        '順調にできました',
+        'このペースでやっていきたいです',
+        '中々進まなかったですが次回頑張ります',
+        'わからなかったところが今日わかって良かったです',
+        '今日は上手くできたので良かったです'
 
     ];
     const reflection = pick(reflections);
+
+    // 睡眠時間バリデーション（HH:MM形式チェック）
+    const timePattern = /^\d{2}:\d{2}$/;
+    if (!bedtime || !wakeupTime || !timePattern.test(bedtime) || !timePattern.test(wakeupTime)) {
+        throw new Error(`日報自動生成エラー: 睡眠時間が不正です（bedtime=${bedtime}, wakeupTime=${wakeupTime}）`);
+    }
 
     return {
         workContent: 'PC作業',
@@ -484,7 +495,16 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                     if (!existingReport) {
                         const isHome = user.service_type === 'home';
-                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
+                        let rd;
+                        for (let i = 0; i < 3; i++) {
+                            try {
+                                rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
+                                break;
+                            } catch (e) {
+                                console.error(`[日報自動生成リトライ ${i + 1}/3]`, e.message);
+                                if (i === 2) throw e;
+                            }
+                        }
 
                         await dbRun(
                             `INSERT INTO daily_reports (
@@ -502,7 +522,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                             ]
                         );
 
-                        console.log(`[日報自動生成] ユーザーID: ${userId}, 日付: ${date}, 区分: ${isHome ? '在宅' : '通所'}`);
+                        console.log(`[日報自動生成] ユーザーID: ${userId}, 日付: ${date}, 区分: ${isHome ? '在宅' : '通所'}, 就寝: ${rd.bedtime}, 起床: ${rd.wakeupTime}`);
                     }
                 }
 
@@ -1018,7 +1038,16 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                     if (!existingReport) {
                         const isHome = user.service_type === 'home';
-                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
+                        let rd;
+                        for (let i = 0; i < 3; i++) {
+                            try {
+                                rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
+                                break;
+                            } catch (e) {
+                                console.error(`[日報自動生成リトライ ${i + 1}/3]`, e.message);
+                                if (i === 2) throw e;
+                            }
+                        }
                         await dbRun(
                             `INSERT INTO daily_reports (
                                 user_id, date, work_content, work_location, pc_number,

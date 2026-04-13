@@ -244,13 +244,13 @@ export class UserReportHandler {
             <label for="bedtime" class="form-label">
               <i class="fas fa-bed"></i> 就寝時間
             </label>
-            <input type="time" class="form-control" id="bedtime" value="${report.bedtime || ''}">
+            <input type="time" class="form-control" id="bedtime" value="${report.bedtime || ''}" required>
           </div>
           <div class="col-md-4 mb-3">
             <label for="wakeupTime" class="form-label">
               <i class="fas fa-sun"></i> 起床時間
             </label>
-            <input type="time" class="form-control" id="wakeupTime" value="${report.wakeup_time || ''}">
+            <input type="time" class="form-control" id="wakeupTime" value="${report.wakeup_time || ''}" required>
           </div>
           <div class="col-md-4 mb-3">
             <label for="sleepQuality" class="form-label">

@@ -77,17 +77,25 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             console.log('[日報API] 出勤記録:', attendance);
             
             if (!attendance || !attendance.clock_out) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: '退勤後に日報を提出してください' 
+                return res.status(400).json({
+                    success: false,
+                    error: '退勤後に日報を提出してください'
                 });
             }
-            
+
+            // 必須項目バリデーション（施設外就労先名、頓服服用時間、連絡時間以外は必須）
+            if (!workContent || !temperature || !appetite || !bedtime || !wakeupTime || !sleepQuality || !reflection) {
+                return res.status(400).json({
+                    success: false,
+                    error: '必須項目が入力されていません（作業内容、体温、食欲、就寝時間、起床時間、睡眠状態、振り返りは必須です）'
+                });
+            }
+
             // 日報登録または更新
             const sqlParams = [
                 userId, today, workContent, externalWorkLocation || null, workLocation || null, pcNumber || null,
-                temperature, appetite, medicationTime || null, bedtime || null, wakeupTime || null,
-                sleepQuality, reflection || '', interviewRequest || null,
+                temperature, appetite, medicationTime || null, bedtime, wakeupTime,
+                sleepQuality, reflection, interviewRequest || null,
                 contactTime1 || null, contactTime2 || null
             ];
 
