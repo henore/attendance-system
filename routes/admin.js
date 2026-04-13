@@ -57,7 +57,7 @@ function generateRandomReportData(isHome, clockInValue, clockOutValue) {
         'このペースでやっていきたいです',
         '中々進まなかったですが次回頑張ります',
         'わからなかったところが今日わかって良かったです',
-        '今日は上手くできたので良かったです'
+        '今日は上手く出来て嬉しかったです'
 
     ];
     const reflection = pick(reflections);
