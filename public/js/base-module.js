@@ -44,7 +44,6 @@ export default class BaseModule {
         });
         this.eventListeners.clear();
 
-        console.log(`${this.constructor.name} destroyed`);
     }
 
     // 共通のエラーハンドリング

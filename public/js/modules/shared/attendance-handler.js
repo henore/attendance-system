@@ -18,7 +18,6 @@ export class AttendanceHandler {
    */
   async clockIn(endpoint = API_ENDPOINTS.ATTENDANCE.CLOCK_IN) {
     try {
-      console.log('[出勤処理] 開始');
       
       const response = await this.apiCall(endpoint, { method: 'POST' });
       
@@ -60,7 +59,6 @@ export class AttendanceHandler {
     }
 
     try {
-      console.log('[退勤処理] 開始');
       
       const response = await this.apiCall(endpoint, { method: 'POST' });
       

@@ -157,7 +157,6 @@ export default class TrialVisitsManager {
             if (e.target.closest('.calendar-day')) {
                 const dateCell = e.target.closest('.calendar-day');
                 const date = dateCell.dataset.date;
-                console.log('[体験入所] カレンダークリック - 要素:', dateCell, '日付:', date);
                 this.onDateClick(date);
             }
         });
@@ -597,7 +596,6 @@ export default class TrialVisitsManager {
 
     // 日付クリック処理
     async onDateClick(date) {
-        console.log('[体験入所] 日付クリック:', date);
         await this.showTrialVisitsModal(date);
     }
 
@@ -633,12 +631,6 @@ export default class TrialVisitsManager {
             const modalTitle = document.getElementById('trialVisitsModalLabel');
             const modalBody = document.getElementById('trialVisitsModalBody');
             
-            console.log('[モーダル確認]', {
-                modalElement: !!modalElement,
-                modalTitle: !!modalTitle,
-                modalBody: !!modalBody,
-                modalManagerHasModal: modalManager.modals.has('trialVisitsModal')
-            });
             
             if (modalElement && modalTitle && modalBody) {
                 modalTitle.innerHTML = `<i class="fas fa-users"></i> ${dateStr}の体験入所予定`;

@@ -16,12 +16,6 @@ export class LineReportSender {
    */
   async sendReportCompletion(reportData, userData, commentData) {
     try {
-      console.log('[画像生成] 開始:', {
-        reportData,
-        userData,
-        commentData,
-        date: reportData?.date || new Date().toISOString().split('T')[0]
-      });
       
       // 1. まず画像を生成
       const imageResponse = await this.app.apiCall(API_ENDPOINTS.LINE.GENERATE_IMAGE, {
@@ -34,7 +28,6 @@ export class LineReportSender {
         })
       });
       
-      console.log('[画像生成] レスポンス:', imageResponse);
        
       if (!imageResponse.success) {
         // 画像生成エラーの詳細化
@@ -105,11 +98,6 @@ export class LineReportSender {
    */
   async sendStaffReportCompletion(staffReportData, userData) {
     try {
-      console.log('[スタッフ日報画像生成] 開始:', {
-        staffReportData,
-        userData,
-        date: staffReportData?.date || new Date().toISOString().split('T')[0]
-      });
 
       // スタッフ日報用の画像を生成
       const imageResponse = await this.app.apiCall('/api/line/generate-staff-report-image', {
@@ -121,7 +109,6 @@ export class LineReportSender {
         })
       });
 
-      console.log('[スタッフ日報画像生成] レスポンス:', imageResponse);
 
       if (!imageResponse.success) {
         const errorMsg = imageResponse.message || 'スタッフ日報画像生成に失敗しました';
@@ -166,6 +153,5 @@ export class LineReportSender {
    * クリーンアップ
    */
   destroy() {
-    console.log('[画像DL] クリーンアップ完了');
   }
 }

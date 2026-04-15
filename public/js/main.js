@@ -18,7 +18,6 @@ class AttendanceManagementSystem {
     }
 
     async init() {
-        console.log('🚀 勤怠管理システム起動');
         
         // 認証チェック
         const isAuthenticated = await this.checkAuthentication();
@@ -314,7 +313,6 @@ class AttendanceManagementSystem {
             const response = await this.apiCall(API_ENDPOINTS.AUTH.LOGOUT, { method: 'POST' });
             
             // レスポンスが成功でなくてもログアウト処理を続行（セッション強制破棄）
-            console.log('ログアウトレスポンス:', response);
             
             this.showNotification(MESSAGES.AUTH.LOGOUT_SUCCESS, 'success');
             
@@ -442,7 +440,6 @@ class AttendanceManagementSystem {
         
         // 利用者の場合はセッション監視を行わない（要件：セッションタイムアウトなし）
         if (this.currentUser.role === 'user') {
-            console.log('利用者のため、セッション監視を無効化');
             return;
         }
         

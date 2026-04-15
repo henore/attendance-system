@@ -46,7 +46,6 @@ export default class StaffModule extends BaseModule {
   }
 
   async init() {
-    console.log('👥 スタッフモジュール初期化');
     
     this.render();
     await this.initializeSharedModules();
@@ -220,7 +219,6 @@ export default class StaffModule extends BaseModule {
       // グローバルに公開（イベントハンドラ用）
       window.staffApproval = this.staffApproval;
 
-      console.log('✅ 共通モジュール初期化完了');
     } catch (error) {
       console.error('❌ 共通モジュール初期化エラー:', error);
       this.showNotification('一部機能の初期化に失敗しました', 'warning');
@@ -245,7 +243,6 @@ export default class StaffModule extends BaseModule {
   }
 
   async switchToSection(sectionId) {
-    console.log(`[StaffModule] 画面切り替え: ${sectionId}`);
     
     // 全てのセクションを非表示
     document.querySelectorAll('.staff-section').forEach(section => {
@@ -353,7 +350,6 @@ export default class StaffModule extends BaseModule {
       const response = await this.app.apiCall('/api/user/last-record');
       if (response.lastRecord && !response.lastRecord.has_report) {
         this.lastReportModal.show(response.lastRecord, () => {
-          console.log('前回記録確認完了');
         });
       }
     } catch (error) {
@@ -386,7 +382,6 @@ export default class StaffModule extends BaseModule {
 
   // 共通メソッド（SharedModulesから使用）
 callApi(endpoint, options = {}) {
-  console.log('[StaffModule callApi] 呼び出し:', endpoint, options);
   return this.app.apiCall(endpoint, options);
   }
 
@@ -500,6 +495,5 @@ callApi(endpoint, options = {}) {
     // 親クラスのクリーンアップ
     super.destroy();
 
-    console.log('👥 スタッフモジュールクリーンアップ完了');
   }
 }

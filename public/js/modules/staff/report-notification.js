@@ -29,7 +29,6 @@ export class StaffReportNotification {
     // 初回チェック
     this.checkForNewReports();
     
-    console.log('📋 日報提出監視を開始しました');
   }
 
   /**

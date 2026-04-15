@@ -262,17 +262,14 @@ export class SharedAttendanceManagement {
   const showOnlyWorkingSwitch = this.container.querySelector('#showOnlyWorkingSwitch');
   
   searchBtn?.addEventListener('click', () => {
-    console.log('[DEBUG] 検索ボタンクリック');
     this.searchAttendanceRecords();
   });
   
   refreshBtn?.addEventListener('click', () => {
-    console.log('[DEBUG] 更新ボタンクリック');
     this.refresh();
   });
   
   showOnlyWorkingSwitch?.addEventListener('change', (e) => {
-    console.log('[DEBUG] 表示フィルター変更:', e.target.checked);
     this.showOnlyWorking = e.target.checked;
     this.updateRecordsList(this.currentRecords);
   });
@@ -280,7 +277,6 @@ export class SharedAttendanceManagement {
   // 権限フィルター変更時のユーザーリスト更新
   const roleSelect = this.container.querySelector('#searchRole');
   roleSelect?.addEventListener('change', () => {
-    console.log('[DEBUG] 権限フィルター変更:', roleSelect.value);
     this.updateUserSelectOptions();
   });
 
@@ -308,7 +304,6 @@ export class SharedAttendanceManagement {
   // 日付変更時の自動検索
   const dateInput = this.container.querySelector('#searchDate');
   dateInput?.addEventListener('change', () => {
-    console.log('[DEBUG] 日付変更:', dateInput.value);
     if (this.currentRecords.length > 0) {
       this.searchAttendanceRecords();
     }
@@ -401,12 +396,10 @@ async updateUserSelectOptions() {
 
 async loadData() {
   try {
-    console.log('[DEBUG] loadData開始 - ユーザー権限:', this.userRole);
     
     await this.loadUsersForSearch();
     
     // admin・staff共に初期検索を実行
-    console.log('[DEBUG] 初期検索を自動実行');
     // 遅延実行でDOM要素の準備を待つ
     setTimeout(() => {
       this.searchAttendanceRecords();
@@ -422,17 +415,14 @@ async loadData() {
 
  async loadUsersForSearch() {
   try {
-    console.log('[DEBUG] ユーザーリスト読み込み開始');
     
     const endpoint = this.userRole === 'admin' ? 
       API_ENDPOINTS.ADMIN.USERS : 
       API_ENDPOINTS.STAFF.USERS;
       
-    console.log('[DEBUG] ユーザー取得エンドポイント:', endpoint);
     
     const response = await this.parent.callApi(endpoint);
     
-    console.log('[DEBUG] ユーザー取得レスポンス:', response);
     
     const userSelect = this.container.querySelector('#searchUser');
     
@@ -463,7 +453,6 @@ async loadData() {
       });
       
       userSelect.innerHTML = html;
-      console.log('[DEBUG] ユーザーリスト設定完了:', filteredUsers.length, '件');
     }
   } catch (error) {
     console.error('[ERROR] ユーザー読み込みエラー:', error);
@@ -507,13 +496,9 @@ async searchAttendanceRecords() {
       API_ENDPOINTS.ADMIN.ATTENDANCE_SEARCH : 
       API_ENDPOINTS.STAFF.ATTENDANCE_SEARCH;
     
-    console.log('[DEBUG] APIエンドポイント:', endpoint);
-    console.log('[DEBUG] クエリパラメータ:', params.toString());
-    console.log('[DEBUG] ユーザー権限:', this.userRole);
     
     const response = await this.app.apiCall(`${endpoint}?${params}`);
     
-    console.log('[DEBUG] APIレスポンス:', response);
     
     // recordsプロパティの確認
     if (!response.records) {
@@ -523,16 +508,13 @@ async searchAttendanceRecords() {
     }
     
     let records = response.records || [];
-    console.log('[DEBUG] 取得レコード:', records);
   
     // スタッフ画面では利用者のみにフィルタリング（追加の安全策）
     if (this.userRole === 'staff') {
       records = records.filter(record => record.user_role === 'user');
-      console.log('[DEBUG] スタッフ画面フィルタ後:', records.length, '件');
     }
     
     if (records.length > 0) {
-      console.log('[DEBUG] 最初のレコード:', records[0]);
     }
     
     // 休憩データの整形（統一処理）
@@ -544,11 +526,6 @@ async searchAttendanceRecords() {
           record.break_start_time = record.br_start;
           record.break_end_time = record.br_end;
           record.break_duration = record.br_duration;
-          console.log('[DEBUG] 利用者休憩データマッピング:', {
-            user: record.user_name,
-            break_start_time: record.break_start_time,
-            break_end_time: record.break_end_time
-          });
         }
         // breakRecordオブジェクトからのデータ
         else if (record.breakRecord) {
@@ -607,7 +584,6 @@ async searchAttendanceRecords() {
       recordsList.innerHTML = '<p class="text-muted text-center">検索条件に該当する記録がありません</p>';
       return;
     }
-    console.log('updateRecordsListデータ内容確認', records);
     // AttendanceTableコンポーネントを使用
     recordsList.innerHTML = this.attendanceTable.generateTable(records, {
       showOnlyWorking: this.showOnlyWorking,

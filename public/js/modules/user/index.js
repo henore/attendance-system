@@ -66,7 +66,6 @@ export default class UserModule extends BaseModule {
   }
 
   async init() {
-    console.log('👤 利用者モジュール初期化');
     this.render();
     await this.loadInitialData();
     this.setupPageLeaveWarning();
@@ -568,7 +567,6 @@ export default class UserModule extends BaseModule {
     this.visibilityChangeHandler = () => {
       if (document.visibilityState === 'hidden' && this.shouldShowLeaveWarning()) {
         // バックグラウンドに移行した場合の処理
-        console.log('ブラウザがバックグラウンドに移行：出勤中のため注意');
       }
     };
     
@@ -665,6 +663,5 @@ export default class UserModule extends BaseModule {
     // 親クラスのクリーンアップ
     super.destroy();
     
-    console.log('👤 利用者モジュールクリーンアップ完了');
   }
 }

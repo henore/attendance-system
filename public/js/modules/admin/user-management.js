@@ -478,7 +478,6 @@ export default class AdminUserManagement {
         document.querySelectorAll('input[type="checkbox"][id^="editWorkWeek"]:checked')
         ).map(cb => cb.value);
 
-        console.log('出勤曜日:', workweek); 
 
         // バリデーション
         if (!username || !name || !role) {

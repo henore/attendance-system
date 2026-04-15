@@ -141,7 +141,6 @@ export class ReportDetailModal {
         this.stopCommentCheck();
         this.isEditing = false;
         // モーダルが閉じられたらcurrentDataをリセット
-        console.log('🗑️ [モーダルクリーンアップ] currentDataをリセット');
         this.currentData = null;
       });
     }
@@ -152,9 +151,6 @@ export class ReportDetailModal {
    */
   async show(userId, userName, date) {
     try {
-      console.log('🔍 [日報詳細] 表示開始 - 受け取ったパラメータ:', { userId, userName, date });
-      console.log('🔍 [日報詳細] this.userRole:', this.userRole);
-      console.log('🔍 [日報詳細] this.app.currentUser:', this.app.currentUser);
 
       // パラメータ検証
       if (!userId || !date) {
@@ -168,11 +164,9 @@ export class ReportDetailModal {
         API_ENDPOINTS.STAFF.REPORT(userId, date)
       );
 
-      console.log('[日報詳細] APIレスポンス:', response);
 
       // ユーザーのroleを確認
       const targetUserRole = response.user?.role;
-      console.log('[日報詳細] ターゲットユーザーのrole:', targetUserRole);
 
       // staffまたはadminの場合、staff日報も取得
       let staffReport = null;
@@ -182,9 +176,7 @@ export class ReportDetailModal {
             `${API_ENDPOINTS.STAFF.DAILY_REPORT(date)}?staffId=${userId}`
           );
           staffReport = staffReportResponse.report;
-          console.log('[日報詳細] スタッフ日報:', staffReport);
         } catch (error) {
-          console.log('[日報詳細] スタッフ日報の取得に失敗（日報未提出の可能性）:', error);
         }
       }
 
@@ -213,10 +205,6 @@ export class ReportDetailModal {
         updated_at: response.comment.updated_at || response.comment.created_at
       } : null;
 
-      console.log('✅ [日報詳細] currentData設定完了:', this.currentData);
-      console.log('📊 [日報詳細] 設定されたuserID:', this.currentData.userId);
-      console.log('👤 [日報詳細] 設定されたユーザー名:', this.currentData.userName);
-      console.log('📅 [日報詳細] 設定された日付:', this.currentData.date);
 
       // モーダルコンテンツを更新
       this.updateModalContent();
@@ -243,7 +231,6 @@ export class ReportDetailModal {
    */
   startEditing() {
     this.isEditing = true;
-    console.log('[排他制御] 編集開始');
     
     // 編集中の表示を追加
     const editingIndicator = document.getElementById('editingIndicator');
@@ -264,7 +251,6 @@ export class ReportDetailModal {
    */
   endEditing() {
     this.isEditing = false;
-    console.log('[排他制御] 編集終了');
     
     // 編集中の表示を削除
     const editingIndicator = document.getElementById('editingIndicator');
@@ -294,7 +280,6 @@ export class ReportDetailModal {
           
           // コメントが更新されているかチェック
           if (this.hasCommentChanged(newComment)) {
-            console.log('[排他制御] 他のユーザーによるコメント更新を検知');
             
             // 警告を表示
             this.showCommentUpdateWarning(newComment);
@@ -836,14 +821,12 @@ export class ReportDetailModal {
    * コメントエリアの設定
    */
   setupCommentArea() {
-    console.log('[setupCommentArea] 開始 - currentData:', this.currentData);
     
     const textarea = document.getElementById('staffCommentTextarea');
     const saveBtn = document.getElementById(`${this.modalId}SaveCommentBtn`);
     const saveAndSendBtn = document.getElementById(`${this.modalId}SaveAndSendBtn`);
     
     if (!textarea || !saveBtn || !saveAndSendBtn) {
-      console.log('[setupCommentArea] 必要な要素が見つかりません');
       return;
     }
     
@@ -857,7 +840,6 @@ export class ReportDetailModal {
     const { comment } = this.currentData;
     const isEditable = !comment || this.userRole === 'admin';
     
-    console.log('[setupCommentArea] 編集可否:', isEditable);
     
     // ボタンの表示制御
     saveBtn.style.display = isEditable ? 'inline-block' : 'none';
@@ -874,12 +856,10 @@ export class ReportDetailModal {
     saveAndSendBtn.parentNode.replaceChild(newSaveAndSendBtn, saveAndSendBtn);
     
     newSaveBtn.addEventListener('click', () => {
-      console.log('[イベントリスナー] コメント保存ボタンクリック');
       this.saveComment(false);
     });
     
     newSaveAndSendBtn.addEventListener('click', () => {
-      console.log('[イベントリスナー] 保存＆画像DLボタンクリック');
       this.saveComment(true);
     });
   }
@@ -906,14 +886,11 @@ export class ReportDetailModal {
    * @param {boolean} sendToLine - 画像DLするかどうか
    */
   async saveComment(sendToLine = false) {
-    console.log('[コメント保存] メソッド開始 - 画像DL:', sendToLine);
     
     try {
       const textarea = document.getElementById('staffCommentTextarea');
       const comment = textarea ? textarea.value.trim() : '';
       
-      console.log('[コメント保存] textarea:', textarea);
-      console.log('[コメント保存] comment値:', comment);
       
       if (!comment) {
         this.app.showNotification('コメントを入力してください', 'warning');
@@ -976,7 +953,6 @@ export class ReportDetailModal {
         // エラーがあっても保存は続行
       }
       
-      console.log('[コメント保存] データ確認:', { userId, userName, date, comment });
       
       // API呼び出し
       const saveResponse = await this.app.apiCall(API_ENDPOINTS.STAFF.COMMENT, {
@@ -995,7 +971,6 @@ export class ReportDetailModal {
         // 画像DL処理
         if (sendToLine) {
           try {
-            console.log('[画像DL] 開始');
             await this.lineSender.sendReportCompletion(
               {
                 ...this.currentData.report,
@@ -1010,7 +985,6 @@ export class ReportDetailModal {
                 created_at: new Date().toISOString()
               }
             );
-            console.log('[画像DL] 完了');
           } catch (lineError) {
             console.error('[画像DL] エラー:', lineError);
             this.app.showNotification('画像の保存に失敗しました', 'warning');
@@ -1199,15 +1173,8 @@ export class ReportDetailModal {
         return;
       }
       
-      console.log('🔍 [日報編集] currentData確認:', this.currentData);
-      console.log('🔍 [日報編集] this.currentData.userId:', this.currentData.userId);
-      console.log('🔍 [日報編集] this.currentData.user?.id:', this.currentData.user?.id);
-      console.log('🔍 [日報編集] this.currentData.date:', this.currentData.date);
       
       const userId = this.currentData.userId || this.currentData.user?.id;
-      console.log('🎯 [日報編集] 使用するuserID:', userId);
-      console.log('🎯 [日報編集] APIパス:', `/api/admin/report/${userId}/${this.currentData.date}`);
-      console.log('🎯 [日報編集] 送信データ:', formData);
       
       const response = await this.app.apiCall(`/api/admin/report/${userId}/${this.currentData.date}`, {
         method: 'PUT',

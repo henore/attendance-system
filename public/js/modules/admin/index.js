@@ -37,7 +37,6 @@ export default class AdminModule extends BaseModule {
     }
 
     async init() {
-        console.log('🔧 管理者モジュール初期化（統合版）');
         
         // グローバルに公開（イベントハンドラ用）
         window.adminModule = this;
@@ -139,7 +138,6 @@ export default class AdminModule extends BaseModule {
     }
 
     async switchToView(viewName) {
-        console.log(`[AdminModule] 画面切り替え: ${viewName}`);
 
         // 全てのセクションを非表示
         this.attendanceManagement?.hide();
@@ -320,7 +318,6 @@ export default class AdminModule extends BaseModule {
         // 親クラスのクリーンアップ
         super.destroy();
 
-        console.log('🔧 管理者モジュールクリーンアップ完了');
     }
 
 }

@@ -17,9 +17,7 @@ async function fetchJapaneseHolidays() {
   }
 
   try {
-    console.log('🔄 祝日データAPIを呼び出し中...');
     const response = await fetch('/api/holidays');
-    console.log('📡 祝日API レスポンス:', response.status);
     
     if (!response.ok) {
       throw new Error(`祝日API取得エラー: ${response.status}`);
@@ -31,13 +29,11 @@ async function fetchJapaneseHolidays() {
     }
     
     const data = result.holidays;
-    console.log('📅 取得した祝日データ件数:', Object.keys(data).length);
     
     // キャッシュを更新（1日間有効）
     holidaysCache = data;
     cacheExpiry = now + (24 * 60 * 60 * 1000);
     
-    console.log('✅ 祝日データを取得しました');
     return data;
   } catch (error) {
     console.error('祝日API取得エラー:', error);
@@ -72,7 +68,6 @@ export function isJapaneseHoliday(date) {
     
     const isHoliday = holidaysCache.hasOwnProperty(dateStr);
     if (isHoliday) {
-      console.log(`🎌 ${dateStr}は祝日: ${holidaysCache[dateStr]}`);
     }
     return isHoliday;
   } catch (error) {

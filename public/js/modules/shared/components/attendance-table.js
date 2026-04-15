@@ -17,7 +17,6 @@ export class AttendanceTable {
    * @returns {string} HTML文字列
    */
   generateTable(records, options = {}) {
-    console.log('generateTableデータ内容確認', records);
     const {
       showOnlyWorking = false,      // 出勤者のみ表示
       showDate = false,              // 日付列を表示
@@ -253,19 +252,10 @@ export class AttendanceTable {
    * 休憩時間のフォーマット（シンプル版）
    */
   formatBreakTime(record) {
-    console.log('[DEBUG formatBreakTime] レコード:', {
-      user_name: record.user_name,
-      user_role: record.user_role,
-      break_start: record.break_start,
-      break_end: record.break_end,
-      break_start_time: record.break_start_time,
-      break_end_time: record.break_end_time,
-    });
     
     // スタッフ
     if (record.user_role === 'staff') {
       if (record.break_start) {
-        console.log('[DEBUG] スタッフ/管理者の休憩:', record.break_start, record.break_end);
         return record.break_end ? 
           `${record.break_start}〜${record.break_end}` : 
           `${record.break_start}〜`;
@@ -274,12 +264,10 @@ export class AttendanceTable {
     // 利用者
     else
       if (record.break_start_time) {
-        console.log('[DEBUG] 利用者の休憩(break_start_time):', record.break_start_time, record.break_end_time);
         return record.break_end_time ? 
           `${record.break_start_time}〜${record.break_end_time}` : 
           `${record.break_start_time}〜`;
       }  
-    console.log('[DEBUG] 休憩なし');
     return '-';
   }
 

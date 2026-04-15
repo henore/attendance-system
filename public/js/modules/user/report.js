@@ -47,17 +47,13 @@ export class UserReportHandler {
     try {
       const today = this.getTodayDate();
       
-      console.log('[日報フォーム] 今日の日付:', today);
-      console.log('[日報フォーム] 引数attendance:', attendance);
       
       // 今日の記録を取得
       const response = await this.apiCall(`${API_ENDPOINTS.USER.REPORT_BY_DATE(today)}`);
-      console.log('[日報フォーム] APIレスポンス:', response);
       
       // 今日の出勤記録を確定
       this.currentAttendance = this.determineTodayAttendance(response, attendance, today);
       
-      console.log('[日報フォーム] 確定した出勤記録:', this.currentAttendance);
       
       // 出勤記録がない場合
       if (!this.currentAttendance) {
@@ -103,18 +99,15 @@ export class UserReportHandler {
   determineTodayAttendance(response, attendance, today) {
     // 1. APIレスポンスの出勤記録をチェック（日付確認必須）
     if (response.attendance && this.isValidTodayRecord(response.attendance, today)) {
-      console.log('[日報フォーム] APIから今日の出勤記録を使用');
       return response.attendance;
     }
     
     // 2. 引数の出勤記録をチェック（日付確認必須）
     if (attendance && this.isValidTodayRecord(attendance, today)) {
-      console.log('[日報フォーム] 引数から今日の出勤記録を使用');
       return attendance;
     }
     
     // 3. どちらも今日の記録でない場合はnull
-    console.log('[日報フォーム] 今日の出勤記録が見つかりません');
     return null;
   }
 
@@ -128,11 +121,9 @@ export class UserReportHandler {
     if (!record) return false;
     if (!record.date) return false;
     if (record.date !== today) {
-      console.log(`[日報フォーム] 日付不一致: ${record.date} !== ${today}`);
       return false;
     }
     if (!record.clock_in) {
-      console.log('[日報フォーム] 出勤時間がありません');
       return false;
     }
     return true;
@@ -146,8 +137,6 @@ export class UserReportHandler {
   generateReportForm(existingReport = null) {
     const report = existingReport || {};
     
-    console.log('[日報フォーム生成] existingReport:', existingReport);
-    console.log('[日報フォーム生成] external_work_location値:', report.external_work_location);
     
     return `
       <form id="reportForm">
@@ -329,8 +318,6 @@ export class UserReportHandler {
   async submitReport(event) {
     event.preventDefault();
     
-    console.log('[日報提出] 開始');
-    console.log('[日報提出] currentAttendance:', this.currentAttendance);
     
     // 出勤情報の再確認・復元
     if (!this.currentAttendance) {
@@ -338,7 +325,6 @@ export class UserReportHandler {
       if (form.dataset.attendance) {
         try {
           this.currentAttendance = JSON.parse(form.dataset.attendance);
-          console.log('[日報提出] フォームから出勤情報を復元:', this.currentAttendance);
         } catch (e) {
           console.error('[日報提出] 出勤情報の復元エラー:', e);
         }
@@ -356,8 +342,6 @@ export class UserReportHandler {
     }
 
     const formData = this.collectFormData();
-    console.log('[日報提出] フォームデータ:', formData);
-    console.log('[日報提出] externalWorkLocationの値:', formData.externalWorkLocation);
     
     try {
       const response = await this.apiCall(API_ENDPOINTS.USER.REPORT_SUBMIT, {
@@ -365,7 +349,6 @@ export class UserReportHandler {
         body: JSON.stringify(formData)
       });
 
-      console.log('[日報提出] 成功レスポンス:', response);
       
       this.hasTodayReport = true;
       this.showNotification(MESSAGES.REPORT.SUBMIT_SUCCESS, 'success');
@@ -499,8 +482,6 @@ export class UserReportHandler {
     const checkbox = document.getElementById('externalWorkLocation');
     const isChecked = checkbox ? checkbox.checked : false;
     
-    console.log('[日報フロント] チェックボックス要素:', checkbox);
-    console.log('[日報フロント] チェック状態:', isChecked);
     
     const formData = {
       workContent: document.getElementById('workContent').value,
@@ -519,7 +500,6 @@ export class UserReportHandler {
       contactTime2: document.getElementById('contactTime2').value || null
     };
     
-    console.log('[日報フロント] 送信データ:', formData);
     return formData;
   }
 

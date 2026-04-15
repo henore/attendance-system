@@ -54,7 +54,6 @@ export class StaffAttendanceBook {
     // カレンダー更新
     await this.updateCalendar();
     
-    console.log('📅 スタッフ出勤簿カレンダー表示完了');
   }
 
   /**
