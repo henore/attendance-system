@@ -633,19 +633,20 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             const startDate = `${year}-${month.padStart(2, '0')}-01`;
             const endDate = `${year}-${month.padStart(2, '0')}-31`;
             
-            // ユーザー情報取得
+            // ユーザー情報取得（passwordは返さない）
             const user = await dbGet(
-                'SELECT * FROM users WHERE id = ? AND is_active = 1', 
+                `SELECT id, username, name, role, service_type, service_no, workweek, transportation
+                 FROM users WHERE id = ? AND is_active = 1`,
                 [userId]
             );
-            
+
             if (!user) {
-                return res.status(404).json({ 
+                return res.status(404).json({
                     success: false,
-                    error: 'ユーザーが見つかりません' 
+                    error: 'ユーザーが見つかりません'
                 });
             }
-            
+
             // 出勤記録取得（休憩データ統合、スタッフ日報追加）
             const records = await dbAll(`
                 SELECT

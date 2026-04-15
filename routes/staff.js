@@ -291,7 +291,11 @@ router.get('/users/list', async (req, res) => {
     try {
       const { userId, date } = req.params;
       
-      const user = await dbGet('SELECT * FROM users WHERE id = ?', [userId]);
+      const user = await dbGet(
+        `SELECT id, username, name, role, service_type, service_no, workweek, transportation
+         FROM users WHERE id = ?`,
+        [userId]
+      );
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
         [userId, date]
