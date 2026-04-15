@@ -160,11 +160,11 @@ export default class StaffModule extends BaseModule {
           <!-- 動的に更新される -->
         </div>
 
-        <!-- 日報セクション -->
+        <!-- 日報セクション（常時表示） -->
         <div id="staffReportSection" class="mt-4">
           <div class="text-center text-muted p-4">
-            <i class="fas fa-info-circle fa-2x mb-3"></i>
-            <p>退勤後に日報を入力できます</p>
+            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+            <p>日報フォームを読み込み中...</p>
           </div>
         </div>
       </div>

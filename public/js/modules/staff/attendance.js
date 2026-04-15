@@ -487,22 +487,13 @@ export class StaffAttendanceUI {
   }
 
   /**
-   * 日報セクションの更新
+   * 日報セクションの更新（常に表示。退勤前は提出ボタンを無効化）
    */
   async updateReportSection() {
     const reportSection = document.getElementById('staffReportSection');
     if (!reportSection) return;
 
-    if (!this.isWorking && this.currentAttendance && this.currentAttendance.clock_out) {
-      await this.loadReportForm(reportSection);
-    } else {
-      reportSection.innerHTML = `
-        <div class="text-center text-muted p-4">
-          <i class="fas fa-info-circle fa-2x mb-3"></i>
-          <p>退勤後に日報を入力できます</p>
-        </div>
-      `;
-    }
+    await this.loadReportForm(reportSection);
   }
 
   /**
@@ -513,19 +504,20 @@ export class StaffAttendanceUI {
       const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY);
       const existingReport = response.report;
 
+      const attendance = this.currentAttendance || {};
+      const canSubmit = !this.isWorking && !!attendance.clock_out;
+
       // 休憩時間を計算（実際の開始・終了時刻から）
-      const breakMinutes = (this.currentAttendance.break_start && this.currentAttendance.break_end)
-        ? calculateBreakDuration(this.currentAttendance.break_start, this.currentAttendance.break_end)
+      const breakMinutes = (attendance.break_start && attendance.break_end)
+        ? calculateBreakDuration(attendance.break_start, attendance.break_end)
         : 0;
 
-      // 実働時間を計算
-      const workHours = calculateWorkHours(
-        this.currentAttendance.clock_in,
-        this.currentAttendance.clock_out,
-        breakMinutes
-      );
+      // 実働時間を計算（退勤後のみ。未退勤時は'-'表示）
+      const workHours = canSubmit
+        ? calculateWorkHours(attendance.clock_in, attendance.clock_out, breakMinutes)
+        : '-';
 
-      container.innerHTML = this.generateReportForm(workHours, existingReport, breakMinutes);
+      container.innerHTML = this.generateReportForm(workHours, existingReport, breakMinutes, canSubmit);
       this.setupReportEventListeners();
 
     } catch (error) {
@@ -541,16 +533,26 @@ export class StaffAttendanceUI {
   /**
    * 日報フォームHTML生成
    */
-  generateReportForm(workHours, existingReport, breakMinutes = 0) {
+  generateReportForm(workHours, existingReport, breakMinutes = 0, canSubmit = true) {
     const workReport = existingReport?.work_report || '';
     const communication = existingReport?.communication || '';
+    const attendance = this.currentAttendance || {};
+    const clockInDisplay = attendance.clock_in || '-';
+    const clockOutDisplay = attendance.clock_out || '-';
 
     let breakDisplay = 'なし';
-    if (this.currentAttendance.break_start && this.currentAttendance.break_end) {
-      breakDisplay = `${this.currentAttendance.break_start}〜${this.currentAttendance.break_end}（${breakMinutes}分）`;
-    } else if (this.currentAttendance.break_start) {
-      breakDisplay = `${this.currentAttendance.break_start}〜（進行中）`;
+    if (attendance.break_start && attendance.break_end) {
+      breakDisplay = `${attendance.break_start}〜${attendance.break_end}（${breakMinutes}分）`;
+    } else if (attendance.break_start) {
+      breakDisplay = `${attendance.break_start}〜（進行中）`;
     }
+
+    const isResubmit = !!existingReport;
+    const submitBtnLabel = isResubmit ? '日報を再提出' : '日報を提出';
+    const submitBtnDisabled = canSubmit ? '' : 'disabled';
+    const submitHelpText = canSubmit
+      ? ''
+      : '<p class="text-muted text-center small mb-2"><i class="fas fa-info-circle"></i> 退勤後に日報を提出できます</p>';
 
     return `
       <div class="card">
@@ -562,13 +564,13 @@ export class StaffAttendanceUI {
             <div class="col-md-3">
               <div class="info-box">
                 <label class="form-label">出勤時間</label>
-                <div class="info-value">${this.currentAttendance.clock_in}</div>
+                <div class="info-value">${clockInDisplay}</div>
               </div>
             </div>
             <div class="col-md-3">
               <div class="info-box">
                 <label class="form-label">退勤時間</label>
-                <div class="info-value">${this.currentAttendance.clock_out}</div>
+                <div class="info-value">${clockOutDisplay}</div>
               </div>
             </div>
             <div class="col-md-3">
@@ -613,9 +615,10 @@ export class StaffAttendanceUI {
               >${communication}</textarea>
             </div>
 
+            ${submitHelpText}
             <div class="d-grid">
-              <button type="submit" class="btn btn-primary btn-lg" id="staffSubmitReportBtn">
-                <i class="fas fa-paper-plane"></i> 日報を提出
+              <button type="submit" class="btn btn-primary btn-lg" id="staffSubmitReportBtn" ${submitBtnDisabled}>
+                <i class="fas fa-paper-plane"></i> ${submitBtnLabel}
               </button>
             </div>
           </form>
@@ -687,22 +690,8 @@ export class StaffAttendanceUI {
       if (response.success) {
         this.app.showNotification('日報を提出しました', 'success');
 
-        const form = document.getElementById('staffDailyReportForm');
-        if (form) {
-          const inputs = form.querySelectorAll('textarea, button');
-          inputs.forEach(input => input.disabled = true);
-        }
-
-        const reportSection = document.getElementById('staffReportSection');
-        if (reportSection) {
-          reportSection.innerHTML = `
-            <div class="alert alert-success text-center">
-              <i class="fas fa-check-circle fa-2x mb-3"></i>
-              <h5>日報を提出しました</h5>
-              <p class="mb-0">お疲れ様でした。</p>
-            </div>
-          `;
-        }
+        // フォームは非表示にせず、再提出可能な状態で維持する
+        await this.updateReportSection();
       } else {
         throw new Error(response.error || '日報の提出に失敗しました');
       }
