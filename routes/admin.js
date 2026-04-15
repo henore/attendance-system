@@ -536,7 +536,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                         try {
                             await dbRun(
-                                `INSERT INTO daily_reports (
+                                `INSERT OR IGNORE INTO daily_reports (
                                     user_id, date, work_content, work_location, pc_number,
                                     external_work_location, temperature, appetite, medication_time,
                                     bedtime, wakeup_time, sleep_quality, reflection, interview_request,
@@ -557,7 +557,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                             console.error('[日報自動生成] 挿入失敗のためフォールバック値で再試行:', insertErr.message);
                             const fb = getFallbackReportData(isHome, clockInValue, clockOutValue);
                             await dbRun(
-                                `INSERT INTO daily_reports (
+                                `INSERT OR IGNORE INTO daily_reports (
                                     user_id, date, work_content, work_location, pc_number,
                                     external_work_location, temperature, appetite, medication_time,
                                     bedtime, wakeup_time, sleep_quality, reflection, interview_request,
@@ -1091,7 +1091,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                         try {
                             await dbRun(
-                                `INSERT INTO daily_reports (
+                                `INSERT OR IGNORE INTO daily_reports (
                                     user_id, date, work_content, work_location, pc_number,
                                     external_work_location, temperature, appetite, medication_time,
                                     bedtime, wakeup_time, sleep_quality, reflection, interview_request,
@@ -1110,7 +1110,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                             console.error('[日報自動生成] 挿入失敗のためフォールバック値で再試行:', insertErr.message);
                             const fb = getFallbackReportData(isHome, clockInValue, clockOutValue);
                             await dbRun(
-                                `INSERT INTO daily_reports (
+                                `INSERT OR IGNORE INTO daily_reports (
                                     user_id, date, work_content, work_location, pc_number,
                                     external_work_location, temperature, appetite, medication_time,
                                     bedtime, wakeup_time, sleep_quality, reflection, interview_request,
