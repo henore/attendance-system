@@ -505,15 +505,16 @@ export class StaffAttendanceUI {
       const existingReport = response.report;
 
       const attendance = this.currentAttendance || {};
-      const canSubmit = !this.isWorking && !!attendance.clock_out;
+      // 出勤後は提出可能（退勤を待たない）
+      const canSubmit = !!attendance.clock_in;
 
       // 休憩時間を計算（実際の開始・終了時刻から）
       const breakMinutes = (attendance.break_start && attendance.break_end)
         ? calculateBreakDuration(attendance.break_start, attendance.break_end)
         : 0;
 
-      // 実働時間を計算（退勤後のみ。未退勤時は'-'表示）
-      const workHours = canSubmit
+      // 実働時間は退勤後のみ計算、それ以外は'-'表示
+      const workHours = attendance.clock_in && attendance.clock_out
         ? calculateWorkHours(attendance.clock_in, attendance.clock_out, breakMinutes)
         : '-';
 
@@ -550,9 +551,6 @@ export class StaffAttendanceUI {
     const isResubmit = !!existingReport;
     const submitBtnLabel = isResubmit ? '日報を再提出' : '日報を提出';
     const submitBtnDisabled = canSubmit ? '' : 'disabled';
-    const submitHelpText = canSubmit
-      ? ''
-      : '<p class="text-muted text-center small mb-2"><i class="fas fa-info-circle"></i> 退勤後に日報を提出できます</p>';
 
     return `
       <div class="card">
@@ -615,7 +613,6 @@ export class StaffAttendanceUI {
               >${communication}</textarea>
             </div>
 
-            ${submitHelpText}
             <div class="d-grid">
               <button type="submit" class="btn btn-primary btn-lg" id="staffSubmitReportBtn" ${submitBtnDisabled}>
                 <i class="fas fa-paper-plane"></i> ${submitBtnLabel}

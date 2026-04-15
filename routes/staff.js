@@ -1115,10 +1115,10 @@ router.post('/break/end', async (req, res) => {
         [staffId, date]
       );
 
-      if (!attendance || !attendance.clock_out) {
+      if (!attendance || !attendance.clock_in) {
         return res.status(400).json({
           success: false,
-          error: '退勤記録がありません。先に退勤処理を完了してください'
+          error: '出勤記録がありません。先に出勤処理を完了してください'
         });
       }
 
