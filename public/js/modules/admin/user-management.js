@@ -433,7 +433,10 @@ export default class AdminUserManagement {
             // 権限変更時のイベント
             const roleSelect = document.getElementById('editRole');
             if (roleSelect) {
+                // cloneNode は <select> の runtime 選択値を保持しないため、複製後に再セット
+                const currentRoleValue = roleSelect.value;
                 roleSelect.replaceWith(roleSelect.cloneNode(true));
+                document.getElementById('editRole').value = currentRoleValue;
                 document.getElementById('editRole').addEventListener('change', (e) => {
                     const editServiceTypeGroup = document.getElementById('editServiceTypeGroup');
                     const editServiceType = document.getElementById('editServiceType');
@@ -481,7 +484,10 @@ export default class AdminUserManagement {
             // サービス区分変更時の送迎フィールド表示切り替え
             const editServiceTypeEl = document.getElementById('editServiceType');
             if (editServiceTypeEl) {
+                // cloneNode は <select> の runtime 選択値を保持しないため、複製後に現在のサービス区分を再セット
+                const currentServiceTypeValue = editServiceTypeEl.value;
                 editServiceTypeEl.replaceWith(editServiceTypeEl.cloneNode(true));
+                document.getElementById('editServiceType').value = currentServiceTypeValue;
                 document.getElementById('editServiceType').addEventListener('change', (e) => {
                     const editTransportationGroup = document.getElementById('editTransportationGroup');
                     if (e.target.value === 'commute') {
