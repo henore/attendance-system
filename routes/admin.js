@@ -6,9 +6,46 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 const { getCurrentDate } = require('../utils/date-time');
 
-// 日報自動生成用のランダムデータ生成
-function generateRandomReportData(isHome, clockInValue, clockOutValue) {
+// スキル別の作業内容候補
+const SKILL_TASK_MAP = {
+    program: ['Progate', 'Udemy', 'Next.js', 'React', 'Javascript', 'HTMLとCSS'],
+    excel:   ['エクセル動画学習', 'MOS学習', 'エクセル', '関数の使い方', 'エクセル学習の続き'],
+    typing:  ['ピースエントリー', 'タイピング練習', 'タイピング速度アップ'],
+    design:  ['canva', 'canva練習', '画像作成', '画像編集', 'HP画像作成', 'チラシ用画像作成']
+};
+
+// ユーザーのスキル設定から作業内容をランダム生成する
+// - スキルが複数登録されている場合は1〜2個ランダムに選び、各スキルから1タスクをピック
+// - スキル未設定または該当なしの場合は 'PC作業' をデフォルト
+function generateWorkContent(userSkills) {
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    if (!userSkills || typeof userSkills !== 'string') return 'PC作業';
+
+    const skillList = userSkills.split(',').map(s => s.trim()).filter(s => SKILL_TASK_MAP[s]);
+    if (skillList.length === 0) return 'PC作業';
+
+    let pickedSkills;
+    if (skillList.length === 1) {
+        pickedSkills = skillList;
+    } else {
+        // 複数ある場合は1個または2個をランダムに選ぶ（50/50）
+        const numToPick = Math.random() < 0.5 ? 1 : 2;
+        const shuffled = [...skillList].sort(() => Math.random() - 0.5);
+        pickedSkills = shuffled.slice(0, Math.min(numToPick, skillList.length));
+    }
+
+    // 各スキルから1タスクずつランダムピック
+    const tasks = pickedSkills.map(skill => pick(SKILL_TASK_MAP[skill]));
+    return tasks.join('、');
+}
+
+// 日報自動生成用のランダムデータ生成
+function generateRandomReportData(isHome, clockInValue, clockOutValue, userSkills) {
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    // 作業内容: ユーザーのスキル登録に応じてランダム選択
+    const workContent = generateWorkContent(userSkills);
 
     // 体温: 35.3〜36.4（0.1刻み）
     const temperature = +(35.3 + Math.floor(Math.random() * 12) * 0.1).toFixed(1);
@@ -68,7 +105,7 @@ function generateRandomReportData(isHome, clockInValue, clockOutValue) {
     const reflection = pick(reflections);
 
     return {
-        workContent: 'PC作業',
+        workContent,
         workLocation: isHome ? 'home' : 'office',
         pcNumber,
         externalWorkLocation: isHome ? '施設外就労先名（佐藤美幸）' : null,
@@ -441,7 +478,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             else if (userId && date) {
                 // ユーザー情報取得
                 const user = await dbGet(
-                    'SELECT id, role, service_type FROM users WHERE id = ?',
+                    'SELECT id, role, service_type, skills FROM users WHERE id = ?',
                     [userId]
                 );
 
@@ -495,7 +532,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                     if (!existingReport) {
                         const isHome = user.service_type === 'home';
-                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
+                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue, user.skills);
 
                         await dbRun(
                             `INSERT OR IGNORE INTO daily_reports (
@@ -985,7 +1022,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 const targetDate = newValues.date;
 
                 const user = await dbGet(
-                    'SELECT id, role, service_type FROM users WHERE id = ?',
+                    'SELECT id, role, service_type, skills FROM users WHERE id = ?',
                     [targetUserId]
                 );
 
@@ -1031,7 +1068,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                     if (!existingReport) {
                         const isHome = user.service_type === 'home';
-                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
+                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue, user.skills);
 
                         await dbRun(
                             `INSERT OR IGNORE INTO daily_reports (
