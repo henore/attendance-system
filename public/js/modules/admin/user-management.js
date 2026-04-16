@@ -84,6 +84,27 @@ export default class AdminUserManagement {
                                         </div>
                                     </div>
                                 </div>
+                                <div class="mb-3" id="skillsGroup" style="display: none;">
+                                    <label class="form-label">スキル（複数選択可）</label>
+                                    <div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="newSkillProgram" value="program">
+                                            <label class="form-check-label" for="newSkillProgram">プログラム</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="newSkillExcel" value="excel">
+                                            <label class="form-check-label" for="newSkillExcel">エクセル</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="newSkillTyping" value="typing">
+                                            <label class="form-check-label" for="newSkillTyping">タイピング</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="newSkillDesign" value="design">
+                                            <label class="form-check-label" for="newSkillDesign">デザイン</label>
+                                        </div>
+                                    </div>
+                                </div>
                                 <button type="submit" class="btn btn-primary w-100" id="registerUserBtn">
                                     <i class="fas fa-user-plus"></i> ユーザー登録
                                 </button>
@@ -181,12 +202,16 @@ export default class AdminUserManagement {
                                 </div>
                                 
                                 <div class="mb-3" id="editServiceTypeGroup" style="display: none;">
-                                    <label for="editServiceType" class="form-label">サービス区分</label>
+                                    <label for="editServiceType" class="form-label">
+                                        サービス区分
+                                        <span class="badge bg-info ms-2" id="editServiceTypeCurrent" style="display: none;"></span>
+                                    </label>
                                     <select class="form-control" id="editServiceType">
                                         <option value="">選択してください</option>
                                         <option value="commute">通所</option>
                                         <option value="home">在宅</option>
                                     </select>
+                                    <div class="form-text">現在のワークロケーションを表示しています。変更も可能です。</div>
                                 </div>
                                 <div class="mb-3" id="editServiceNoGroup" style="display: none;">
                                         <label for="editServiceNo" class="form-label">受給者番号</label>
@@ -212,6 +237,27 @@ export default class AdminUserManagement {
                                         <div class="form-check form-check-inline">
                                             <input class="form-check-input" type="radio" name="editTransportation" id="editTransportationNo" value="0" checked>
                                             <label class="form-check-label" for="editTransportationNo">なし</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3" id="editSkillsGroup" style="display: none;">
+                                    <label class="form-label">スキル（複数選択可）</label>
+                                    <div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="editSkillProgram" value="program">
+                                            <label class="form-check-label" for="editSkillProgram">プログラム</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="editSkillExcel" value="excel">
+                                            <label class="form-check-label" for="editSkillExcel">エクセル</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="editSkillTyping" value="typing">
+                                            <label class="form-check-label" for="editSkillTyping">タイピング</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="editSkillDesign" value="design">
+                                            <label class="form-check-label" for="editSkillDesign">デザイン</label>
                                         </div>
                                     </div>
                                 </div>
@@ -318,13 +364,26 @@ export default class AdminUserManagement {
             // サービス区分の表示制御
             const serviceTypeGroup = document.getElementById('editServiceTypeGroup');
             const serviceTypeSelect = document.getElementById('editServiceType');
-             
+            const serviceTypeCurrent = document.getElementById('editServiceTypeCurrent');
+
             const editTransportationGroup = document.getElementById('editTransportationGroup');
+            const editSkillsGroup = document.getElementById('editSkillsGroup');
 
             if (user.role === 'user') {
                 serviceTypeGroup.style.display = 'block';
                 serviceTypeSelect.value = user.service_type || '';
                 serviceTypeSelect.required = true;
+
+                // 現在のワークロケーションをバッジで表示
+                if (user.service_type === 'commute') {
+                    serviceTypeCurrent.textContent = '現在: 通所';
+                    serviceTypeCurrent.style.display = 'inline-block';
+                } else if (user.service_type === 'home') {
+                    serviceTypeCurrent.textContent = '現在: 在宅';
+                    serviceTypeCurrent.style.display = 'inline-block';
+                } else {
+                    serviceTypeCurrent.style.display = 'none';
+                }
 
                 document.getElementById('editServiceNo').value = user.service_no;
                 editServiceNoGroup.style.display = 'block';
@@ -336,6 +395,13 @@ export default class AdminUserManagement {
                 const workWeekArray = (user?.workweek ?? "").split(',');
                 document.querySelectorAll('input[type="checkbox"][id^="editWorkWeek"]').forEach(cb => {
                     cb.checked = workWeekArray.includes(cb.value);
+                });
+
+                // スキル（複数選択可）
+                editSkillsGroup.style.display = 'block';
+                const skillsArray = (user?.skills ?? "").split(',');
+                document.querySelectorAll('input[type="checkbox"][id^="editSkill"]').forEach(cb => {
+                    cb.checked = skillsArray.includes(cb.value);
                 });
 
                 // 送迎フィールド（通所の場合のみ表示）
@@ -355,6 +421,7 @@ export default class AdminUserManagement {
                 serviceTypeGroup.style.display = 'none';
                 serviceTypeSelect.value = '';
                 serviceTypeSelect.required = false;
+                serviceTypeCurrent.style.display = 'none';
 
                 editServiceNoGroup.style.display = 'none';
                 editServiceNoGroup.required = false;
@@ -363,6 +430,11 @@ export default class AdminUserManagement {
                 editWorkWeekGroup.required = false;
 
                 editTransportationGroup.style.display = 'none';
+
+                editSkillsGroup.style.display = 'none';
+                document.querySelectorAll('input[type="checkbox"][id^="editSkill"]').forEach(cb => {
+                    cb.checked = false;
+                });
             }
 
             // パスワード生成ボタン
@@ -383,6 +455,7 @@ export default class AdminUserManagement {
                     const editServiceTypeGroup = document.getElementById('editServiceTypeGroup');
                     const editServiceType = document.getElementById('editServiceType');
                     const editTransportationGroup = document.getElementById('editTransportationGroup');
+                    const editSkillsGroup = document.getElementById('editSkillsGroup');
 
                     if (e.target.value === 'user') {
                         editServiceTypeGroup.style.display = 'block';
@@ -394,6 +467,8 @@ export default class AdminUserManagement {
 
                         editWorkWeekGroup.style.display = 'block';
                         editWorkWeekGroup.required = true;
+
+                        editSkillsGroup.style.display = 'block';
 
                         // 送迎フィールドはサービス区分に応じて表示
                         if (editServiceType.value === 'commute') {
@@ -414,6 +489,8 @@ export default class AdminUserManagement {
                         editWorkWeekGroup.required = false;
 
                         editTransportationGroup.style.display = 'none';
+
+                        editSkillsGroup.style.display = 'none';
                     }
                 });
             }
@@ -477,6 +554,9 @@ export default class AdminUserManagement {
         const workweek = Array.from(
         document.querySelectorAll('input[type="checkbox"][id^="editWorkWeek"]:checked')
         ).map(cb => cb.value);
+        const skills = Array.from(
+        document.querySelectorAll('input[type="checkbox"][id^="editSkill"]:checked')
+        ).map(cb => cb.value);
 
 
         // バリデーション
@@ -515,7 +595,8 @@ export default class AdminUserManagement {
                 serviceType: role === 'user' ? serviceType : null,
                 service_no,
                 workweek: workweek.join(','),
-                transportation: (role === 'user' && serviceType === 'commute' && transportationValue === '1') ? 1 : null
+                transportation: (role === 'user' && serviceType === 'commute' && transportationValue === '1') ? 1 : null,
+                skills: role === 'user' ? skills : []
             };
 
             if (password) {
@@ -565,6 +646,7 @@ export default class AdminUserManagement {
         const serviceTypeSelect = this.container.querySelector('#newServiceType');
         const ServiesNoGroup = this.container.querySelector('#ServiceNoGroup');
         const transportationGroup = this.container.querySelector('#transportationGroup');
+        const skillsGroup = this.container.querySelector('#skillsGroup');
 
         if (roleSelect.value === 'user') {
             serviceTypeGroup.style.display = 'block';
@@ -572,6 +654,8 @@ export default class AdminUserManagement {
 
             ServiesNoGroup.style.display = 'block';
             ServiesNoGroup.required = true;
+
+            skillsGroup.style.display = 'block';
 
             // 通所の場合のみ送迎フィールドを表示
             if (serviceTypeSelect.value === 'commute') {
@@ -589,6 +673,11 @@ export default class AdminUserManagement {
             ServiesNoGroup.required = false;
 
             transportationGroup.style.display = 'none';
+
+            skillsGroup.style.display = 'none';
+            this.container.querySelectorAll('input[type="checkbox"][id^="newSkill"]').forEach(cb => {
+                cb.checked = false;
+            });
         }
     }
 
@@ -596,14 +685,19 @@ export default class AdminUserManagement {
         e.preventDefault();
 
         const transportationRadio = this.container.querySelector('input[name="newTransportation"]:checked');
+        const role = this.container.querySelector('#newRole').value;
+        const skills = Array.from(
+            this.container.querySelectorAll('input[type="checkbox"][id^="newSkill"]:checked')
+        ).map(cb => cb.value);
         const formData = {
             username: this.container.querySelector('#newUsername').value.trim(),
             password: this.container.querySelector('#newPassword').value,
             name: this.container.querySelector('#newName').value.trim(),
-            role: this.container.querySelector('#newRole').value,
+            role,
             serviceType: this.container.querySelector('#newServiceType').value,
             ServiceNo: this.container.querySelector('#newServiceNo').value,
-            transportation: transportationRadio?.value === '1' ? 1 : null
+            transportation: transportationRadio?.value === '1' ? 1 : null,
+            skills: role === 'user' ? skills : []
         };
 
         // バリデーション
