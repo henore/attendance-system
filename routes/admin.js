@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 const { getCurrentDate } = require('../utils/date-time');
 
-// 日報自動���成用のランダムデータ生成
+// 日報自動生成用のランダムデータ生成
 function generateRandomReportData(isHome, clockInValue, clockOutValue) {
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -19,14 +19,15 @@ function generateRandomReportData(isHome, clockInValue, clockOutValue) {
     // PC番号
     const pcNumber = isHome ? pick(['8', '9']) : pick(['8', '9']);
 
-    // 就寝時間: 21:00〜24:00（15分刻み）
-    const bedMinutes = 21 * 60 + Math.floor(Math.random() * 13) * 15; // 21:00〜24:00
+    // 就寝時間: 21:00〜23:45（15分刻み・HH:MM有効範囲内）
+    // 24:00 以降は time入力のフォーマット仕様外となり日報フォームに反映されないため生成しない
+    const bedMinutes = 21 * 60 + Math.floor(Math.random() * 12) * 15; // 21:00〜23:45
     const bedH = Math.floor(bedMinutes / 60);
     const bedM = bedMinutes % 60;
     const bedtime = `${String(bedH).padStart(2, '0')}:${String(bedM).padStart(2, '0')}`;
 
-    // 起床時間: 06:00〜08:00（15分刻み）
-    const wakeMinutes = 6 * 60 + Math.floor(Math.random() * 9) * 15; // 06:00〜08:00
+    // 起床時間: 05:30〜08:15（15分刻み）
+    const wakeMinutes = 5 * 60 + 30 + Math.floor(Math.random() * 12) * 15; // 05:30〜08:15
     const wakeH = Math.floor(wakeMinutes / 60);
     const wakeM = wakeMinutes % 60;
     const wakeupTime = `${String(wakeH).padStart(2, '0')}:${String(wakeM).padStart(2, '0')}`;
@@ -62,20 +63,6 @@ function generateRandomReportData(isHome, clockInValue, clockOutValue) {
     ];
     const reflection = pick(reflections);
 
-    // 睡眠時間バリデーション（HH:MM形式チェック）
-    // 異常時はエラーにせず、安全なデフォルト値に置き換える（日報は必ず挿入する方針）
-    const timePattern = /^\d{2}:\d{2}$/;
-    let safeBedtime = bedtime;
-    let safeWakeupTime = wakeupTime;
-    if (!safeBedtime || !timePattern.test(safeBedtime)) {
-        console.warn(`[日報自動生成] bedtime不正のためフォールバック: ${safeBedtime}`);
-        safeBedtime = '23:00';
-    }
-    if (!safeWakeupTime || !timePattern.test(safeWakeupTime)) {
-        console.warn(`[日報自動生成] wakeupTime不正のためフォールバック: ${safeWakeupTime}`);
-        safeWakeupTime = '07:00';
-    }
-
     return {
         workContent: 'PC作業',
         workLocation: isHome ? 'home' : 'office',
@@ -83,42 +70,13 @@ function generateRandomReportData(isHome, clockInValue, clockOutValue) {
         externalWorkLocation: isHome ? '施設外就労先名（佐藤美幸）' : null,
         temperature,
         appetite,
-        bedtime: safeBedtime,
-        wakeupTime: safeWakeupTime,
+        bedtime,
+        wakeupTime,
         sleepQuality,
         reflection,
         contactTime1: isHome ? clockInValue : null,
         contactTime2: isHome ? clockOutValue : null
     };
-}
-
-// 日報自動生成が失敗した場合に使用するハード・フォールバック値
-// 「日報は必ず挿入する」ポリシーを保証するための最終手段
-function getFallbackReportData(isHome, clockInValue, clockOutValue) {
-    return {
-        workContent: 'PC作業',
-        workLocation: isHome ? 'home' : 'office',
-        pcNumber: '8',
-        externalWorkLocation: isHome ? '施設外就労先名（佐藤美幸）' : null,
-        temperature: 36.0,
-        appetite: 'good',
-        bedtime: '23:00',
-        wakeupTime: '07:00',
-        sleepQuality: 'good',
-        reflection: 'お疲れさまでした',
-        contactTime1: isHome ? clockInValue : null,
-        contactTime2: isHome ? clockOutValue : null
-    };
-}
-
-// 日報データを安全に生成する（例外時は必ずフォールバック値を返す）
-function safeGenerateReportData(isHome, clockInValue, clockOutValue) {
-    try {
-        return generateRandomReportData(isHome, clockInValue, clockOutValue);
-    } catch (e) {
-        console.error('[日報自動生成] 例外発生のためフォールバック値を使用:', e.message);
-        return getFallbackReportData(isHome, clockInValue, clockOutValue);
-    }
 }
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
@@ -532,46 +490,25 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                     if (!existingReport) {
                         const isHome = user.service_type === 'home';
-                        const rd = safeGenerateReportData(isHome, clockInValue, clockOutValue);
+                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
 
-                        try {
-                            await dbRun(
-                                `INSERT OR IGNORE INTO daily_reports (
-                                    user_id, date, work_content, work_location, pc_number,
-                                    external_work_location, temperature, appetite, medication_time,
-                                    bedtime, wakeup_time, sleep_quality, reflection, interview_request,
-                                    contact_time_1, contact_time_2
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                                [
-                                    userId, date,
-                                    rd.workContent, rd.workLocation, rd.pcNumber,
-                                    rd.externalWorkLocation, rd.temperature, rd.appetite,
-                                    null, rd.bedtime, rd.wakeupTime, rd.sleepQuality,
-                                    rd.reflection, null, rd.contactTime1, rd.contactTime2
-                                ]
-                            );
+                        await dbRun(
+                            `INSERT OR IGNORE INTO daily_reports (
+                                user_id, date, work_content, work_location, pc_number,
+                                external_work_location, temperature, appetite, medication_time,
+                                bedtime, wakeup_time, sleep_quality, reflection, interview_request,
+                                contact_time_1, contact_time_2
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [
+                                userId, date,
+                                rd.workContent, rd.workLocation, rd.pcNumber,
+                                rd.externalWorkLocation, rd.temperature, rd.appetite,
+                                null, rd.bedtime, rd.wakeupTime, rd.sleepQuality,
+                                rd.reflection, null, rd.contactTime1, rd.contactTime2
+                            ]
+                        );
 
-                            console.log(`[日報自動生成] ユーザーID: ${userId}, 日付: ${date}, 区分: ${isHome ? '在宅' : '通所'}, 就寝: ${rd.bedtime}, 起床: ${rd.wakeupTime}`);
-                        } catch (insertErr) {
-                            // 日報挿入失敗時はフォールバック値で再挿入を試みる（エラーはユーザーに表示せず内部処理）
-                            console.error('[日報自動生成] 挿入失敗のためフォールバック値で再試行:', insertErr.message);
-                            const fb = getFallbackReportData(isHome, clockInValue, clockOutValue);
-                            await dbRun(
-                                `INSERT OR IGNORE INTO daily_reports (
-                                    user_id, date, work_content, work_location, pc_number,
-                                    external_work_location, temperature, appetite, medication_time,
-                                    bedtime, wakeup_time, sleep_quality, reflection, interview_request,
-                                    contact_time_1, contact_time_2
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                                [
-                                    userId, date,
-                                    fb.workContent, fb.workLocation, fb.pcNumber,
-                                    fb.externalWorkLocation, fb.temperature, fb.appetite,
-                                    null, fb.bedtime, fb.wakeupTime, fb.sleepQuality,
-                                    fb.reflection, null, fb.contactTime1, fb.contactTime2
-                                ]
-                            );
-                        }
+                        console.log(`[日報自動生成] ユーザーID: ${userId}, 日付: ${date}, 区分: ${isHome ? '在宅' : '通所'}, 就寝: ${rd.bedtime}, 起床: ${rd.wakeupTime}`);
                     }
                 }
 
@@ -1088,44 +1025,23 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                     if (!existingReport) {
                         const isHome = user.service_type === 'home';
-                        const rd = safeGenerateReportData(isHome, clockInValue, clockOutValue);
+                        const rd = generateRandomReportData(isHome, clockInValue, clockOutValue);
 
-                        try {
-                            await dbRun(
-                                `INSERT OR IGNORE INTO daily_reports (
-                                    user_id, date, work_content, work_location, pc_number,
-                                    external_work_location, temperature, appetite, medication_time,
-                                    bedtime, wakeup_time, sleep_quality, reflection, interview_request,
-                                    contact_time_1, contact_time_2
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                                [
-                                    targetUserId, targetDate,
-                                    rd.workContent, rd.workLocation, rd.pcNumber,
-                                    rd.externalWorkLocation, rd.temperature, rd.appetite,
-                                    null, rd.bedtime, rd.wakeupTime, rd.sleepQuality,
-                                    rd.reflection, null, rd.contactTime1, rd.contactTime2
-                                ]
-                            );
-                        } catch (insertErr) {
-                            // 日報挿入失敗時はフォールバック値で再挿入（エラーは内部処理）
-                            console.error('[日報自動生成] 挿入失敗のためフォールバック値で再試行:', insertErr.message);
-                            const fb = getFallbackReportData(isHome, clockInValue, clockOutValue);
-                            await dbRun(
-                                `INSERT OR IGNORE INTO daily_reports (
-                                    user_id, date, work_content, work_location, pc_number,
-                                    external_work_location, temperature, appetite, medication_time,
-                                    bedtime, wakeup_time, sleep_quality, reflection, interview_request,
-                                    contact_time_1, contact_time_2
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                                [
-                                    targetUserId, targetDate,
-                                    fb.workContent, fb.workLocation, fb.pcNumber,
-                                    fb.externalWorkLocation, fb.temperature, fb.appetite,
-                                    null, fb.bedtime, fb.wakeupTime, fb.sleepQuality,
-                                    fb.reflection, null, fb.contactTime1, fb.contactTime2
-                                ]
-                            );
-                        }
+                        await dbRun(
+                            `INSERT OR IGNORE INTO daily_reports (
+                                user_id, date, work_content, work_location, pc_number,
+                                external_work_location, temperature, appetite, medication_time,
+                                bedtime, wakeup_time, sleep_quality, reflection, interview_request,
+                                contact_time_1, contact_time_2
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [
+                                targetUserId, targetDate,
+                                rd.workContent, rd.workLocation, rd.pcNumber,
+                                rd.externalWorkLocation, rd.temperature, rd.appetite,
+                                null, rd.bedtime, rd.wakeupTime, rd.sleepQuality,
+                                rd.reflection, null, rd.contactTime1, rd.contactTime2
+                            ]
+                        );
                     }
                 }
 
