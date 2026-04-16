@@ -1,0 +1,2 @@
+# Windows で編集した際に CRLF が混入してシェル実行が失敗するのを防止
+*.sh text eol=lf
