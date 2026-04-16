@@ -202,16 +202,12 @@ export default class AdminUserManagement {
                                 </div>
                                 
                                 <div class="mb-3" id="editServiceTypeGroup" style="display: none;">
-                                    <label for="editServiceType" class="form-label">
-                                        サービス区分
-                                        <span class="badge bg-info ms-2" id="editServiceTypeCurrent" style="display: none;"></span>
-                                    </label>
+                                    <label for="editServiceType" class="form-label">サービス区分</label>
                                     <select class="form-control" id="editServiceType">
                                         <option value="">選択してください</option>
                                         <option value="commute">通所</option>
                                         <option value="home">在宅</option>
                                     </select>
-                                    <div class="form-text">現在のワークロケーションを表示しています。変更も可能です。</div>
                                 </div>
                                 <div class="mb-3" id="editServiceNoGroup" style="display: none;">
                                         <label for="editServiceNo" class="form-label">受給者番号</label>
@@ -361,10 +357,9 @@ export default class AdminUserManagement {
             document.getElementById('editPassword').value = '';
             
 
-            // サービス区分の表示制御
+            // サービス区分の表示制御（現在値をデフォルト選択にして、変更も可能）
             const serviceTypeGroup = document.getElementById('editServiceTypeGroup');
             const serviceTypeSelect = document.getElementById('editServiceType');
-            const serviceTypeCurrent = document.getElementById('editServiceTypeCurrent');
 
             const editTransportationGroup = document.getElementById('editTransportationGroup');
             const editSkillsGroup = document.getElementById('editSkillsGroup');
@@ -373,17 +368,6 @@ export default class AdminUserManagement {
                 serviceTypeGroup.style.display = 'block';
                 serviceTypeSelect.value = user.service_type || '';
                 serviceTypeSelect.required = true;
-
-                // 現在のワークロケーションをバッジで表示
-                if (user.service_type === 'commute') {
-                    serviceTypeCurrent.textContent = '現在: 通所';
-                    serviceTypeCurrent.style.display = 'inline-block';
-                } else if (user.service_type === 'home') {
-                    serviceTypeCurrent.textContent = '現在: 在宅';
-                    serviceTypeCurrent.style.display = 'inline-block';
-                } else {
-                    serviceTypeCurrent.style.display = 'none';
-                }
 
                 document.getElementById('editServiceNo').value = user.service_no;
                 editServiceNoGroup.style.display = 'block';
@@ -421,7 +405,6 @@ export default class AdminUserManagement {
                 serviceTypeGroup.style.display = 'none';
                 serviceTypeSelect.value = '';
                 serviceTypeSelect.required = false;
-                serviceTypeCurrent.style.display = 'none';
 
                 editServiceNoGroup.style.display = 'none';
                 editServiceNoGroup.required = false;
