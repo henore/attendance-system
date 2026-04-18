@@ -491,7 +491,10 @@ export class StaffAttendanceBook {
       const hours = durationMs / (1000 * 60 * 60);
       
       if (hours > 0) {
-        return `${hours.toFixed(1)}時間`;
+        const totalMinutes = Math.round(hours * 60);
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       }
     } catch (error) {
       console.error('勤務時間計算エラー:', error);
@@ -529,7 +532,13 @@ export class StaffAttendanceBook {
     return {
       workDays,
       totalHours,
-      averageHours: workDays > 0 ? (totalHours / workDays).toFixed(1) : 0
+      averageHours: workDays > 0 ? (() => {
+        const avg = totalHours / workDays;
+        const totalMin = Math.round(avg * 60);
+        const h = Math.floor(totalMin / 60);
+        const m = totalMin % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      })() : '00:00'
     };
   }
 

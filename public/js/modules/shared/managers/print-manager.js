@@ -68,7 +68,14 @@ export class PrintManager {
                     const breakMinutes = record.break_start && record.break_end ? 
                         calculateBreakDuration(record.break_start, record.break_end) : 0;
                     const hours = calculateWorkHours(record.clock_in, record.clock_out, breakMinutes);
-                    workHours = hours ? `${hours.toFixed(1)}h` : '';
+                    if (hours) {
+                        const totalMin = Math.round(hours * 60);
+                        const hh = Math.floor(totalMin / 60);
+                        const mm = totalMin % 60;
+                        workHours = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+                    } else {
+                        workHours = '';
+                    }
                 } catch (error) {
                     console.error('勤務時間計算エラー:', error);
                     workHours = '-';

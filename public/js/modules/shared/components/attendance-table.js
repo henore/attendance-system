@@ -150,7 +150,7 @@ export class AttendanceTable {
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
         <td class="text-center">${nakanukeDisplay}</td>
-        <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
+        <td class="text-center">${netHours || '-'}</td>
         <td class="text-center">${statusBadge}${nakanukeStatusBadge}${pendingBadge}</td>
         <td class="text-center">${reportStatus}</td>
         ${showOperations ? `<td class="text-center">${operations}</td>` : ''}
@@ -256,7 +256,7 @@ export class AttendanceTable {
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
         ${nakanukeCell}
-        <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
+        <td class="text-center">${netHours || '-'}</td>
         ${transportationCells}
         <td class="text-center status-col">${statusBadge}${nakanukeStatusBadge}${record.has_pending_correction ? '<br><span class="badge bg-warning text-dark mt-1" style="font-size:0.65em;"><i class="fas fa-clock"></i> 承認待ち</span>' : ''}</td>
         ${showOperations ? `<td class="text-center operation-col">${operations}</td>` : ''}
@@ -359,8 +359,11 @@ export class AttendanceTable {
         nakanukeMinutes = parseInt(record.nakanuke_minutes) || 0;
       }
 
-      const netHours = workHours - (breakMinutes / 60) - (nakanukeMinutes / 60);
-      return netHours.toFixed(2);
+      const netMinutes = Math.round((workHours - (breakMinutes / 60) - (nakanukeMinutes / 60)) * 60);
+      if (netMinutes <= 0) return null;
+      const h = Math.floor(netMinutes / 60);
+      const m = netMinutes % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
     } catch (error) {
       console.error('勤務時間計算エラー:', error);

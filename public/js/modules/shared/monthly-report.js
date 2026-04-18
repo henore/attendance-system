@@ -652,16 +652,14 @@ export default class SharedMonthlyReport {
     generateMonthlyFooter(records, user) {
         // 集計
         const workingDays = records.filter(r => r.clock_in).length;
-        let totalWorkHours = 0;
-
-        const roundToQuarter = (num) => Math.round(num * 4) / 4;
+        let totalMinutes = 0;
 
         records.forEach(record => {
             if (record.clock_in && record.clock_out) {
-                const hours = this.attendanceTable.calculateWorkDurationDay(record);
-                if (hours) {
-                    const roundedHours = roundToQuarter(parseFloat(hours));
-                    totalWorkHours += roundedHours;
+                const hhmmStr = this.attendanceTable.calculateWorkDurationDay(record);
+                if (hhmmStr && hhmmStr.includes(':')) {
+                    const [h, m] = hhmmStr.split(':').map(Number);
+                    totalMinutes += h * 60 + m;
                 }
             }
         });
@@ -688,7 +686,7 @@ export default class SharedMonthlyReport {
                         <tr>
                             <th colspan="${baseColspan}" class="text-center">月間集計</th>
                             <th colspan="2" class="text-center">出勤日数: ${workingDays}日</th>
-                            <th colspan="2" class="text-center">総実働: ${totalWorkHours.toFixed(2)}時間</th>
+                            <th colspan="2" class="text-center">総実働: ${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}</th>
                             ${transportationCells}
                             <th colspan="1" class="stamp print-only">印</th>
                         </tr>

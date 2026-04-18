@@ -464,8 +464,11 @@ callApi(endpoint, options = {}) {
         breakMinutes = 60; // スタッフは固定60分
       }
       
-      const netHours = hours - (breakMinutes / 60);
-      return netHours > 0 ? netHours.toFixed(1) : hours.toFixed(1);
+      const netMinutes = Math.round((hours - (breakMinutes / 60)) * 60);
+      if (netMinutes <= 0) return null;
+      const h = Math.floor(netMinutes / 60);
+      const m = netMinutes % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     } catch (error) {
       console.error('勤務時間計算エラー:', error);
       return null;

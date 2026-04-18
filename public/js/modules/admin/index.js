@@ -271,7 +271,10 @@ export default class AdminModule extends BaseModule {
             const hours = durationMs / (1000 * 60 * 60);
 
             if (hours > 0) {
-                return hours.toFixed(1);
+                const totalMinutes = Math.round(hours * 60);
+                const h = Math.floor(totalMinutes / 60);
+                const m = totalMinutes % 60;
+                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
             }
         } catch (error) {
             console.error('勤務時間計算エラー:', error);

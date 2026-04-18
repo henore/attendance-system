@@ -113,7 +113,10 @@ export const generateStatusBadge = (status) => {
  */
 export const formatWorkHours = (hours) => {
   if (!hours || hours <= 0) return '-';
-  return `${hours.toFixed(1)}時間`;
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
 /**

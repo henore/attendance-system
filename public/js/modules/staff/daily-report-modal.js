@@ -28,12 +28,19 @@ export class StaffDailyReportModal {
         ? calculateBreakDuration(attendance.break_start, attendance.break_end)
         : 0;
 
-      // 実働時間を計算
-      const workHours = calculateWorkHours(
+      // 実働時間を計算（HH:MM形式）
+      const rawHours = calculateWorkHours(
         attendance.clock_in,
         attendance.clock_out,
         breakMinutes
       );
+      let workHours = '-';
+      if (rawHours && rawHours > 0) {
+        const totalMin = Math.round(rawHours * 60);
+        const h = Math.floor(totalMin / 60);
+        const m = totalMin % 60;
+        workHours = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
 
       // モーダルHTMLを生成
       const modalHTML = this.generateModalHTML(attendance, workHours, existingReport, breakMinutes);

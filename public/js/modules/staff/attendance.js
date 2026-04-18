@@ -753,7 +753,13 @@ export class StaffAttendanceUI {
       let workHours = '-';
       if (attendance.clock_in && attendance.clock_out) {
         const totalDeduction = breakMinutes + nakanukeMinutes;
-        workHours = calculateWorkHours(attendance.clock_in, attendance.clock_out, totalDeduction);
+        const hours = calculateWorkHours(attendance.clock_in, attendance.clock_out, totalDeduction);
+        if (hours && hours > 0) {
+          const totalMin = Math.round(hours * 60);
+          const h = Math.floor(totalMin / 60);
+          const m = totalMin % 60;
+          workHours = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
       }
 
       container.innerHTML = this.generateReportForm(workHours, existingReport, breakMinutes, canSubmit, nakanukeMinutes);
