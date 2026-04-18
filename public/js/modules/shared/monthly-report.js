@@ -212,6 +212,13 @@ export default class SharedMonthlyReport {
                     </div>
                 </div>
 
+                <div class="row mb-3" id="monthlyEditNakanukeGroup" style="display: none;">
+                    <div class="col-6">
+                        <label for="monthlyEditNakanukeMinutes" class="form-label">中抜け経過分数</label>
+                        <input type="number" class="form-control" id="monthlyEditNakanukeMinutes" min="0" placeholder="0">
+                    </div>
+                </div>
+
                 <div class="mb-3">
                     <label for="monthlyEditStatus" class="form-label">状態</label>
                     <select class="form-control" id="monthlyEditStatus">
@@ -718,6 +725,19 @@ export default class SharedMonthlyReport {
         document.getElementById('monthlyEditStatus').value = data.status || 'normal';
         document.getElementById('monthlyEditReason').value = '';
 
+        // 中抜けフィールドの表示制御（スタッフのみ）
+        const nakanukeGroup = document.getElementById('monthlyEditNakanukeGroup');
+        const nakanukeInput = document.getElementById('monthlyEditNakanukeMinutes');
+        if (nakanukeGroup && nakanukeInput) {
+            if (data.userRole === 'staff') {
+                nakanukeGroup.style.display = 'flex';
+                nakanukeInput.value = data.nakanukeMinutes || 0;
+            } else {
+                nakanukeGroup.style.display = 'none';
+                nakanukeInput.value = 0;
+            }
+        }
+
         // 削除セクションの表示制御（管理者のみ）
         const deleteSection = document.getElementById('monthlyDeleteSection');
         if (deleteSection) {
@@ -756,6 +776,10 @@ export default class SharedMonthlyReport {
                 return;
             }
 
+            // 中抜け経過分数
+            const nakanukeMinutesInput = document.getElementById('monthlyEditNakanukeMinutes');
+            const nakanukeMinutes = nakanukeMinutesInput ? parseInt(nakanukeMinutesInput.value) || 0 : undefined;
+
             const requestData = {
                 recordId: recordId || null,
                 userId: userId,
@@ -764,6 +788,7 @@ export default class SharedMonthlyReport {
                 newClockOut: clockOut,
                 newBreakStart: breakStart,
                 newBreakEnd: breakEnd,
+                nakanukeMinutes: nakanukeMinutes,
                 status: status,
                 reason: reason
             };

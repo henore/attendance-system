@@ -181,6 +181,13 @@ export class SharedAttendanceManagement {
                   </div>
                 </div>
 
+                <div class="row mb-3" id="editNakanukeGroup" style="display: none;">
+                  <div class="col-6">
+                    <label for="editNakanukeMinutes" class="form-label">中抜け経過分数</label>
+                    <input type="number" class="form-control" id="editNakanukeMinutes" min="0" placeholder="0">
+                  </div>
+                </div>
+
                 <div class="row mb-3">
                   <div class="col-6">
                     <label for="editStatus" class="form-label">ステータス</label>
@@ -639,6 +646,19 @@ async searchAttendanceRecords() {
     this.container.querySelector('#editStatus').value = data.status || 'normal';
     this.container.querySelector('#editReason').value = '';
 
+    // 中抜けフィールドの表示制御（スタッフのみ）
+    const nakanukeGroup = this.container.querySelector('#editNakanukeGroup');
+    const nakanukeInput = this.container.querySelector('#editNakanukeMinutes');
+    if (nakanukeGroup && nakanukeInput) {
+      if (data.userRole === 'staff') {
+        nakanukeGroup.style.display = 'flex';
+        nakanukeInput.value = data.nakanukeMinutes || 0;
+      } else {
+        nakanukeGroup.style.display = 'none';
+        nakanukeInput.value = 0;
+      }
+    }
+
     // 削除セクションの表示制御（管理者のみ）
     const deleteSection = this.container.querySelector('#deleteAttendanceSection');
     if (deleteSection) {
@@ -693,6 +713,10 @@ async searchAttendanceRecords() {
         return;
       }
 
+      // 中抜け経過分数
+      const nakanukeMinutesInput = this.container.querySelector('#editNakanukeMinutes');
+      const nakanukeMinutes = nakanukeMinutesInput ? parseInt(nakanukeMinutesInput.value) || 0 : undefined;
+
       const requestData = {
         recordId: recordId,
         userId: this.container.querySelector('#editUserId').value,
@@ -701,6 +725,7 @@ async searchAttendanceRecords() {
         newClockOut: clockOut,
         newBreakStart: breakStart,
         newBreakEnd: breakEnd,
+        nakanukeMinutes: nakanukeMinutes,
         status: finalStatus,
         reason: reason
       };
@@ -849,6 +874,12 @@ async searchAttendanceRecords() {
           `${attendance.break_start}〜 (進行中)`;
       }
 
+      // 中抜け表示
+      let nakanukeDisplay = '-';
+      if (attendance && attendance.nakanuke_minutes > 0) {
+        nakanukeDisplay = `${attendance.nakanuke_minutes}分`;
+      }
+
       // モーダルHTML生成
       const modalHTML = `
         <div class="modal fade" id="staffReportDetailModal" tabindex="-1">
@@ -887,7 +918,7 @@ async searchAttendanceRecords() {
                       </div>
                     </div>
                   </div>
-                  <div class="col-4">
+                  <div class="col-3">
                     <div class="detail-section border rounded p-3 bg-light">
                       <h6 class="text-muted mb-2">
                         <i class="fas fa-coffee text-warning"></i> 休憩時間
@@ -897,7 +928,17 @@ async searchAttendanceRecords() {
                       </div>
                     </div>
                   </div>
-                  <div class="col-4">
+                  <div class="col-2">
+                    <div class="detail-section border rounded p-3 bg-light">
+                      <h6 class="text-muted mb-2">
+                        <i class="fas fa-door-open text-secondary"></i> 中抜け
+                      </h6>
+                      <div class="detail-value small mb-0">
+                        ${nakanukeDisplay}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-3">
                     <div class="detail-section border rounded p-3 bg-light">
                       <h6 class="text-muted mb-2">
                         <i class="fas fa-clock text-info"></i> 退勤時間

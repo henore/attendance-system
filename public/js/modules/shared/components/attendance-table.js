@@ -70,6 +70,8 @@ export class AttendanceTable {
       // サービス区分列と送迎列の表示判定
       const showServiceType = options.showServiceType || false;
       const showTransportation = options.showTransportation || false;
+      // 中抜け列表示判定（staffのみ）
+      const showNakanuke = options.targetUserRole === 'staff';
       // userの場合は「日報」、staffの場合は「操作」
       const operationLabel = options.targetUserRole === 'user' ? '日報' : '操作';
       return `
@@ -79,7 +81,8 @@ export class AttendanceTable {
             ${showServiceType ? '<th class="text-center" width="6%">区分</th>' : ''}
             <th class="text-center" width="10%">出勤</th>
             <th class="text-center" width="10%">退勤</th>
-            <th class="text-center" width="15%">休憩</th>
+            <th class="text-center" width="12%">休憩</th>
+            ${showNakanuke ? '<th class="text-center nakanuke-col" width="6%">中抜け</th>' : ''}
             <th class="text-center" width="8%">実働</th>
             ${showTransportation ? '<th class="text-center transportation-col" width="4%">迎</th><th class="text-center transportation-col" width="4%">送</th>' : ''}
             <th class="text-center status-col" width="8%">状態</th>
@@ -88,21 +91,22 @@ export class AttendanceTable {
         </thead>
       `;
     }
-    
+
     // 通常の出勤管理用ヘッダー
     return `
       <thead class="table-light">
         <tr>
           ${showDate ? '<th class="text-center" width="10%">日付</th>' : ''}
-          <th class="text-center" width="15%">ユーザー</th>
-          <th class="text-center" width="10%">権限</th>
-          <th class="text-center" width="10%">出勤</th>
-          <th class="text-center" width="10%">退勤</th>
-          <th class="text-center" width="12%">休憩</th>
-          <th class="text-center" width="8%">実働</th>
+          <th class="text-center" width="12%">ユーザー</th>
+          <th class="text-center" width="8%">権限</th>
+          <th class="text-center" width="8%">出勤</th>
+          <th class="text-center" width="8%">退勤</th>
+          <th class="text-center" width="10%">休憩</th>
+          <th class="text-center" width="5%">中抜け</th>
+          <th class="text-center" width="7%">実働</th>
           <th class="text-center" width="8%">状態</th>
-          <th class="text-center" width="12%">日報・コメント</th>
-          ${showOperations ? '<th class="text-center" width="15%">操作</th>' : ''}
+          <th class="text-center" width="10%">日報・コメント</th>
+          ${showOperations ? '<th class="text-center" width="14%">操作</th>' : ''}
         </tr>
       </thead>
     `;
@@ -130,6 +134,8 @@ export class AttendanceTable {
     const breakDisplay = this.formatBreakTime(record);
     const netHours = this.calculateWorkDurationDay(record);
     const statusBadge = this.getStatusBadge(record.status || 'normal');
+    const nakanukeDisplay = this.formatNakanukeTime(record);
+    const nakanukeStatusBadge = this.getNakanukeStatusBadge(record);
     const pendingBadge = record.has_pending_correction ? '<br><span class="badge bg-warning text-dark mt-1"><i class="fas fa-clock"></i> 承認待ち</span>' : '';
     const reportStatus = this.getReportCommentStatus(record);
     const operations = showOperations ?
@@ -143,8 +149,9 @@ export class AttendanceTable {
         <td class="text-center">${record.clock_in || '-'}</td>
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
+        <td class="text-center">${nakanukeDisplay}</td>
         <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
-        <td class="text-center">${statusBadge}${pendingBadge}</td>
+        <td class="text-center">${statusBadge}${nakanukeStatusBadge}${pendingBadge}</td>
         <td class="text-center">${reportStatus}</td>
         ${showOperations ? `<td class="text-center">${operations}</td>` : ''}
       </tr>
@@ -158,9 +165,14 @@ export class AttendanceTable {
     const { showOperations } = options;
     const showServiceType = options.showServiceType || false;
     const showTransportation = options.showTransportation || false;
+    const showNakanuke = options.targetUserRole === 'staff';
 
     // 休憩時間表示
     const breakDisplay = this.formatBreakTime(record);
+
+    // 中抜け表示
+    const nakanukeDisplay = this.formatNakanukeTime(record);
+    const nakanukeStatusBadge = this.getNakanukeStatusBadge(record);
 
     // 実働時間計算
     const netHours = this.calculateWorkDurationDay(record);
@@ -232,6 +244,9 @@ export class AttendanceTable {
       transportationCells = `<td class="text-center transportation-col">${hasTransportation ? '1' : ''}</td><td class="text-center transportation-col">${hasTransportation ? '1' : ''}</td>`;
     }
 
+    // 中抜け列（staffのみ）
+    const nakanukeCell = showNakanuke ? `<td class="text-center nakanuke-col">${nakanukeDisplay}</td>` : '';
+
     return `
       <tr class="${rowClass}">
         <td class="${dayCellClass}" ${dayCellAttrs}>${record.day}</td>
@@ -240,9 +255,10 @@ export class AttendanceTable {
         <td class="text-center">${record.clock_in || '-'}</td>
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
+        ${nakanukeCell}
         <td class="text-center">${netHours ? netHours + 'h' : '-'}</td>
         ${transportationCells}
-        <td class="text-center status-col">${statusBadge}${record.has_pending_correction ? '<br><span class="badge bg-warning text-dark mt-1" style="font-size:0.65em;"><i class="fas fa-clock"></i> 承認待ち</span>' : ''}</td>
+        <td class="text-center status-col">${statusBadge}${nakanukeStatusBadge}${record.has_pending_correction ? '<br><span class="badge bg-warning text-dark mt-1" style="font-size:0.65em;"><i class="fas fa-clock"></i> 承認待ち</span>' : ''}</td>
         ${showOperations ? `<td class="text-center operation-col">${operations}</td>` : ''}
       </tr>
     `;
@@ -272,9 +288,43 @@ export class AttendanceTable {
   }
 
   /**
-   * 実働時間計算（休憩時間考慮）
+   * 中抜け時間のフォーマット
    */
-  
+  formatNakanukeTime(record) {
+    if (record.user_role !== 'staff') return '-';
+
+    // 中抜け中（開始あり・経過分0）
+    if (record.nakanuke_start && (!record.nakanuke_minutes || record.nakanuke_minutes === 0)) {
+      return `${record.nakanuke_start}〜`;
+    }
+    // 中抜け完了
+    if (record.nakanuke_minutes && record.nakanuke_minutes > 0) {
+      return `${record.nakanuke_minutes}分`;
+    }
+    return '-';
+  }
+
+  /**
+   * 中抜けステータスバッジ取得
+   */
+  getNakanukeStatusBadge(record) {
+    if (record.user_role !== 'staff') return '';
+
+    // 中抜け中
+    if (record.nakanuke_start && (!record.nakanuke_minutes || record.nakanuke_minutes === 0)) {
+      return '<br><span class="badge bg-secondary">中抜け中</span>';
+    }
+    // 中抜け終了済み
+    if (record.nakanuke_minutes && record.nakanuke_minutes > 0) {
+      return '<br><span class="badge bg-secondary">中抜け</span>';
+    }
+    return '';
+  }
+
+  /**
+   * 実働時間計算（休憩時間・中抜け時間考慮）
+   */
+
   calculateWorkDurationDay(record) {
     if (!record.clock_in || !record.clock_out) return null;
 
@@ -303,7 +353,13 @@ export class AttendanceTable {
         }
       }
 
-      const netHours = workHours - (breakMinutes / 60);
+      // 中抜け時間の控除（スタッフのみ）
+      let nakanukeMinutes = 0;
+      if (record.user_role === 'staff' && record.nakanuke_minutes) {
+        nakanukeMinutes = parseInt(record.nakanuke_minutes) || 0;
+      }
+
+      const netHours = workHours - (breakMinutes / 60) - (nakanukeMinutes / 60);
       return netHours.toFixed(2);
 
     } catch (error) {
@@ -385,7 +441,8 @@ export class AttendanceTable {
         'data-clock-in': record.clock_in || '',
         'data-clock-out': record.clock_out || '',
         'data-status': record.status || 'normal',
-        'data-service-type': record.service_type || ''
+        'data-service-type': record.service_type || '',
+        'data-nakanuke-minutes': record.nakanuke_minutes || 0
       };
 
       // 休憩データの追加
@@ -458,7 +515,8 @@ export class AttendanceTable {
         'data-clock-in': record.clock_in || '',
         'data-clock-out': record.clock_out || '',
         'data-status': record.status || 'normal',
-        'data-service-type': record.service_type || ''
+        'data-service-type': record.service_type || '',
+        'data-nakanuke-minutes': record.nakanuke_minutes || 0
       };
 
       // 休憩データ（利用者とスタッフで参照先が異なる）

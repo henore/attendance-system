@@ -74,6 +74,7 @@ export default class AdminAuditLog {
                                 <option value="staff_attendance_creation">出勤記録作成（スタッフ）</option>
                                 <option value="staff_attendance_deletion">出勤記録削除要望（スタッフ）</option>
                                 <option value="user_deactivation">ユーザー無効化</option>
+                                <option value="staff_nakanuke">中抜け（スタッフ）</option>
                                 <option value="monthly_attendance_view">月次出勤簿閲覧</option>
                             </select>
                         </div>
@@ -493,6 +494,7 @@ export default class AdminAuditLog {
             'staff_attendance_correction': '出勤記録訂正（スタッフ）',
             'staff_attendance_creation': '出勤記録作成（スタッフ）',
             'staff_attendance_deletion': '出勤記録削除要望（スタッフ）',
+            'staff_nakanuke': '中抜け（スタッフ）',
             'user_deactivation': 'ユーザー無効化',
             'user_update': 'ユーザー更新',
             'monthly_attendance_view': '月次出勤簿閲覧',
@@ -512,6 +514,7 @@ export default class AdminAuditLog {
             'staff_attendance_correction': 'bg-warning',
             'staff_attendance_creation': 'bg-warning',
             'staff_attendance_deletion': 'bg-danger',
+            'staff_nakanuke': 'bg-secondary',
             'user_deactivation': 'bg-danger',
             'user_update': 'bg-info',
             'monthly_attendance_view': 'bg-info',

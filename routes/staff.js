@@ -33,7 +33,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         });
       }
       
-      // 休憩中は退勤不可
+      // 休憩中・中抜け中は退勤不可
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
         [staffId, today]
@@ -42,6 +42,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         return res.status(400).json({
           success: false,
           error: '休憩を終了してから退勤してください'
+        });
+      }
+      if (attendance && attendance.nakanuke_start && attendance.nakanuke_minutes === 0) {
+        return res.status(400).json({
+          success: false,
+          error: '中抜けを終了してから退勤してください'
         });
       }
 
@@ -70,7 +76,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       const today = getCurrentDate();
       const currentTime = getCurrentTime();
 
-      // 休憩中は退勤不可
+      // 休憩中・中抜け中は退勤不可
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
         [staffId, today]
@@ -79,6 +85,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         return res.status(400).json({
           success: false,
           error: '休憩を終了してから退勤してください'
+        });
+      }
+      if (attendance && attendance.nakanuke_start && attendance.nakanuke_minutes === 0) {
+        return res.status(400).json({
+          success: false,
+          error: '中抜けを終了してから退勤してください'
         });
       }
 
@@ -112,9 +124,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     }
     
     let query = `
-      SELECT 
+      SELECT
         a.id, a.user_id, a.date, a.clock_in, a.clock_out, a.status,
         a.break_start, a.break_end,
+        a.nakanuke_start, a.nakanuke_minutes, a.nakanuke_reason,
         u.name as user_name, u.role as user_role, u.service_type,u.workweek as user_workweek,u.id as user_id,
         dr.id as report_id,
         sc.id as comment_id,
@@ -157,9 +170,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         clock_out: record.clock_out,
         status: record.status || 'normal',
         report_id: record.report_id,
-        comment_id: record.comment_id
+        comment_id: record.comment_id,
+        nakanuke_start: record.nakanuke_start,
+        nakanuke_minutes: record.nakanuke_minutes || 0,
+        nakanuke_reason: record.nakanuke_reason
       };
-      
+
       // 休憩データの統合
       if (record.user_role === 'staff' || record.user_role === 'admin') {
         processed.break_start = record.break_start;
@@ -468,6 +484,149 @@ router.post('/break/end', async (req, res) => {
     });
   }
 });
+
+  // 中抜け開始（スタッフ専用）
+  router.post('/nakanuke/start', async (req, res) => {
+    try {
+      const userId = req.session.user.id;
+      const today = getCurrentDate();
+      const currentTime = getCurrentTime();
+      const { reason } = req.body;
+
+      if (!reason || !reason.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: '中抜け理由を入力してください'
+        });
+      }
+
+      // 既存の出勤記録を確認
+      const attendance = await dbGet(
+        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+        [userId, today]
+      );
+
+      if (!attendance || !attendance.clock_in) {
+        return res.status(400).json({
+          success: false,
+          error: '出勤していません'
+        });
+      }
+
+      if (attendance.clock_out) {
+        return res.status(400).json({
+          success: false,
+          error: '既に退勤しています'
+        });
+      }
+
+      if (attendance.break_start && !attendance.break_end) {
+        return res.status(400).json({
+          success: false,
+          error: '休憩中は中抜けできません'
+        });
+      }
+
+      if (attendance.nakanuke_start && attendance.nakanuke_minutes === 0) {
+        return res.status(400).json({
+          success: false,
+          error: '既に中抜け中です'
+        });
+      }
+
+      // 中抜け開始を記録
+      await dbRun(
+        'UPDATE attendance SET nakanuke_start = ?, nakanuke_reason = ?, nakanuke_minutes = 0 WHERE id = ?',
+        [currentTime, reason.trim(), attendance.id]
+      );
+
+      res.json({
+        success: true,
+        message: '中抜けを開始しました',
+        startTime: currentTime
+      });
+    } catch (error) {
+      console.error('中抜け開始エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '中抜け開始に失敗しました'
+      });
+    }
+  });
+
+  // 中抜け終了（スタッフ専用）
+  router.post('/nakanuke/end', async (req, res) => {
+    try {
+      const userId = req.session.user.id;
+      const today = getCurrentDate();
+      const currentTime = getCurrentTime();
+
+      // 既存の出勤記録を確認
+      const attendance = await dbGet(
+        'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+        [userId, today]
+      );
+
+      if (!attendance || !attendance.nakanuke_start) {
+        return res.status(400).json({
+          success: false,
+          error: '中抜けを開始していません'
+        });
+      }
+
+      if (attendance.nakanuke_minutes > 0) {
+        return res.status(400).json({
+          success: false,
+          error: '既に中抜けを終了しています'
+        });
+      }
+
+      // 経過分数を計算
+      const elapsedMinutes = timeToMinutes(currentTime) - timeToMinutes(attendance.nakanuke_start);
+
+      // 中抜け経過分数をDBに記録
+      await dbRun(
+        'UPDATE attendance SET nakanuke_minutes = ? WHERE id = ?',
+        [elapsedMinutes, attendance.id]
+      );
+
+      // 監査ログに記録
+      await dbRun(
+        `INSERT INTO audit_log (
+          admin_id, action_type, target_id, target_type,
+          new_value, reason, ip_address
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          userId,
+          'staff_nakanuke',
+          attendance.id,
+          'attendance',
+          JSON.stringify({
+            date: today,
+            nakanuke_start: attendance.nakanuke_start,
+            nakanuke_end: currentTime,
+            nakanuke_minutes: elapsedMinutes
+          }),
+          attendance.nakanuke_reason,
+          req.ip
+        ]
+      );
+
+      res.json({
+        success: true,
+        message: '中抜けを終了しました',
+        endTime: currentTime,
+        nakanuke_start: attendance.nakanuke_start,
+        nakanuke_minutes: elapsedMinutes
+      });
+    } catch (error) {
+      console.error('中抜け終了エラー:', error);
+      res.status(500).json({
+        success: false,
+        error: '中抜け終了に失敗しました'
+      });
+    }
+  });
 
   // 月別出勤簿データ取得（スタッフ権限用）
   router.get('/monthly-attendance', async (req, res) => {
@@ -1132,20 +1291,23 @@ router.post('/break/end', async (req, res) => {
         [staffId, date]
       );
 
+      // 中抜け経過分数を出勤記録から取得
+      const nakanukeMinutes = attendance.nakanuke_minutes || 0;
+
       if (existingReport) {
         // 更新
         await dbRun(
           `UPDATE staff_daily_reports
-           SET work_report = ?, communication = ?, updated_at = CURRENT_TIMESTAMP
+           SET work_report = ?, communication = ?, nakanuke_minutes = ?, updated_at = CURRENT_TIMESTAMP
            WHERE staff_id = ? AND date = ?`,
-          [work_report, communication || null, staffId, date]
+          [work_report, communication || null, nakanukeMinutes, staffId, date]
         );
       } else {
         // 新規作成
         await dbRun(
-          `INSERT INTO staff_daily_reports (staff_id, date, work_report, communication)
-           VALUES (?, ?, ?, ?)`,
-          [staffId, date, work_report, communication || null]
+          `INSERT INTO staff_daily_reports (staff_id, date, work_report, communication, nakanuke_minutes)
+           VALUES (?, ?, ?, ?, ?)`,
+          [staffId, date, work_report, communication || null, nakanukeMinutes]
         );
       }
 

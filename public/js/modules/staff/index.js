@@ -135,6 +135,20 @@ export default class StaffModule extends BaseModule {
           </div>
         </div>
 
+        <!-- 中抜けボタン -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <button class="btn btn-secondary btn-lg w-100" id="nakanukeStartBtn" disabled>
+              <i class="fas fa-door-open"></i> 中抜け開始
+            </button>
+          </div>
+          <div class="col-md-6">
+            <button class="btn btn-outline-secondary btn-lg w-100" id="nakanukeEndBtn" disabled>
+              <i class="fas fa-door-closed"></i> 中抜け終了
+            </button>
+          </div>
+        </div>
+
         <!-- 休憩ボタン -->
         <div class="row mb-4">
           <div class="col-md-6">
@@ -147,6 +161,11 @@ export default class StaffModule extends BaseModule {
               <i class="fas fa-coffee"></i> 休憩終了
             </button>
           </div>
+        </div>
+
+        <!-- 中抜けステータス専用表示 -->
+        <div id="nakanukeStatusDisplay" class="break-status-display">
+          <!-- 動的に更新される -->
         </div>
 
         <!-- 休憩ステータス専用表示 -->
@@ -191,6 +210,10 @@ export default class StaffModule extends BaseModule {
     // 休憩ボタン（AttendanceUIに委譲）
     this.addEventListenerById('breakStartBtn', 'click', () => this.attendanceUI.handleBreakStart());
     this.addEventListenerById('breakEndBtn', 'click', () => this.attendanceUI.handleBreakEnd());
+
+    // 中抜けボタン（AttendanceUIに委譲）
+    this.addEventListenerById('nakanukeStartBtn', 'click', () => this.attendanceUI.handleNakanukeStart());
+    this.addEventListenerById('nakanukeEndBtn', 'click', () => this.attendanceUI.handleNakanukeEnd());
 
     // 時刻表示の更新
     this.startTimeDisplay();

@@ -427,6 +427,16 @@ export class StaffAttendanceBook {
       `;
     }
 
+    // 中抜け記録
+    if (attendanceData.nakanuke_minutes > 0) {
+      html += `
+        <div class="detail-section">
+          <h6><i class="fas fa-door-open text-secondary"></i> 中抜け記録</h6>
+          <p>中抜け時間: ${attendanceData.nakanuke_minutes}分</p>
+        </div>
+      `;
+    }
+
     // スタッフ日報
     if (dailyReport) {
       html += `

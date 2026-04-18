@@ -294,6 +294,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       SELECT
         a.id, a.user_id, a.date, a.clock_in, a.clock_out, a.status,
         a.break_start, a.break_end,
+        a.nakanuke_start, a.nakanuke_minutes, a.nakanuke_reason,
         u.name as user_name, u.role as user_role, u.service_type, u.workweek as user_workweek,u.id as user_id,
         dr.id as report_id,
         sc.id as comment_id,
@@ -339,9 +340,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         status: record.status || 'normal',
         report_id: record.report_id,
         comment_id: record.comment_id,
-        staff_report_id: record.staff_report_id
+        staff_report_id: record.staff_report_id,
+        nakanuke_start: record.nakanuke_start,
+        nakanuke_minutes: record.nakanuke_minutes || 0,
+        nakanuke_reason: record.nakanuke_reason
       };
-      
+
       // スタッフ・管理者の休憩情報
       if (record.user_role === 'staff' || record.user_role === 'admin') {
         processed.break_start = record.break_start;
@@ -370,10 +374,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     // 出勤記録訂正（休憩時間編集対応）- 修正版
     router.post('/attendance/correct', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
-            const { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason } = req.body;
+            const { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, nakanukeMinutes, status, reason } = req.body;
 
             // デバッグログ
-            console.log('出勤記録修正リクエスト:', { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, status, reason });
+            console.log('出勤記録修正リクエスト:', { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, nakanukeMinutes, status, reason });
 
             // バリデーション
             // recordIdがある場合は既存記録の更新
@@ -444,6 +448,15 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     await dbRun(
                         'UPDATE attendance SET break_start = ?, break_end = ? WHERE id = ?',
                         [breakStartValue, breakEndValue, recordId]
+                    );
+                }
+
+                // スタッフの中抜け経過分数を更新
+                if (user.role === 'staff' && nakanukeMinutes !== undefined) {
+                    const nakanukeVal = parseInt(nakanukeMinutes) || 0;
+                    await dbRun(
+                        'UPDATE attendance SET nakanuke_minutes = ? WHERE id = ?',
+                        [nakanukeVal, recordId]
                     );
                 }
 
@@ -626,10 +639,11 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 });
             }
 
-            // 出勤記録取得（休憩データ統合、スタッフ日報追加）
+            // 出勤記録取得（休憩データ統合、スタッフ日報追加、中抜け含む）
             const records = await dbAll(`
                 SELECT
                     a.*,
+                    a.nakanuke_start, a.nakanuke_minutes, a.nakanuke_reason,
                     dr.id as report_id,
                     u.service_type,
                     sdr.id as staff_report_id,

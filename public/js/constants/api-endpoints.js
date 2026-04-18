@@ -51,6 +51,8 @@ export const API_ENDPOINTS = {
     CLOCK_OUT: '/api/staff/clock-out',
     BREAK_START: '/api/staff/break/start',
     BREAK_END: '/api/staff/break/end',
+    NAKANUKE_START: '/api/staff/nakanuke/start',
+    NAKANUKE_END: '/api/staff/nakanuke/end',
     USERS: '/api/staff/users',
     USERS_LIST: '/api/staff/users/list',
     COMMENT: '/api/staff/comment',
