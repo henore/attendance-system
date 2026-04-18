@@ -8,14 +8,95 @@ const { getCurrentDate } = require('../utils/date-time');
 
 // スキル別の作業内容候補
 const SKILL_TASK_MAP = {
-    program: ['Progate', 'Udemy', 'Next.js', 'React', 'Javascript', 'HTMLとCSS'],
-    excel:   ['エクセル動画学習', 'MOS学習', 'エクセル', '関数の使い方', 'エクセル学習の続き'],
-    typing:  ['ピースエントリー', 'タイピング練習', 'タイピング速度アップ'],
-    design:  ['canva', 'canva練習', '画像作成', '画像編集', 'HP画像作成', 'チラシ用画像作成']
+    program: ['Progate HTML＆CSS基礎学習', 
+              'Progate HTML＆CSS基礎学習続き', 
+              'Progate Javascript基礎（if、for、オブジェクトなど）学習',
+              'Progate Javascript応用学習（DOM操作、await、asyncなど）',
+              'Progate React基礎学習',
+              'Progate React編 props、state、コンポーネント分割',
+              'Progate 復習',
+              'Udemy React動画学習',
+              'Udemy React応用',
+              'Progate HTML＆CSS基礎学習', 
+              'Progate HTML＆CSS基礎学習続き', 
+              'Progate Javascript基礎（if、for、オブジェクトなど）学習',
+              'Progate Javascript応用学習（DOM操作、await、asyncなど）',
+              'Progate React基礎学習',
+              'Progate React編 props、state、コンポーネント分割',
+              'Progate 復習',
+              'Udemy React動画学習',
+              'Udemy React応用',
+              'Next.js 基礎の理解 ', 
+              'Node.js API連携、SQL構文の学習',
+              'Node.js学習nginxとの連携、CRUD',
+              'バックエンドの学習 AWSデプロイ、git操作の基礎',
+              'バックエンド SQL、API作成のやり方',
+              'Next.js ルーティング、page.tsx概念、layout.tsxの学習',
+              'Next.js server&client、Linkページ遷移、コンポーネント、use clent 学習', 
+              'Next.js 学習 fetch、APIルート、エラー処理、ダッシュボードUI、フォームバリデーション',
+              'Next.js データ管理、デプロイ、DB連携、認証、パフォーマンス制御の学習' 
+            ],
+    excel:   ['エクセル動画学習1話～6話まで', 
+              'Excel動画学習7話～13話まで', 
+              'エクセル動画学習14話～19話まで', 
+              'Excel動画学習20話～26話まで', 
+              'エクセル動画学習1話～6話まで', 
+              'Excel動画学習7話～13話まで', 
+              'エクセル動画学習14話～19話まで', 
+              'Excel動画学習20話～26話まで', 
+              'Excel MOS アソシエイト学習 SUM,AVERAGE関数など', 
+              'Excel MOS グラフ作成のやり方',
+              'エクセル MOS 学習 条件付き書式 スパークラインなど',
+              'エクセル MOS アソシエイト テーブル作成の学習', 
+              'Excel 学習 色々な関数の使い方', 
+              'Excel MOS アソシエイト学習 SUM,AVERAGE関数など', 
+              'Excel MOS グラフ作成のやり方',
+              'エクセル MOS 学習 条件付き書式 スパークラインなど',
+              'エクセル MOS アソシエイト テーブル作成の学習', 
+              'Excel 学習 色々な関数の使い方', 
+              'エクセルMOSエキスパート マクロの学習',
+              'Excel学習 MOSエキスパート VLOOKUPやCOUNT、COUNTIF関数の学習',
+              'エクセルMOS学習 フラッシュフィル',
+              'Excel MOS 模擬試験チャレンジ'
+               ],
+    typing:  ['ピースエントリー', 'タイピング練習毎日５問','プレイグラムタイピング','マナビジョン','PC基本操作学習','PC基本操作復習'],
+    design:  ['canva学習 スマホ用ショート動画作成', 
+              'canva学習 テキスト挿入など', 
+              'canva練習 サイズ変更、テキストのエフェクトなど', 
+              'canva学習 スマホ用ショート動画作成', 
+              'canva学習 テキスト挿入など', 
+              'canva練習 サイズ変更、テキストのエフェクトなど', 
+              'illustrator 画像作成', 
+              'illustrator アイコン、ロゴ制作のやり方', 
+              'Photoshop 学習 画像編集', 
+              'Photoshop サムネ、WEBバナーの作り方', 
+              'premium 動画編集、動画作成のやり方',
+              'premium学習 テロップ、音声調整、BGM追加',
+              'aftereffectの学習 アニメーション',  
+              'aftereffectのモーショングラフィックス、premium連携学習', 
+              'blender、オブジェクト選択、移動・回転・ズームのやり方', 
+              'blender学習、UV展開、FBX書き出し、Unity連携', 
+              'Unity C#、ゲーム構築', 
+              'Unity製ライブ配信アプリの研究、移動、UI設計など', 
+              'Clip stadio 学習 デッサン、線画、塗り、模写等', 
+              'Clip stadio 透過画像作成、依頼用データ作成', 
+              'live2d キャラクター作成 目の開閉、口の開閉、顔動きなど', 
+              'live2d 頭角度、紙揺れ、物理演算、軽量化、書き出し設定、VTube Studio連携学習', 
+              'Figma基礎学習 UI、スマホレスポンシブ', 
+              'Figma 画面構成、テキスト入力、移動拡大、レイヤー管理の学習', 
+              'HP案件用画像作成', 
+              'チラシ案件用画像作成',
+              'HP案件用画像作成', 
+              'チラシ案件用画像作成'
+            
+            ]
 };
 
 // ユーザーのスキル設定から作業内容をランダム生成する
-// - スキルが複数登録されている場合は1〜2個ランダムに選び、各スキルから1タスクをピック
+// - typingスキルがある場合は必ずタイピングから1つ取り出す
+// - typing＋他スキルがある場合はタイピング1つ＋他から1つの計2つ
+// - typingのみの場合はタイピングから1つ
+// - typing無しで複数スキルの場合は従来通りランダム1〜2個
 // - スキル未設定または該当なしの場合は 'PC作業' をデフォルト
 function generateWorkContent(userSkills) {
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -25,17 +106,30 @@ function generateWorkContent(userSkills) {
     const skillList = userSkills.split(',').map(s => s.trim()).filter(s => SKILL_TASK_MAP[s]);
     if (skillList.length === 0) return 'PC作業';
 
+    const hasTyping = skillList.includes('typing');
+    const otherSkills = skillList.filter(s => s !== 'typing');
+
+    if (hasTyping) {
+        // タイピングから必ず1つ取り出す
+        const tasks = [pick(SKILL_TASK_MAP['typing'])];
+        // 他スキルがあれば1つ追加
+        if (otherSkills.length > 0) {
+            const randomOther = pick(otherSkills);
+            tasks.push(pick(SKILL_TASK_MAP[randomOther]));
+        }
+        return tasks.join('、');
+    }
+
+    // typing無し: 従来ロジック
     let pickedSkills;
     if (skillList.length === 1) {
         pickedSkills = skillList;
     } else {
-        // 複数ある場合は1個または2個をランダムに選ぶ（50/50）
         const numToPick = Math.random() < 0.5 ? 1 : 2;
         const shuffled = [...skillList].sort(() => Math.random() - 0.5);
         pickedSkills = shuffled.slice(0, Math.min(numToPick, skillList.length));
     }
 
-    // 各スキルから1タスクずつランダムピック
     const tasks = pickedSkills.map(skill => pick(SKILL_TASK_MAP[skill]));
     return tasks.join('、');
 }
