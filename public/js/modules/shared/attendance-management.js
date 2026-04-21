@@ -975,7 +975,7 @@ async searchAttendanceRecords() {
 
                 <div class="mb-3 mt-4">
                   <small class="text-muted">
-                    <i class="fas fa-clock"></i> 提出日時: ${new Date(report.created_at).toLocaleString('ja-JP')}
+                    <i class="fas fa-clock"></i> 提出日: ${new Date(report.created_at).toLocaleDateString('ja-JP')}
                   </small>
                 </div>
               </div>
