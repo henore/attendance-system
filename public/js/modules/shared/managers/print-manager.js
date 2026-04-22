@@ -250,10 +250,10 @@ export class PrintManager {
 
         const monthlyStyles = `
             @media print {
-                /* 基本的な印刷設定 */
+                /* 基本的な印刷設定（margin:0でブラウザのヘッダー/フッターを除去） */
                 @page {
                     size: A4;
-                    margin: 10mm;
+                    margin: 0;
                 }
                 
                 body {
@@ -476,6 +476,7 @@ export class PrintManager {
                 .user-jisseki-print {
                     width: 100%;
                     font-family: "游ゴシック", "Yu Gothic", "MS Gothic", sans-serif;
+                    padding: 10mm;
                 }
 
                 /* ヘッダー行（和暦・タイトル） */
