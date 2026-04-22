@@ -476,7 +476,7 @@ export class PrintManager {
                 .user-jisseki-print {
                     width: 100%;
                     font-family: "游ゴシック", "Yu Gothic", "MS Gothic", sans-serif;
-                    padding: 10mm;
+                    padding: 5mm 10mm;
                 }
 
                 /* ヘッダー行（和暦・タイトル） */
@@ -550,15 +550,15 @@ export class PrintManager {
                     padding: 0.5mm;
                 }
                 .jisseki-main tbody tr {
-                    height: 5.2mm;
+                    height: 6.5mm;
                 }
                 .jisseki-main tbody td {
-                    height: 5.2mm;
+                    height: 6.5mm;
                 }
                 .jisseki-main tfoot td {
                     font-size: 7pt;
                     padding: 0.5mm 1mm;
-                    height: 5.5mm;
+                    height: 7mm;
                 }
 
                 /* カラム幅（合計100%） */
