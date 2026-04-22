@@ -1771,8 +1771,16 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             const lastDay = new Date(year, month, 0).getDate();
             const endDate = `${year}-${monthPadded}-${String(lastDay).padStart(2, '0')}`;
 
+            const excludeCondition = `
+                AND u.name NOT LIKE '%test%'
+                AND u.name NOT LIKE '%Test%'
+                AND u.name NOT LIKE '%TEST%'
+                AND u.name NOT LIKE '%メンテ%'
+                AND u.username NOT IN ('user1', 'user2')
+            `;
+
             const activeUsers = await dbAll(
-                "SELECT id FROM users WHERE role = 'user' AND is_active = 1",
+                `SELECT id FROM users u WHERE u.role = 'user' AND u.is_active = 1 ${excludeCondition}`,
                 []
             );
             const userCount = activeUsers.length;
@@ -1782,6 +1790,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 FROM attendance a
                 JOIN users u ON a.user_id = u.id
                 WHERE u.role = 'user' AND u.is_active = 1
+                  ${excludeCondition}
                   AND a.date >= ? AND a.date <= ?
                   AND a.clock_in IS NOT NULL
                 GROUP BY a.date
