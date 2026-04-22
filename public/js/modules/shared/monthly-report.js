@@ -812,11 +812,8 @@ export default class SharedMonthlyReport {
                 </tbody>
                 <tfoot>
                     <tr class="jisseki-total-row">
-                        <td colspan="2" rowspan="2"><strong>合計</strong></td>
-                        <td rowspan="2"></td>
-                        <td rowspan="2"></td>
-                        <td rowspan="2"></td>
-                        <td colspan="2" rowspan="2">${totalTransportCount > 0 ? totalTransportCount + '回' : ''}</td>
+                        <td colspan="5" rowspan="2"><strong>合計</strong></td>
+                        <td colspan="2" rowspan="2">${totalTransportCount > 0 ? totalTransportCount + '回' : '回'}</td>
                         <td rowspan="2">回</td>
                         <td rowspan="2">回</td>
                         <td rowspan="2">回</td>
