@@ -6,6 +6,7 @@ import AdminUserManagement from './user-management.js';
 import SharedMonthlyReport from '../shared/monthly-report.js';
 import SharedHandover from '../shared/handover.js';
 import AdminAuditLog from './audit-log.js';
+import AttendanceStats from './attendance-stats.js';
 import TrialVisitsManager from '../shared/trial-visits.js';
 import AdminApproval from './approval.js';
 
@@ -73,6 +74,9 @@ export default class AdminModule extends BaseModule {
                         <button class="btn btn-outline-primary admin-menu-btn" data-target="monthlyReport">
                             <i class="fas fa-calendar-alt"></i> 月別出勤簿
                         </button>
+                        <button class="btn btn-outline-primary admin-menu-btn" data-target="attendanceStats">
+                            <i class="fas fa-chart-bar"></i> 出勤人数管理
+                        </button>
                         <button class="btn btn-outline-primary admin-menu-btn" data-target="auditLog">
                             <i class="fas fa-clipboard-list"></i> 監査ログ
                         </button>
@@ -125,6 +129,10 @@ export default class AdminModule extends BaseModule {
         // グローバルに公開（イベントハンドラ用）
         window.adminApproval = this.adminApproval;
 
+        // 出勤人数管理モジュール
+        this.attendanceStats = new AttendanceStats(this.app, this);
+        await this.attendanceStats.init(contentArea);
+
         // 各サブモジュールを初期化
         this.subModules = {
             userManagement: new AdminUserManagement(this.app, this),
@@ -143,6 +151,7 @@ export default class AdminModule extends BaseModule {
         this.attendanceManagement?.hide();
         this.handoverSection?.hide();
         this.monthlyReport?.hide();
+        this.attendanceStats?.hide();
         this.trialVisitsManager?.hide();
         this.adminApproval?.hide();
         Object.values(this.subModules).forEach(module => {
@@ -168,6 +177,8 @@ export default class AdminModule extends BaseModule {
             await this.handoverSection?.show();
         } else if (viewName === 'monthlyReport') {
             await this.monthlyReport?.show();
+        } else if (viewName === 'attendanceStats') {
+            await this.attendanceStats?.show();
         } else if (this.subModules[viewName]) {
             await this.subModules[viewName].show();
         } else {
@@ -309,6 +320,12 @@ export default class AdminModule extends BaseModule {
             this.adminApproval.destroy();
             this.adminApproval = null;
             window.adminApproval = null;
+        }
+
+        // 出勤人数管理モジュールのクリーンアップ
+        if (this.attendanceStats) {
+            this.attendanceStats.destroy();
+            this.attendanceStats = null;
         }
 
         // 各サブモジュールをクリーンアップ

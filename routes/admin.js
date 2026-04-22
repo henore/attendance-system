@@ -1758,5 +1758,49 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
+    // 出勤人数統計データ取得
+    router.get('/attendance-stats', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { year, month } = req.query;
+            if (!year || !month) {
+                return res.status(400).json({ success: false, error: 'パラメータが不足しています' });
+            }
+
+            const monthPadded = String(month).padStart(2, '0');
+            const startDate = `${year}-${monthPadded}-01`;
+            const lastDay = new Date(year, month, 0).getDate();
+            const endDate = `${year}-${monthPadded}-${String(lastDay).padStart(2, '0')}`;
+
+            const activeUsers = await dbAll(
+                "SELECT id FROM users WHERE role = 'user' AND is_active = 1",
+                []
+            );
+            const userCount = activeUsers.length;
+
+            const dailyCounts = await dbAll(`
+                SELECT a.date, COUNT(DISTINCT a.user_id) as count
+                FROM attendance a
+                JOIN users u ON a.user_id = u.id
+                WHERE u.role = 'user' AND u.is_active = 1
+                  AND a.date >= ? AND a.date <= ?
+                  AND a.clock_in IS NOT NULL
+                GROUP BY a.date
+                ORDER BY a.date
+            `, [startDate, endDate]);
+
+            res.json({
+                success: true,
+                userCount,
+                dailyCounts,
+                year: parseInt(year),
+                month: parseInt(month),
+                daysInMonth: lastDay
+            });
+        } catch (error) {
+            console.error('出勤人数統計エラー:', error);
+            res.status(500).json({ success: false, error: '出勤人数統計の取得に失敗しました' });
+        }
+    });
+
     return router;
 };

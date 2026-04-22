@@ -108,6 +108,7 @@ export const API_ENDPOINTS = {
     TRIAL_VISITS_UPDATE: (id) => `/api/trial-visits/${id}`,
     TRIAL_VISITS_DELETE: (id) => `/api/trial-visits/${id}`,
     TRIAL_VISITS_MONTHLY: (year, month) => `/api/trial-visits/monthly/${year}/${month}`,
-    TRIAL_VISITS_NOTIFICATION_CHECK: '/api/trial-visits/notification-check'
+    TRIAL_VISITS_NOTIFICATION_CHECK: '/api/trial-visits/notification-check',
+    ATTENDANCE_STATS: '/api/admin/attendance-stats'
   }
 };
