@@ -581,16 +581,32 @@ export class PrintManager {
                     line-height: 1.3;
                 }
 
-                /* 初期加算・勤務時間行 */
-                .jisseki-addon-row td,
-                .jisseki-hours-row td {
+                /* 初期加算行 */
+                .jisseki-addon-row td {
                     font-size: 7pt;
+                }
+
+                /* テーブル下部エリア */
+                .jisseki-bottom-area {
+                    margin-top: 5mm;
+                }
+                .jisseki-hours-line {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-size: 9pt;
+                    margin-bottom: 3mm;
+                }
+                .jisseki-hours-left {
+                    font-weight: bold;
+                }
+                .jisseki-hours-right {
+                    text-align: right;
                 }
 
                 /* 印エリア */
                 .jisseki-stamp-area {
                     float: right;
-                    margin-top: 2mm;
                     font-size: 8pt;
                     border: 1px solid #333;
                     width: 15mm;

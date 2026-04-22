@@ -834,18 +834,15 @@ export default class SharedMonthlyReport {
                         <td colspan="2">当月算定日数</td>
                         <td colspan="2">${totalWorkDays}</td>
                     </tr>
-                    <tr class="jisseki-hours-row">
-                        <td colspan="2">勤務時間</td>
-                        <td colspan="4">${totalHours} 時間</td>
-                        <td colspan="2"></td>
-                        <td>1</td>
-                        <td colspan="2">枚中</td>
-                        <td>1</td>
-                        <td colspan="2">枚</td>
-                    </tr>
                 </tfoot>
             </table>
-            <div class="jisseki-stamp-area">印</div>
+            <div class="jisseki-bottom-area">
+                <div class="jisseki-hours-line">
+                    <span class="jisseki-hours-left">勤務時間　${totalHours} 時間</span>
+                    <span class="jisseki-hours-right">1 枚中 1 枚</span>
+                </div>
+                <div class="jisseki-stamp-area">印</div>
+            </div>
         </div>`;
     }
 
