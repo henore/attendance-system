@@ -601,7 +601,15 @@ export class PrintManager {
                     font-weight: bold;
                 }
                 .jisseki-hours-right {
-                    text-align: right;
+                    display: flex;
+                    align-items: center;
+                }
+                .jisseki-box {
+                    border: 1px solid #333;
+                    padding: 1mm 2mm;
+                    font-size: 9pt;
+                    text-align: center;
+                    min-width: 8mm;
                 }
 
                 /* 印エリア */

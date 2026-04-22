@@ -839,7 +839,7 @@ export default class SharedMonthlyReport {
             <div class="jisseki-bottom-area">
                 <div class="jisseki-hours-line">
                     <span class="jisseki-hours-left">勤務時間　${totalHours} 時間</span>
-                    <span class="jisseki-hours-right">1 枚中 1 枚</span>
+                    <span class="jisseki-hours-right"><span class="jisseki-box">1</span><span class="jisseki-box">枚中</span><span class="jisseki-box">1</span><span class="jisseki-box">枚</span></span>
                 </div>
                 <div class="jisseki-stamp-area">印</div>
             </div>
