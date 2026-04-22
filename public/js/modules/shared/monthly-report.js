@@ -834,7 +834,7 @@ export default class SharedMonthlyReport {
                     <td class="jisseki-addon-blank"></td>
                     <td>30日目</td>
                     <td class="jisseki-addon-blank"></td>
-                    <td>当月算定��数</td>
+                    <td>当月算定日数</td>
                     <td>${totalWorkDays}</td>
                 </tr>
             </table>
