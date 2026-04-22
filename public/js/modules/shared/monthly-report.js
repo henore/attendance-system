@@ -825,16 +825,18 @@ export default class SharedMonthlyReport {
                     <tr class="jisseki-total-row">
                         <td class="jisseki-facility-cell">累計　　日/180日</td>
                     </tr>
-                    <tr class="jisseki-addon-row">
-                        <td colspan="2">初期加算</td>
-                        <td colspan="2">利用開始日</td>
-                        <td colspan="2"></td>
-                        <td colspan="2">30日目</td>
-                        <td colspan="2"></td>
-                        <td colspan="2">当月算定日数</td>
-                        <td colspan="2">${totalWorkDays}</td>
-                    </tr>
                 </tfoot>
+            </table>
+            <table class="jisseki-addon-table">
+                <tr>
+                    <td>初期加算</td>
+                    <td>利用開始日</td>
+                    <td class="jisseki-addon-blank"></td>
+                    <td>30日目</td>
+                    <td class="jisseki-addon-blank"></td>
+                    <td>当月算定��数</td>
+                    <td>${totalWorkDays}</td>
+                </tr>
             </table>
             <div class="jisseki-bottom-area">
                 <div class="jisseki-hours-line">

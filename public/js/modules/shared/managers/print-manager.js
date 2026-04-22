@@ -582,9 +582,23 @@ export class PrintManager {
                     line-height: 1.3;
                 }
 
-                /* 初期加算行 */
-                .jisseki-addon-row td {
+                /* 初期加算テーブル */
+                .jisseki-addon-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                    margin-top: 5mm;
+                }
+                .jisseki-addon-table td {
+                    border: 1px solid #333;
+                    text-align: center;
                     font-size: 7pt;
+                    padding: 0.5mm 1mm;
+                    height: 5.5mm;
+                    vertical-align: middle;
+                }
+                .jisseki-addon-blank {
+                    width: 12%;
                 }
 
                 /* テーブル下部エリア */
