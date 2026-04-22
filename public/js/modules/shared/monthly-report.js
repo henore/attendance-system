@@ -620,7 +620,7 @@ export default class SharedMonthlyReport {
         }
 
         let html = `
-            <div class="monthly-attendance-report">
+            <div class="monthly-attendance-report monthly-report-${user.role}">
                 <h5 class="mb-3">
                     <i class="fas fa-user"></i> ${user.name}さんの${monthName}出勤記録
                     <small class="text-muted ms-2">
@@ -642,6 +642,7 @@ export default class SharedMonthlyReport {
                 })}
                 
                 ${this.generateMonthlyFooter(dailyRecords, user)}
+                ${user.role === 'user' ? this.generateUserJissekiPrint(year, month, user, dailyRecords) : ''}
                 ${this.printManager.generatePrintStyles('monthly')}
             </div>
         `;
@@ -696,6 +697,160 @@ export default class SharedMonthlyReport {
         `;
     }
 
+    getWareki(year) {
+        if (year >= 2019) return `令和${year - 2018}年`;
+        if (year >= 1989) return `平成${year - 1988}年`;
+        return `${year}年`;
+    }
+
+    generateUserJissekiPrint(year, month, user, dailyRecords) {
+        const wareki = this.getWareki(year);
+        const daysInMonth = getDaysInMonth(year, month);
+        const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+
+        let totalWorkDays = 0;
+        let totalTransport = 0;
+        let totalMinutes = 0;
+
+        const recordMap = {};
+        dailyRecords.forEach(record => {
+            recordMap[record.day] = record;
+            if (record.clock_in) {
+                totalWorkDays++;
+                if (record.transportation === 1) totalTransport++;
+            }
+            if (record.clock_in && record.clock_out) {
+                const hhmmStr = this.attendanceTable.calculateWorkDurationDay(record);
+                if (hhmmStr && hhmmStr.includes(':')) {
+                    const [h, m] = hhmmStr.split(':').map(Number);
+                    totalMinutes += h * 60 + m;
+                }
+            }
+        });
+
+        const totalHours = `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+        const totalTransportCount = totalTransport * 2;
+
+        let dayRows = '';
+        for (let day = 1; day <= 31; day++) {
+            if (day <= daysInMonth) {
+                const record = recordMap[day];
+                const date = new Date(year, month - 1, day);
+                const dayName = dayNames[date.getDay()];
+                const isAttended = record && record.clock_in;
+
+                const serviceStatus = isAttended ?
+                    (record.service_type === 'commute' ? '通所' : record.service_type === 'home' ? '在宅' : '') : '';
+                const clockIn = isAttended ? record.clock_in : '';
+                const clockOut = isAttended && record.clock_out ? record.clock_out : '';
+                const transportIn = isAttended && record.transportation === 1 ? '1' : '';
+                const transportOut = transportIn;
+
+                dayRows += `<tr>
+                    <td>${day}</td><td>${dayName}</td>
+                    <td>${serviceStatus}</td>
+                    <td>${clockIn}</td><td>${clockOut}</td>
+                    <td>${transportIn}</td><td>${transportOut}</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                    <td></td><td></td>
+                </tr>`;
+            } else {
+                dayRows += `<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+            }
+        }
+
+        return `
+        <div class="user-jisseki-print d-none">
+            <div class="jisseki-row1">
+                <span class="jisseki-wareki">${wareki} ${month}月</span>
+                <span class="jisseki-title">就労継続支援提供実績記録表</span>
+            </div>
+            <table class="jisseki-info">
+                <tr>
+                    <td class="jisseki-label">受給者番号</td>
+                    <td class="jisseki-value">${user.service_no || ''}</td>
+                    <td class="jisseki-label">支給決定障害者氏名</td>
+                    <td class="jisseki-value">${user.name}</td>
+                    <td class="jisseki-label">事業所番号</td>
+                    <td class="jisseki-value">1412801597</td>
+                </tr>
+                <tr>
+                    <td class="jisseki-label">契約支給量</td>
+                    <td class="jisseki-value" colspan="2">就労支援B型　原則の日数</td>
+                    <td class="jisseki-label">事業者及びその事業所</td>
+                    <td class="jisseki-value" colspan="2">はっぴぃたいむ渋沢</td>
+                </tr>
+            </table>
+            <table class="jisseki-main">
+                <thead>
+                    <tr>
+                        <th rowspan="3" class="jcol-date">日付</th>
+                        <th rowspan="3" class="jcol-day">曜日</th>
+                        <th colspan="10">サービス提供実績</th>
+                        <th rowspan="3" class="jcol-confirm">利用者<br>確認欄</th>
+                        <th rowspan="3" class="jcol-note">備考</th>
+                    </tr>
+                    <tr>
+                        <th rowspan="2" class="jcol-status">サービス提供<br>の状況</th>
+                        <th rowspan="2" class="jcol-time">開始<br>時間</th>
+                        <th rowspan="2" class="jcol-time">終了<br>時間</th>
+                        <th colspan="2">送迎加算</th>
+                        <th>訪問支援<br>特別加算</th>
+                        <th rowspan="2" class="jcol-addon">食事提供<br>加算</th>
+                        <th rowspan="2" class="jcol-addon">医療連携<br>体制加算</th>
+                        <th rowspan="2" class="jcol-addon">地域協働<br>加算</th>
+                        <th rowspan="2" class="jcol-addon">施設外<br>加算</th>
+                    </tr>
+                    <tr>
+                        <th class="jcol-transport">往</th>
+                        <th class="jcol-transport">復</th>
+                        <th class="jcol-addon">時間数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${dayRows}
+                </tbody>
+                <tfoot>
+                    <tr class="jisseki-total-row">
+                        <td colspan="2" rowspan="2"><strong>合計</strong></td>
+                        <td rowspan="2"></td>
+                        <td rowspan="2"></td>
+                        <td rowspan="2"></td>
+                        <td colspan="2" rowspan="2">${totalTransportCount > 0 ? totalTransportCount + '回' : ''}</td>
+                        <td rowspan="2">回</td>
+                        <td rowspan="2">回</td>
+                        <td rowspan="2">回</td>
+                        <td rowspan="2">回</td>
+                        <td rowspan="2">回</td>
+                        <td class="jisseki-facility-cell">施設外支援<br>当月　　日</td>
+                        <td rowspan="2"></td>
+                    </tr>
+                    <tr class="jisseki-total-row">
+                        <td class="jisseki-facility-cell">累計　　日/180日</td>
+                    </tr>
+                    <tr class="jisseki-addon-row">
+                        <td colspan="2">初期加算</td>
+                        <td colspan="2">利用開始日</td>
+                        <td colspan="2"></td>
+                        <td colspan="2">30日目</td>
+                        <td colspan="2"></td>
+                        <td colspan="2">当月算定日数</td>
+                        <td colspan="2">${totalWorkDays}</td>
+                    </tr>
+                    <tr class="jisseki-hours-row">
+                        <td colspan="2">勤務時間</td>
+                        <td colspan="4">${totalHours} 時間</td>
+                        <td colspan="2"></td>
+                        <td>1</td>
+                        <td colspan="2">枚中</td>
+                        <td>1</td>
+                        <td colspan="2">枚</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <div class="jisseki-stamp-area">印</div>
+        </div>`;
+    }
 
     // 以下、編集関連のメソッド
     async editAttendance(data) {

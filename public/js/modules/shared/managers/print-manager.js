@@ -462,6 +462,142 @@ export class PrintManager {
                 .screen-only {
                     display: none !important;
                 }
+
+                /* ===== 利用者実績記録表（印刷専用フォーマット） ===== */
+                .monthly-report-user > h5,
+                .monthly-report-user > .table-responsive,
+                .monthly-report-user > .attendance-table {
+                    display: none !important;
+                }
+                .monthly-report-user .user-jisseki-print {
+                    display: block !important;
+                }
+
+                .user-jisseki-print {
+                    width: 100%;
+                    font-family: "游ゴシック", "Yu Gothic", "MS Gothic", sans-serif;
+                }
+
+                /* ヘッダー行（和暦・タイトル） */
+                .jisseki-row1 {
+                    position: relative;
+                    text-align: center;
+                    margin-bottom: 2mm;
+                    padding-top: 1mm;
+                    height: 8mm;
+                    line-height: 8mm;
+                }
+                .jisseki-wareki {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    font-size: 10pt;
+                    line-height: 8mm;
+                }
+                .jisseki-title {
+                    font-size: 14pt;
+                    font-weight: bold;
+                    letter-spacing: 2pt;
+                }
+
+                /* 情報テーブル（受給者番号等） */
+                .jisseki-info {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 1mm;
+                }
+                .jisseki-info td {
+                    border: 1px solid #333;
+                    padding: 0.5mm 2mm;
+                    font-size: 8pt;
+                    height: 5.5mm;
+                }
+                .jisseki-label {
+                    background-color: #f0f0f0 !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                    font-weight: bold;
+                    text-align: center;
+                    white-space: nowrap;
+                    font-size: 7pt !important;
+                }
+                .jisseki-value {
+                    text-align: center;
+                }
+
+                /* メインテーブル */
+                .jisseki-main {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                }
+                .jisseki-main th,
+                .jisseki-main td {
+                    border: 1px solid #333;
+                    text-align: center;
+                    padding: 0 0.5mm;
+                    font-size: 7pt;
+                    line-height: 1.2;
+                    vertical-align: middle;
+                }
+                .jisseki-main thead th {
+                    background-color: #f0f0f0 !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                    font-size: 6pt;
+                    font-weight: bold;
+                    padding: 0.5mm;
+                }
+                .jisseki-main tbody tr {
+                    height: 5.2mm;
+                }
+                .jisseki-main tbody td {
+                    height: 5.2mm;
+                }
+                .jisseki-main tfoot td {
+                    font-size: 7pt;
+                    padding: 0.5mm 1mm;
+                    height: 5.5mm;
+                }
+
+                /* カラム幅（合計100%） */
+                .jcol-date { width: 4%; }
+                .jcol-day { width: 4%; }
+                .jcol-status { width: 9%; }
+                .jcol-time { width: 8%; }
+                .jcol-transport { width: 4%; }
+                .jcol-addon { width: 6%; }
+                .jcol-confirm { width: 12%; }
+                .jcol-note { width: 17%; }
+
+                /* 合計行 */
+                .jisseki-total-row td {
+                    font-weight: bold;
+                }
+                .jisseki-facility-cell {
+                    font-size: 6pt !important;
+                    text-align: left !important;
+                    padding: 0.3mm 1mm !important;
+                    line-height: 1.3;
+                }
+
+                /* 初期加算・勤務時間行 */
+                .jisseki-addon-row td,
+                .jisseki-hours-row td {
+                    font-size: 7pt;
+                }
+
+                /* 印エリア */
+                .jisseki-stamp-area {
+                    float: right;
+                    margin-top: 2mm;
+                    font-size: 8pt;
+                    border: 1px solid #333;
+                    width: 15mm;
+                    height: 15mm;
+                    line-height: 15mm;
+                    text-align: center;
+                }
             }
         `;
 
