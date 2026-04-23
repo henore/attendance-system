@@ -134,36 +134,51 @@ export default class AttendanceStats {
         const display = this.container.querySelector('#statsDisplay');
         display.innerHTML = `
             <div class="row mb-4">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card text-center border-primary">
-                        <div class="card-body">
-                            <h6 class="text-muted">利用者数</h6>
-                            <h3 class="text-primary">${userCount}<small class="fs-6">人</small></h3>
+                        <div class="card-body py-2">
+                            <h6 class="text-muted small">利用者数</h6>
+                            <h4 class="text-primary mb-0">${userCount}<small class="fs-6">人</small></h4>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card text-center border-success">
-                        <div class="card-body">
-                            <h6 class="text-muted">月延べ出勤数</h6>
-                            <h3 class="text-success">${totalAttendance}<small class="fs-6">人日</small></h3>
+                        <div class="card-body py-2">
+                            <h6 class="text-muted small">月延べ出勤数</h6>
+                            <h4 class="text-success mb-0">${totalAttendance}<small class="fs-6">人日</small></h4>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card text-center border-info">
-                        <div class="card-body">
-                            <h6 class="text-muted">毎日の平均勤務人数</h6>
-                            <h3 class="text-info">${dailyAverage.toFixed(1)}<small class="fs-6">人/日</small></h3>
+                        <div class="card-body py-2">
+                            <h6 class="text-muted small">平均勤務人数</h6>
+                            <h4 class="text-info mb-0">${dailyAverage.toFixed(1)}<small class="fs-6">人/日</small></h4>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <div class="card text-center border-warning">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted small">月間売上目標</h6>
+                            <h4 class="text-warning mb-0">-<small class="fs-6">円</small></h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-center border-dark">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted small">月間売上</h6>
+                            <h4 class="text-dark mb-0">-<small class="fs-6">円</small></h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
                     <div class="card text-center border-secondary">
-                        <div class="card-body">
-                            <h6 class="text-muted">売上達成率</h6>
-                            <h3 class="text-secondary">-<small class="fs-6">%</small></h3>
-                            <small class="text-muted">（要件待ち）</small>
+                        <div class="card-body py-2">
+                            <h6 class="text-muted small">売上達成率</h6>
+                            <h4 class="text-secondary mb-0">-<small class="fs-6">%</small></h4>
                         </div>
                     </div>
                 </div>
@@ -221,6 +236,9 @@ export default class AttendanceStats {
                     <td>${w.workingDays}日</td>
                     <td>${w.totalAttendance}人日</td>
                     <td class="${textClass}">${w.average.toFixed(1)}人/日${isAlert ? ' <i class="fas fa-exclamation-triangle"></i>' : ''}</td>
+                    <td class="text-muted">-</td>
+                    <td class="text-muted">-</td>
+                    <td class="text-muted">-</td>
                 </tr>`;
         }).join('');
 
@@ -229,11 +247,14 @@ export default class AttendanceStats {
                 <table class="table table-bordered table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th width="10%">週</th>
-                            <th width="25%">期間</th>
-                            <th width="15%">稼働日数</th>
-                            <th width="20%">延べ出勤数</th>
-                            <th width="30%">平均出勤人数</th>
+                            <th>週</th>
+                            <th>期間</th>
+                            <th>稼働日数</th>
+                            <th>延べ出勤数</th>
+                            <th>平均出勤人数</th>
+                            <th>売上目標</th>
+                            <th>売上</th>
+                            <th>売上達成率</th>
                         </tr>
                     </thead>
                     <tbody>${rows}</tbody>
