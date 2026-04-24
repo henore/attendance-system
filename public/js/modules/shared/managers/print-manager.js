@@ -567,10 +567,10 @@ export class PrintManager {
                     padding: 0.5mm;
                 }
                 .jisseki-main tbody tr {
-                    height: 6.5mm;
+                    height: 7.0mm;
                 }
                 .jisseki-main tbody td {
-                    height: 6.5mm;
+                    height: 7.0mm;
                 }
                 .jisseki-main tfoot td {
                     font-size: 7pt;
@@ -604,7 +604,7 @@ export class PrintManager {
                     width: 100%;
                     border-collapse: collapse;
                     table-layout: fixed;
-                    margin-top: 0.5mm;
+                    margin-top: 0;
                 }
                 .jisseki-addon-table td {
                     border: 1px solid #333;
@@ -620,14 +620,14 @@ export class PrintManager {
 
                 /* テーブル下部エリア */
                 .jisseki-bottom-area {
-                    margin-top: 0.5mm;
+                    margin-top: 0;
                 }
                 .jisseki-hours-line {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                     font-size: 9pt;
-                    margin-bottom: 1mm;
+                    margin-bottom: 0;
                 }
                 .jisseki-hours-left {
                     font-weight: bold;
