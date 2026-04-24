@@ -567,10 +567,10 @@ export class PrintManager {
                     padding: 0.5mm;
                 }
                 .jisseki-main tbody tr {
-                    height: 7.2mm;
+                    height: 7.3mm;
                 }
                 .jisseki-main tbody td {
-                    height: 7.2mm;
+                    height: 7.3mm;
                 }
                 .jisseki-main tfoot td {
                     font-size: 7pt;
