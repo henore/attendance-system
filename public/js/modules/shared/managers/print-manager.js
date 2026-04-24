@@ -476,7 +476,7 @@ export class PrintManager {
                 .user-jisseki-print {
                     width: 100%;
                     font-family: "游ゴシック", "Yu Gothic", "MS Gothic", sans-serif;
-                    padding: 5mm 8mm;
+                    padding: 2mm 5mm;
                     page-break-inside: avoid;
                     overflow: hidden;
                 }
@@ -485,17 +485,17 @@ export class PrintManager {
                 .jisseki-row1 {
                     position: relative;
                     text-align: center;
-                    margin-bottom: 2mm;
-                    padding-top: 1mm;
-                    height: 8mm;
-                    line-height: 8mm;
+                    margin-bottom: 1mm;
+                    padding-top: 0;
+                    height: 6mm;
+                    line-height: 6mm;
                 }
                 .jisseki-wareki {
                     position: absolute;
                     left: 0;
                     top: 0;
                     font-size: 10pt;
-                    line-height: 8mm;
+                    line-height: 6mm;
                 }
                 .jisseki-title {
                     font-size: 14pt;
@@ -507,13 +507,13 @@ export class PrintManager {
                 .jisseki-info {
                     width: 100%;
                     border-collapse: collapse;
-                    margin-bottom: 1mm;
+                    margin-bottom: 0;
                 }
                 .jisseki-info td {
                     border: 1px solid #333;
                     padding: 0.5mm 2mm;
                     font-size: 8pt;
-                    height: 5.5mm;
+                    height: 5mm;
                 }
                 .jisseki-label {
                     background-color: #f0f0f0 !important;
@@ -552,10 +552,10 @@ export class PrintManager {
                     padding: 0.5mm;
                 }
                 .jisseki-main tbody tr {
-                    height: 5.8mm;
+                    height: 7.5mm;
                 }
                 .jisseki-main tbody td {
-                    height: 5.8mm;
+                    height: 7.5mm;
                 }
                 .jisseki-main tfoot td {
                     font-size: 7pt;
@@ -589,7 +589,7 @@ export class PrintManager {
                     width: 100%;
                     border-collapse: collapse;
                     table-layout: fixed;
-                    margin-top: 5mm;
+                    margin-top: 0.5mm;
                 }
                 .jisseki-addon-table td {
                     border: 1px solid #333;
@@ -605,14 +605,14 @@ export class PrintManager {
 
                 /* テーブル下部エリア */
                 .jisseki-bottom-area {
-                    margin-top: 5mm;
+                    margin-top: 0.5mm;
                 }
                 .jisseki-hours-line {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
                     font-size: 9pt;
-                    margin-bottom: 3mm;
+                    margin-bottom: 1mm;
                 }
                 .jisseki-hours-left {
                     font-weight: bold;
@@ -629,16 +629,6 @@ export class PrintManager {
                     min-width: 8mm;
                 }
 
-                /* 印エリア */
-                .jisseki-stamp-area {
-                    float: right;
-                    font-size: 8pt;
-                    border: 1px solid #333;
-                    width: 15mm;
-                    height: 15mm;
-                    line-height: 15mm;
-                    text-align: center;
-                }
             }
         `;
 

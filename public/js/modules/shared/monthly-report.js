@@ -763,7 +763,7 @@ export default class SharedMonthlyReport {
         <div class="user-jisseki-print d-none">
             <div class="jisseki-row1">
                 <span class="jisseki-wareki">${wareki} ${month}月</span>
-                <span class="jisseki-title">就労継続支援提供実績記録表</span>
+                <span class="jisseki-title">就労継続支援提供実績記録票</span>
             </div>
             <table class="jisseki-info">
                 <tr>
@@ -843,7 +843,6 @@ export default class SharedMonthlyReport {
                     <span class="jisseki-hours-left">勤務時間　${totalHours} 時間</span>
                     <span class="jisseki-hours-right"><span class="jisseki-box">1</span><span class="jisseki-box">枚中</span><span class="jisseki-box">1</span><span class="jisseki-box">枚</span></span>
                 </div>
-                <div class="jisseki-stamp-area">印</div>
             </div>
         </div>`;
     }
