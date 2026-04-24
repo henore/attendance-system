@@ -210,7 +210,7 @@ export class PrintManager {
                 .shared-section .custom-card-header,
                 .shared-section .row.mb-4,
                 .btn, .btn-group, .alert, .modal,
-                .navbar, .sidebar, .operation-column,
+                .navbar, .sidebar, .operation-column, .admin-menu,
                 .copy-btn, nav, header, footer,
                 .d-print-none { 
                     display: none !important; 
@@ -426,8 +426,8 @@ export class PrintManager {
                     color: white !important;
                 }
                 
-                /* 改ページ制御 */
-                .monthly-attendance-report {
+                /* 改ページ制御（スタッフ用のみ、利用者は実績記録票で別制御） */
+                .monthly-report-staff {
                     page-break-inside: avoid;
                 }
                 
@@ -463,7 +463,23 @@ export class PrintManager {
                     display: none !important;
                 }
 
-                /* ===== 利用者実績記録表（印刷専用フォーマット） ===== */
+                /* ===== 利用者実績記録票（印刷専用フォーマット） ===== */
+                /* カードヘッダー・フィルター・カード枠を非表示 */
+                #monthlyReportSection .custom-card-header {
+                    display: none !important;
+                }
+                #monthlyReportSection .card-body > .row {
+                    display: none !important;
+                }
+                #monthlyReportSection .custom-card {
+                    border: none !important;
+                    box-shadow: none !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                #monthlyReportSection .card-body {
+                    padding: 0 !important;
+                }
                 .monthly-report-user > h5,
                 .monthly-report-user > .table-responsive,
                 .monthly-report-user > .attendance-table {
@@ -476,8 +492,7 @@ export class PrintManager {
                 .user-jisseki-print {
                     width: 100%;
                     font-family: "游ゴシック", "Yu Gothic", "MS Gothic", sans-serif;
-                    padding: 2mm 5mm;
-                    page-break-inside: avoid;
+                    padding: 2mm 3mm;
                     overflow: hidden;
                 }
 
@@ -552,10 +567,10 @@ export class PrintManager {
                     padding: 0.5mm;
                 }
                 .jisseki-main tbody tr {
-                    height: 7.5mm;
+                    height: 6.5mm;
                 }
                 .jisseki-main tbody td {
-                    height: 7.5mm;
+                    height: 6.5mm;
                 }
                 .jisseki-main tfoot td {
                     font-size: 7pt;
