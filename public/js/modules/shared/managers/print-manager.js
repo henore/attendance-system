@@ -210,7 +210,7 @@ export class PrintManager {
                 .shared-section .custom-card-header,
                 .shared-section .row.mb-4,
                 .btn, .btn-group, .alert, .modal,
-                .navbar, .sidebar, .operation-column, .admin-menu,
+                .navbar, .sidebar, .operation-column, .admin-menu, .staff-menu, .notification-badge,
                 .copy-btn, nav, header, footer,
                 .d-print-none { 
                     display: none !important; 
