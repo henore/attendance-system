@@ -71,6 +71,13 @@ export default class AdminUserManagement {
                                     <input type="text" class="form-control" id="newServiceNo">
                                     <div class="form-text">受給者番号入力（印刷で使用）</div>
                                 </div>
+                                <div class="mb-3" id="hourlyWageGroup" style="display: none;">
+                                    <label for="newHourlyWage" class="form-label">工賃（時給）</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="newHourlyWage" min="0" placeholder="例: 250">
+                                        <span class="input-group-text">円/時</span>
+                                    </div>
+                                </div>
                                 <div class="mb-3" id="transportationGroup" style="display: none;">
                                     <label class="form-label">送迎</label>
                                     <div>
@@ -223,6 +230,13 @@ export default class AdminUserManagement {
                                 <input type="checkbox" id="editWorkWeek6" value="土"> 土
                                 <input type="checkbox" id="editWorkWeek7" value="日"> 日
                                 </div>
+                                <div class="mb-3" id="editHourlyWageGroup" style="display: none;">
+                                    <label for="editHourlyWage" class="form-label">工賃（時給）</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="editHourlyWage" min="0" placeholder="例: 250">
+                                        <span class="input-group-text">円/時</span>
+                                    </div>
+                                </div>
                                 <div class="mb-3" id="editTransportationGroup" style="display: none;">
                                     <label class="form-label">送迎</label>
                                     <div>
@@ -373,6 +387,10 @@ export default class AdminUserManagement {
                 editServiceNoGroup.style.display = 'block';
                 editServiceNoGroup.required = true;
 
+                const editHourlyWageGroup = document.getElementById('editHourlyWageGroup');
+                if (editHourlyWageGroup) editHourlyWageGroup.style.display = 'block';
+                document.getElementById('editHourlyWage').value = user.hourly_wage || '';
+
                 editWorkWeekGroup.style.display = 'block';
                 editWorkWeekGroup.required = true;
 
@@ -409,6 +427,9 @@ export default class AdminUserManagement {
                 editServiceNoGroup.style.display = 'none';
                 editServiceNoGroup.required = false;
 
+                const editHourlyWageGroup = document.getElementById('editHourlyWageGroup');
+                if (editHourlyWageGroup) editHourlyWageGroup.style.display = 'none';
+
                 editWorkWeekGroup.style.display = 'none';
                 editWorkWeekGroup.required = false;
 
@@ -443,6 +464,7 @@ export default class AdminUserManagement {
                     const editTransportationGroup = document.getElementById('editTransportationGroup');
                     const editSkillsGroup = document.getElementById('editSkillsGroup');
 
+                    const editHourlyWageGroup = document.getElementById('editHourlyWageGroup');
                     if (e.target.value === 'user') {
                         editServiceTypeGroup.style.display = 'block';
                         editServiceType.required = true;
@@ -451,12 +473,13 @@ export default class AdminUserManagement {
                         editServiceNoGroup.style.display = 'block';
                         editServiceNoGroup.required = true;
 
+                        if (editHourlyWageGroup) editHourlyWageGroup.style.display = 'block';
+
                         editWorkWeekGroup.style.display = 'block';
                         editWorkWeekGroup.required = true;
 
                         editSkillsGroup.style.display = 'block';
 
-                        // 送迎フィールドはサービス区分に応じて表示
                         if (editServiceType.value === 'commute') {
                             editTransportationGroup.style.display = 'block';
                         } else {
@@ -470,6 +493,8 @@ export default class AdminUserManagement {
 
                         editServiceNoGroup.style.display = 'none';
                         editServiceNoGroup.required = false;
+
+                        if (editHourlyWageGroup) editHourlyWageGroup.style.display = 'none';
 
                         editWorkWeekGroup.style.display = 'none';
                         editWorkWeekGroup.required = false;
@@ -585,7 +610,8 @@ export default class AdminUserManagement {
                 service_no,
                 workweek: workweek.join(','),
                 transportation: (role === 'user' && serviceType === 'commute' && transportationValue === '1') ? 1 : null,
-                skills: role === 'user' ? skills : []
+                skills: role === 'user' ? skills : [],
+                hourly_wage: role === 'user' ? (document.getElementById('editHourlyWage').value || null) : null
             };
 
             if (password) {
@@ -636,6 +662,7 @@ export default class AdminUserManagement {
         const ServiesNoGroup = this.container.querySelector('#ServiceNoGroup');
         const transportationGroup = this.container.querySelector('#transportationGroup');
         const skillsGroup = this.container.querySelector('#skillsGroup');
+        const hourlyWageGroup = this.container.querySelector('#hourlyWageGroup');
 
         if (roleSelect.value === 'user') {
             serviceTypeGroup.style.display = 'block';
@@ -643,6 +670,8 @@ export default class AdminUserManagement {
 
             ServiesNoGroup.style.display = 'block';
             ServiesNoGroup.required = true;
+
+            if (hourlyWageGroup) hourlyWageGroup.style.display = 'block';
 
             skillsGroup.style.display = 'block';
 
@@ -660,6 +689,8 @@ export default class AdminUserManagement {
 
             ServiesNoGroup.style.display = 'none';
             ServiesNoGroup.required = false;
+
+            if (hourlyWageGroup) hourlyWageGroup.style.display = 'none';
 
             transportationGroup.style.display = 'none';
 
@@ -686,7 +717,8 @@ export default class AdminUserManagement {
             serviceType: this.container.querySelector('#newServiceType').value,
             ServiceNo: this.container.querySelector('#newServiceNo').value,
             transportation: transportationRadio?.value === '1' ? 1 : null,
-            skills: role === 'user' ? skills : []
+            skills: role === 'user' ? skills : [],
+            hourly_wage: role === 'user' ? (this.container.querySelector('#newHourlyWage').value || null) : null
         };
 
         // バリデーション

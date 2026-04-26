@@ -672,13 +672,21 @@ export default class SharedMonthlyReport {
             const transportationCount = records.filter(r => {
                 return r.transportation && r.clock_in;
             }).length;
-            const totalTransportation = transportationCount * 2; // 迎+送の合算
+            const totalTransportation = transportationCount * 2;
             transportationCells = `<th colspan="2" class="text-center transportation-col">送迎:${totalTransportation}</th>`;
+        }
+
+        // 月間工賃（利用者かつ工賃設定あり、admin権限のみ表示、印刷しない）
+        let wageCells = '';
+        if (user.role === 'user' && user.hourly_wage && this.isAdmin) {
+            const totalHours = totalMinutes / 60;
+            const monthlyWage = Math.floor(totalHours * user.hourly_wage);
+            wageCells = `<th colspan="2" class="text-center d-print-none" style="color: #198754;">月間工賃: ${monthlyWage.toLocaleString()}円</th>`;
         }
 
         // サービス区分列の有無でcolspan調整
         const showServiceType = user.role === 'user' && (this.isAdmin || this.isStaff);
-        const baseColspan = showServiceType ? 3 : 2;
+        const baseColspan = showServiceType ? 2 : 1;
 
         return `
             <div class="table-responsive">
@@ -689,7 +697,7 @@ export default class SharedMonthlyReport {
                             <th colspan="2" class="text-center">出勤日数: ${workingDays}日</th>
                             <th colspan="2" class="text-center">総実働: ${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}</th>
                             ${transportationCells}
-                            <th colspan="1" class="stamp print-only">印</th>
+                            ${wageCells}
                         </tr>
                     </tfoot>
                 </table>

@@ -47,7 +47,8 @@ db.serialize(() => {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             service_no VARCHAR(255),
             workweek TEXT,
-            transportation INTEGER
+            transportation INTEGER,
+            hourly_wage INTEGER DEFAULT NULL
         )
     `);
 
