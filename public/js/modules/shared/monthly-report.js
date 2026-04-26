@@ -681,7 +681,7 @@ export default class SharedMonthlyReport {
         if (user.role === 'user' && user.hourly_wage && this.isAdmin) {
             const totalHours = totalMinutes / 60;
             const monthlyWage = Math.floor(totalHours * user.hourly_wage);
-            wageCells = `<th colspan="2" class="text-center d-print-none" style="color: #198754;">月間工賃: ${monthlyWage.toLocaleString()}円</th>`;
+            wageCells = `<th colspan="2" class="text-center d-print-none" style="color: #198754;">月間工賃: ${monthlyWage}円</th>`;
         }
 
         // サービス区分列の有無でcolspan調整
