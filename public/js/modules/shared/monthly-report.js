@@ -328,31 +328,36 @@ export default class SharedMonthlyReport {
                 this.reportDetailModal.show(userId, userName, date);
             }
 
-            // 月別出勤簿：利用者の日付クリックで編集モーダルを開く
-            if (this.canEdit && e.target.closest('.monthly-user-day-edit')) {
-                const cell = e.target.closest('.monthly-user-day-edit');
-                this.editAttendance(cell.dataset);
-                return;
-            }
-
-            // 月別出勤簿：スタッフの日付クリックで日報表示
-            if (e.target.closest('.monthly-day-cell')) {
-                const cell = e.target.closest('.monthly-day-cell');
-                const userId = cell.getAttribute('data-user-id');
-                const userName = cell.getAttribute('data-user-name');
-                const date = cell.getAttribute('data-date');
-
-                if (userId && date) {
-                    this.reportDetailModal.show(userId, userName, date);
-                }
-            }
-
             // 編集ボタン（管理者・スタッフ）
             if (this.canEdit && e.target.closest('.btn-edit-attendance')) {
                 const btn = e.target.closest('.btn-edit-attendance');
                 this.editAttendance(btn.dataset);
             }
         });
+
+        // 管理者画面：日付ダブルクリックで操作モーダルを開く
+        if (this.isAdmin) {
+            this.container.addEventListener('dblclick', (e) => {
+                // 利用者の日付ダブルクリックで編集モーダルを開く
+                if (e.target.closest('.monthly-user-day-edit')) {
+                    const cell = e.target.closest('.monthly-user-day-edit');
+                    this.editAttendance(cell.dataset);
+                    return;
+                }
+
+                // スタッフの日付ダブルクリックで日報表示
+                if (e.target.closest('.monthly-day-cell')) {
+                    const cell = e.target.closest('.monthly-day-cell');
+                    const userId = cell.getAttribute('data-user-id');
+                    const userName = cell.getAttribute('data-user-name');
+                    const date = cell.getAttribute('data-date');
+
+                    if (userId && date) {
+                        this.reportDetailModal.show(userId, userName, date);
+                    }
+                }
+            });
+        }
     }
 
     registerModals() {

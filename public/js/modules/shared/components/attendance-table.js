@@ -201,8 +201,8 @@ export class AttendanceTable {
     let dayCellClass = 'text-center';
     let dayCellAttrs = '';
 
-    if (record.user_role === 'user') {
-      // 利用者：日付クリックで編集モーダルを開く（視覚変化なし）
+    if (record.user_role === 'user' && this.userRole === 'admin') {
+      // 管理者画面：利用者の日付ダブルクリックで編集モーダルを開く
       const editData = {
         'data-record-id': record.id || '',
         'data-user-id': record.user_id,

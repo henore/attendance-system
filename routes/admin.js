@@ -48,6 +48,9 @@ const SKILL_TASK_MAP = {
               'Excel動画学習7話～13話まで', 
               'エクセル動画学習14話～19話まで', 
               'Excel動画学習20話～26話まで', 
+              'Excel動画学習1から13話見直し', 
+              'エクセル動画学習14話～24話見直し', 
+              'Excel動画学習　復習', 
               'Excel MOS アソシエイト学習 SUM,AVERAGE関数など', 
               'Excel MOS グラフ作成のやり方',
               'エクセル MOS 学習 条件付き書式 スパークラインなど',
@@ -63,11 +66,6 @@ const SKILL_TASK_MAP = {
               'エクセルMOS学習 フラッシュフィル',
               'Excel MOS 模擬試験チャレンジ',
               'Excel MOS アソシエイト 模試',
-              'エクセル MOS 模試試験',
-              'Excel MOS 模試',
-              'Excel MOS 模擬試験チャレンジ',
-              'Excel MOS アソシエイト 模試',
-              'エクセル MOS 模試試験',
               'Excel MOS 模試'
               
                ],
