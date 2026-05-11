@@ -71,6 +71,11 @@ export default class AdminUserManagement {
                                     <input type="text" class="form-control" id="newServiceNo">
                                     <div class="form-text">受給者番号入力（印刷で使用）</div>
                                 </div>
+                                <div class="mb-3" id="certificateExpiryGroup" style="display: none;">
+                                    <label for="newCertificateExpiry" class="form-label">受給者証有効期限</label>
+                                    <input type="date" class="form-control" id="newCertificateExpiry">
+                                    <div class="form-text">受給者証の有効期限（YYYY-MM-DD）</div>
+                                </div>
                                 <div class="mb-3" id="hourlyWageGroup" style="display: none;">
                                     <label for="newHourlyWage" class="form-label">工賃（時給）</label>
                                     <div class="input-group">
@@ -219,6 +224,10 @@ export default class AdminUserManagement {
                                 <div class="mb-3" id="editServiceNoGroup" style="display: none;">
                                         <label for="editServiceNo" class="form-label">受給者番号</label>
                                         <input type="text" class="form-control" id="editServiceNo">
+                                </div>
+                                <div class="mb-3" id="editCertificateExpiryGroup" style="display: none;">
+                                    <label for="editCertificateExpiry" class="form-label">受給者証有効期限</label>
+                                    <input type="date" class="form-control" id="editCertificateExpiry">
                                 </div>
                                 <div class="mb-3" id="editWorkWeekGroup" style="display: none;">
                                 <label class="form-label">出勤予定</label><br>
@@ -387,6 +396,10 @@ export default class AdminUserManagement {
                 editServiceNoGroup.style.display = 'block';
                 editServiceNoGroup.required = true;
 
+                const editCertificateExpiryGroup = document.getElementById('editCertificateExpiryGroup');
+                if (editCertificateExpiryGroup) editCertificateExpiryGroup.style.display = 'block';
+                document.getElementById('editCertificateExpiry').value = user.certificate_expiry || '';
+
                 const editHourlyWageGroup = document.getElementById('editHourlyWageGroup');
                 if (editHourlyWageGroup) editHourlyWageGroup.style.display = 'block';
                 document.getElementById('editHourlyWage').value = user.hourly_wage || '';
@@ -427,6 +440,9 @@ export default class AdminUserManagement {
                 editServiceNoGroup.style.display = 'none';
                 editServiceNoGroup.required = false;
 
+                const editCertificateExpiryGroup2 = document.getElementById('editCertificateExpiryGroup');
+                if (editCertificateExpiryGroup2) editCertificateExpiryGroup2.style.display = 'none';
+
                 const editHourlyWageGroup = document.getElementById('editHourlyWageGroup');
                 if (editHourlyWageGroup) editHourlyWageGroup.style.display = 'none';
 
@@ -465,6 +481,7 @@ export default class AdminUserManagement {
                     const editSkillsGroup = document.getElementById('editSkillsGroup');
 
                     const editHourlyWageGroup = document.getElementById('editHourlyWageGroup');
+                    const editCertExpiryGroup = document.getElementById('editCertificateExpiryGroup');
                     if (e.target.value === 'user') {
                         editServiceTypeGroup.style.display = 'block';
                         editServiceType.required = true;
@@ -474,6 +491,7 @@ export default class AdminUserManagement {
                         editServiceNoGroup.required = true;
 
                         if (editHourlyWageGroup) editHourlyWageGroup.style.display = 'block';
+                        if (editCertExpiryGroup) editCertExpiryGroup.style.display = 'block';
 
                         editWorkWeekGroup.style.display = 'block';
                         editWorkWeekGroup.required = true;
@@ -495,6 +513,7 @@ export default class AdminUserManagement {
                         editServiceNoGroup.required = false;
 
                         if (editHourlyWageGroup) editHourlyWageGroup.style.display = 'none';
+                        if (editCertExpiryGroup) editCertExpiryGroup.style.display = 'none';
 
                         editWorkWeekGroup.style.display = 'none';
                         editWorkWeekGroup.required = false;
@@ -565,6 +584,7 @@ export default class AdminUserManagement {
         const role = document.getElementById('editRole').value;
         const serviceType = document.getElementById('editServiceType').value;
         const service_no = document.getElementById('editServiceNo').value;
+        const certificate_expiry = document.getElementById('editCertificateExpiry').value || null;
         const workweek = Array.from(
         document.querySelectorAll('input[type="checkbox"][id^="editWorkWeek"]:checked')
         ).map(cb => cb.value);
@@ -611,7 +631,8 @@ export default class AdminUserManagement {
                 workweek: workweek.join(','),
                 transportation: (role === 'user' && serviceType === 'commute' && transportationValue === '1') ? 1 : null,
                 skills: role === 'user' ? skills : [],
-                hourly_wage: role === 'user' ? (document.getElementById('editHourlyWage').value || null) : null
+                hourly_wage: role === 'user' ? (document.getElementById('editHourlyWage').value || null) : null,
+                certificate_expiry: role === 'user' ? certificate_expiry : null
             };
 
             if (password) {
@@ -663,6 +684,7 @@ export default class AdminUserManagement {
         const transportationGroup = this.container.querySelector('#transportationGroup');
         const skillsGroup = this.container.querySelector('#skillsGroup');
         const hourlyWageGroup = this.container.querySelector('#hourlyWageGroup');
+        const certificateExpiryGroup = this.container.querySelector('#certificateExpiryGroup');
 
         if (roleSelect.value === 'user') {
             serviceTypeGroup.style.display = 'block';
@@ -672,6 +694,7 @@ export default class AdminUserManagement {
             ServiesNoGroup.required = true;
 
             if (hourlyWageGroup) hourlyWageGroup.style.display = 'block';
+            if (certificateExpiryGroup) certificateExpiryGroup.style.display = 'block';
 
             skillsGroup.style.display = 'block';
 
@@ -691,6 +714,7 @@ export default class AdminUserManagement {
             ServiesNoGroup.required = false;
 
             if (hourlyWageGroup) hourlyWageGroup.style.display = 'none';
+            if (certificateExpiryGroup) certificateExpiryGroup.style.display = 'none';
 
             transportationGroup.style.display = 'none';
 
@@ -718,7 +742,8 @@ export default class AdminUserManagement {
             ServiceNo: this.container.querySelector('#newServiceNo').value,
             transportation: transportationRadio?.value === '1' ? 1 : null,
             skills: role === 'user' ? skills : [],
-            hourly_wage: role === 'user' ? (this.container.querySelector('#newHourlyWage').value || null) : null
+            hourly_wage: role === 'user' ? (this.container.querySelector('#newHourlyWage').value || null) : null,
+            certificate_expiry: role === 'user' ? (this.container.querySelector('#newCertificateExpiry').value || null) : null
         };
 
         // バリデーション

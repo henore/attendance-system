@@ -43,7 +43,8 @@ export const API_ENDPOINTS = {
     BREAK_STATUS: (date) => `/api/user/break/status/${date}`,
     STAFF_COMMENT_UNREAD: '/api/user/staff-comment/unread',
     STAFF_COMMENT_MARK_READ: '/api/user/staff-comment/mark-read',
-    LAST_RECORD: '/api/user/last-record'
+    LAST_RECORD: '/api/user/last-record',
+    CERTIFICATE_EXPIRY: '/api/user/certificate-expiry'
   },
   
   // スタッフ用

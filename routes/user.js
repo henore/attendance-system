@@ -394,6 +394,27 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
         }
     });
 
+    // 受給者証有効期限取得
+    router.get('/certificate-expiry', requireAuth, async (req, res) => {
+        try {
+            const userId = req.session.user.id;
+            const user = await dbGet(
+                'SELECT certificate_expiry FROM users WHERE id = ?',
+                [userId]
+            );
+            res.json({
+                success: true,
+                certificate_expiry: user ? user.certificate_expiry : null
+            });
+        } catch (error) {
+            console.error('受給者証有効期限取得エラー:', error);
+            res.status(500).json({
+                success: false,
+                error: '受給者証有効期限の取得に失敗しました'
+            });
+        }
+    });
+
     // 前回の日報記録取得
     router.get('/last-record', requireAuth, async (req, res) => {
         try {

@@ -745,6 +745,56 @@ export class ReportDetailModal {
   }
 
   /**
+   * 受給者証有効期限の警告を生成
+   */
+  generateCertificateExpiryWarning() {
+    const { user } = this.currentData;
+    if (!user || !user.certificate_expiry) return '';
+
+    const expiry = new Date(user.certificate_expiry);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+
+    const oneMonthLater = new Date(today);
+    oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+
+    if (expiry <= oneMonthLater && expiry >= today) {
+      const month = expiry.getMonth() + 1;
+      const day = expiry.getDate();
+      return `
+        <div class="alert alert-danger mb-3" style="font-weight: bold;">
+          <i class="fas fa-exclamation-triangle"></i>
+          受給者証の有効期限が近付いています、${month}月${day}日まで
+        </div>
+      `;
+    }
+    return '';
+  }
+
+  /**
+   * 受給者証有効期限ポップアップ通知
+   */
+  showCertificateExpiryPopup() {
+    const { user, userName } = this.currentData;
+    if (!user || !user.certificate_expiry) return;
+
+    const expiry = new Date(user.certificate_expiry);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+
+    const oneMonthLater = new Date(today);
+    oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+
+    if (expiry <= oneMonthLater && expiry >= today) {
+      setTimeout(() => {
+        alert(`${userName}さんの受給者証の有効期限が近づいています、更新をお願いして下さい。`);
+      }, 500);
+    }
+  }
+
+  /**
    * コメントセクション生成
    */
   generateCommentSection(comment) {
@@ -776,22 +826,22 @@ export class ReportDetailModal {
     // 編集可能（スタッフ・管理者）
     const existingComment = comment ? comment.comment : '';
     const isEditable = !comment || this.userRole === 'admin';
-    
+
     return `
       <div class="staff-comment-section">
         <h6><i class="fas fa-comment-plus"></i> スタッフコメント</h6>
-        
+
         ${comment && !isEditable ? `
           <div class="alert alert-warning mb-3">
             <i class="fas fa-lock"></i> 既にコメントが記入されています
           </div>
         ` : ''}
-        
+
         <div class="mb-3">
-          <textarea 
-            class="form-control" 
-            id="staffCommentTextarea" 
-            rows="4" 
+          <textarea
+            class="form-control"
+            id="staffCommentTextarea"
+            rows="4"
             placeholder="利用者への返信、アドバイス、気づいた点などを記入してください..."
             maxlength="500"
             ${!isEditable ? 'readonly' : ''}
@@ -806,13 +856,15 @@ export class ReportDetailModal {
         ${comment ? `
           <div class="existing-comment-info">
             <small class="text-muted">
-              <i class="fas fa-info-circle"></i> 
-              記入者: ${comment.staff_name || 'スタッフ'} | 
+              <i class="fas fa-info-circle"></i>
+              記入者: ${comment.staff_name || 'スタッフ'} |
               記入日時: ${formatDateTime(comment.created_at)}
               ${comment.updated_at ? ` | 更新: ${formatDateTime(comment.updated_at)}` : ''}
             </small>
           </div>
         ` : ''}
+
+        ${this.generateCertificateExpiryWarning()}
       </div>
     `;
   }
@@ -967,7 +1019,10 @@ export class ReportDetailModal {
       // 保存成功後の処理
       if (saveResponse.success !== false) {
         this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
-        
+
+        // 受給者証有効期限の通知
+        this.showCertificateExpiryPopup();
+
         // 画像DL処理
         if (sendToLine) {
           try {

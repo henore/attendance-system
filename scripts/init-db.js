@@ -48,7 +48,8 @@ db.serialize(() => {
             service_no VARCHAR(255),
             workweek TEXT,
             transportation INTEGER,
-            hourly_wage INTEGER DEFAULT NULL
+            hourly_wage INTEGER DEFAULT NULL,
+            certificate_expiry DATE DEFAULT NULL
         )
     `);
 

@@ -308,7 +308,7 @@ router.get('/users/list', async (req, res) => {
       const { userId, date } = req.params;
       
       const user = await dbGet(
-        `SELECT id, username, name, role, service_type, service_no, workweek, transportation
+        `SELECT id, username, name, role, service_type, service_no, workweek, transportation, certificate_expiry
          FROM users WHERE id = ?`,
         [userId]
       );

@@ -7,6 +7,7 @@ import { TermsModal } from './terms-modal.js';
 import { LastReportModal } from './last-report-modal.js';
 import { ConfirmationModal } from './confirmation-modal.js';
 import { getCurrentTime } from '../../utils/date-time.js';
+import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 
 export default class UserModule extends BaseModule {
   constructor(app) {
@@ -210,6 +211,9 @@ export default class UserModule extends BaseModule {
           </div>
         </div>
 
+        <!-- 受給者証有効期限警告 -->
+        <div id="certificateExpiryWarning" style="display: none;"></div>
+
         <!-- 日報セクション -->
         <div class="row mb-4">
           <div class="col-12">
@@ -305,6 +309,44 @@ export default class UserModule extends BaseModule {
     await this.loadReportForm();
     await this.checkUnreadComments();
     await this.loadAttendanceCalendar();
+    await this.checkCertificateExpiry();
+  }
+
+  /**
+   * 受給者証有効期限チェック
+   */
+  async checkCertificateExpiry() {
+    try {
+      const response = await this.apiCall(API_ENDPOINTS.USER.CERTIFICATE_EXPIRY);
+      if (!response.certificate_expiry) return;
+
+      const expiry = new Date(response.certificate_expiry);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      expiry.setHours(0, 0, 0, 0);
+
+      const oneMonthLater = new Date(today);
+      oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+
+      if (expiry <= oneMonthLater && expiry >= today) {
+        const warningDiv = document.getElementById('certificateExpiryWarning');
+        if (warningDiv) {
+          warningDiv.style.display = 'block';
+          warningDiv.innerHTML = `
+            <div class="row mb-4">
+              <div class="col-12">
+                <div class="alert alert-danger mb-0" style="font-weight: bold; font-size: 0.95rem;">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  受給者証の有効期限が近付いています。早急に更新手続きをして下さい。
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+    } catch (error) {
+      console.error('受給者証有効期限チェックエラー:', error);
+    }
   }
 
   /**
