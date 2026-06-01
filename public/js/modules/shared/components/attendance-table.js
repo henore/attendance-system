@@ -571,7 +571,7 @@ export class AttendanceTable {
   generateTableFooter(records, options) {
     if (!options.showFooter) return '';
 
-    const attendingRecords = records.filter(r => r.clock_in);
+    const attendingRecords = records.filter(r => r.clock_in && r.clock_in !== '出勤予定');
     const commuteCount = attendingRecords.filter(r => r.user_role === 'user' && r.service_type === 'commute').length;
     const homeCount = attendingRecords.filter(r => r.user_role === 'user' && r.service_type === 'home').length;
     const userTotal = commuteCount + homeCount;
