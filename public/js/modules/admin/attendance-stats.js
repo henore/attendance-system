@@ -285,6 +285,10 @@ export default class AttendanceStats {
 
     renderDailyTable(year, month, daysInMonth, dailyMap, commuteMap, homeMap, dayNames) {
         let rows = '';
+        let commuteTotal = 0;
+        let homeTotal = 0;
+        let grandTotal = 0;
+
         for (let d = 1; d <= daysInMonth; d++) {
             const date = new Date(year, month - 1, d);
             const dow = date.getDay();
@@ -294,6 +298,10 @@ export default class AttendanceStats {
             const totalCount = dailyMap[d] || 0;
             const isWeekend = dow === 0 || dow === 6;
             const rowClass = isWeekend ? (dow === 0 ? 'table-danger' : 'table-info') : '';
+
+            commuteTotal += commuteCount;
+            homeTotal += homeCount;
+            grandTotal += totalCount;
 
             rows += `
                 <tr class="${rowClass}">
@@ -318,6 +326,14 @@ export default class AttendanceStats {
                         </tr>
                     </thead>
                     <tbody>${rows}</tbody>
+                    <tfoot class="table-secondary" style="position: sticky; bottom: 0; z-index: 1;">
+                        <tr>
+                            <td colspan="2" class="text-end"><strong>合計</strong></td>
+                            <td><strong>${commuteTotal}人日</strong></td>
+                            <td><strong>${homeTotal}人日</strong></td>
+                            <td><strong>${grandTotal}人日</strong></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>`;
     }

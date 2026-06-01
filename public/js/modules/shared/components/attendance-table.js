@@ -590,7 +590,7 @@ export class AttendanceTable {
     }
 
     return `
-      <tfoot class="table-secondary">
+      <tfoot class="table-secondary" style="position: sticky; bottom: 0; z-index: 1;">
         <tr>
           <td colspan="${colSpan}" class="text-end">
             ${summaryParts.join(' | ')}
