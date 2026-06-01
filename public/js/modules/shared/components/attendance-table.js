@@ -145,7 +145,7 @@ export class AttendanceTable {
       <tr>
         ${showDate ? `<td>${this.formatDateCell(record.date)}</td>` : ''}
         <td><strong>${record.user_name || 'Unknown'}</strong></td>
-        <td><span class="badge bg-${roleClass}">${roleDisplay}</span>${record.user_role === 'user' && record.service_type ? `<br><span class="badge bg-${record.service_type === 'commute' ? 'info' : 'secondary'}" style="font-size:0.7em;">${record.service_type === 'commute' ? '通所' : '在宅'}</span>` : ''}</td>
+        <td><span class="badge bg-${roleClass}">${roleDisplay}</span>${record.user_role === 'user' && record.service_type ? ` <span class="badge bg-${record.service_type === 'commute' ? 'info' : 'secondary'}" style="font-size:0.7em;">${record.service_type === 'commute' ? '通所' : '在宅'}</span>` : ''}</td>
         <td class="text-center">${record.clock_in || '-'}</td>
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
