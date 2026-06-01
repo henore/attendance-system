@@ -45,7 +45,7 @@ export class AttendanceTable {
     const roleClass = userRole ? `attendance-table-${userRole}` : '';
 
     return `
-      <div class="table-responsive attendance-table ${roleClass}">
+      <div class="table-responsive attendance-table ${roleClass}" style="max-height: 70vh; overflow-y: auto;">
         <table class="table table-hover">
           ${this.generateTableHeader(options)}
           <tbody>
@@ -75,7 +75,7 @@ export class AttendanceTable {
       // userの場合は「日報」、staffの場合は「操作」
       const operationLabel = options.targetUserRole === 'user' ? '日報' : '操作';
       return `
-        <thead class="table-primary">
+        <thead class="table-primary" style="position: sticky; top: 0; z-index: 1;">
           <tr>
             ${showDate ? '<th class="text-center" width="5%">日</th><th class="text-center" width="5%">曜</th>' : ''}
             ${showServiceType ? '<th class="text-center" width="6%">区分</th>' : ''}
@@ -94,7 +94,7 @@ export class AttendanceTable {
 
     // 通常の出勤管理用ヘッダー
     return `
-      <thead class="table-light">
+      <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
         <tr>
           ${showDate ? '<th class="text-center" width="10%">日付</th>' : ''}
           <th class="text-center" width="12%">ユーザー</th>

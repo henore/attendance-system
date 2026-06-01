@@ -306,9 +306,9 @@ export default class AttendanceStats {
         }
 
         return `
-            <div class="table-responsive">
+            <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
                 <table class="table table-bordered table-hover">
-                    <thead class="table-light">
+                    <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
                         <tr>
                             <th width="20%">日付</th>
                             <th width="10%">曜日</th>
