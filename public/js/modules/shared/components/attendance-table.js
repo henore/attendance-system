@@ -145,7 +145,7 @@ export class AttendanceTable {
       <tr>
         ${showDate ? `<td>${this.formatDateCell(record.date)}</td>` : ''}
         <td><strong>${record.user_name || 'Unknown'}</strong></td>
-        <td><span class="badge bg-${roleClass}">${roleDisplay}</span></td>
+        <td><span class="badge bg-${roleClass}">${roleDisplay}</span>${record.user_role === 'user' && record.service_type ? `<br><span class="badge bg-${record.service_type === 'commute' ? 'info' : 'secondary'}" style="font-size:0.7em;">${record.service_type === 'commute' ? '通所' : '在宅'}</span>` : ''}</td>
         <td class="text-center">${record.clock_in || '-'}</td>
         <td class="text-center">${record.clock_out || '-'}</td>
         <td class="text-center small">${breakDisplay}</td>
@@ -570,15 +570,30 @@ export class AttendanceTable {
    */
   generateTableFooter(records, options) {
     if (!options.showFooter) return '';
-    
-    const workingCount = records.filter(r => r.clock_in && !r.clock_out).length;
-    const finishedCount = records.filter(r => r.clock_in && r.clock_out).length;
-    
+
+    const attendingRecords = records.filter(r => r.clock_in);
+    const commuteCount = attendingRecords.filter(r => r.user_role === 'user' && r.service_type === 'commute').length;
+    const homeCount = attendingRecords.filter(r => r.user_role === 'user' && r.service_type === 'home').length;
+    const userTotal = commuteCount + homeCount;
+    const staffCount = attendingRecords.filter(r => r.user_role === 'staff' || r.user_role === 'admin').length;
+
+    const colSpan = options.showDate ? 11 : 10;
+
+    let summaryParts = [
+      `通所利用者：${commuteCount}名`,
+      `在宅利用者：${homeCount}名`,
+      `利用者出勤合計：${userTotal}名`
+    ];
+
+    if (this.userRole === 'admin') {
+      summaryParts.push(`スタッフ出勤合計：${staffCount}名`);
+    }
+
     return `
       <tfoot class="table-secondary">
         <tr>
-          <td colspan="${options.showDate ? 9 : 8}" class="text-end">
-            出勤中: ${workingCount}名 | 退勤済: ${finishedCount}名
+          <td colspan="${colSpan}" class="text-end">
+            ${summaryParts.join(' | ')}
           </td>
         </tr>
       </tfoot>

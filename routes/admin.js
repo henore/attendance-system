@@ -1782,13 +1782,18 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             `;
 
             const activeUsers = await dbAll(
-                `SELECT id FROM users u WHERE u.role = 'user' AND u.is_active = 1 ${excludeCondition}`,
+                `SELECT id, service_type FROM users u WHERE u.role = 'user' AND u.is_active = 1 ${excludeCondition}`,
                 []
             );
             const userCount = activeUsers.length;
+            const commuteUserCount = activeUsers.filter(u => u.service_type === 'commute').length;
+            const homeUserCount = activeUsers.filter(u => u.service_type === 'home').length;
 
             const dailyCounts = await dbAll(`
-                SELECT a.date, COUNT(DISTINCT a.user_id) as count
+                SELECT a.date,
+                  COUNT(DISTINCT a.user_id) as count,
+                  COUNT(DISTINCT CASE WHEN u.service_type = 'commute' THEN a.user_id END) as commute_count,
+                  COUNT(DISTINCT CASE WHEN u.service_type = 'home' THEN a.user_id END) as home_count
                 FROM attendance a
                 JOIN users u ON a.user_id = u.id
                 WHERE u.role = 'user' AND u.is_active = 1
@@ -1802,6 +1807,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             res.json({
                 success: true,
                 userCount,
+                commuteUserCount,
+                homeUserCount,
                 dailyCounts,
                 year: parseInt(year),
                 month: parseInt(month),

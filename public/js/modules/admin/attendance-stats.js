@@ -109,13 +109,17 @@ export default class AttendanceStats {
     }
 
     renderStats(data) {
-        const { userCount, dailyCounts, year, month, daysInMonth } = data;
+        const { userCount, commuteUserCount, homeUserCount, dailyCounts, year, month, daysInMonth } = data;
         const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
 
         const dailyMap = {};
+        const commuteMap = {};
+        const homeMap = {};
         dailyCounts.forEach(d => {
             const day = new Date(d.date).getDate();
             dailyMap[day] = d.count;
+            commuteMap[day] = d.commute_count || 0;
+            homeMap[day] = d.home_count || 0;
         });
 
         let totalAttendance = 0;
@@ -128,7 +132,6 @@ export default class AttendanceStats {
 
         const dailyAverage = workingDays > 0 ? (totalAttendance / workingDays) : 0;
 
-        // 週ごとの集計
         const weeks = this.calculateWeeklyStats(year, month, daysInMonth, dailyMap, dayNames);
 
         const display = this.container.querySelector('#statsDisplay');
@@ -184,11 +187,29 @@ export default class AttendanceStats {
                 </div>
             </div>
 
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="alert alert-primary mb-0 py-2 text-center">
+                        <strong>通所利用者数：${commuteUserCount}名</strong>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="alert alert-success mb-0 py-2 text-center">
+                        <strong>在宅利用者数：${homeUserCount}名</strong>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="alert alert-dark mb-0 py-2 text-center">
+                        <strong>利用者数合計：${userCount}名</strong>
+                    </div>
+                </div>
+            </div>
+
             <h6 class="mb-3"><i class="fas fa-calendar-week"></i> 週別平均出勤人数</h6>
             ${this.renderWeeklyTable(weeks)}
 
             <h6 class="mt-4 mb-3"><i class="fas fa-list"></i> 日別出勤人数</h6>
-            ${this.renderDailyTable(year, month, daysInMonth, dailyMap, dayNames)}
+            ${this.renderDailyTable(year, month, daysInMonth, dailyMap, commuteMap, homeMap, dayNames)}
         `;
     }
 
@@ -262,13 +283,15 @@ export default class AttendanceStats {
             </div>`;
     }
 
-    renderDailyTable(year, month, daysInMonth, dailyMap, dayNames) {
+    renderDailyTable(year, month, daysInMonth, dailyMap, commuteMap, homeMap, dayNames) {
         let rows = '';
         for (let d = 1; d <= daysInMonth; d++) {
             const date = new Date(year, month - 1, d);
             const dow = date.getDay();
             const dayName = dayNames[dow];
-            const count = dailyMap[d] || 0;
+            const commuteCount = commuteMap[d] || 0;
+            const homeCount = homeMap[d] || 0;
+            const totalCount = dailyMap[d] || 0;
             const isWeekend = dow === 0 || dow === 6;
             const rowClass = isWeekend ? (dow === 0 ? 'table-danger' : 'table-info') : '';
 
@@ -276,7 +299,9 @@ export default class AttendanceStats {
                 <tr class="${rowClass}">
                     <td>${month}/${d}</td>
                     <td>${dayName}</td>
-                    <td>${count > 0 ? count + '人' : '-'}</td>
+                    <td>${commuteCount > 0 ? commuteCount + '人' : '-'}</td>
+                    <td>${homeCount > 0 ? homeCount + '人' : '-'}</td>
+                    <td><strong>${totalCount > 0 ? totalCount + '人' : '-'}</strong></td>
                 </tr>`;
         }
 
@@ -285,9 +310,11 @@ export default class AttendanceStats {
                 <table class="table table-bordered table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th width="30%">日付</th>
-                            <th width="20%">曜日</th>
-                            <th width="50%">出勤人数</th>
+                            <th width="20%">日付</th>
+                            <th width="10%">曜日</th>
+                            <th width="23%">通所</th>
+                            <th width="23%">在宅</th>
+                            <th width="24%">合計</th>
                         </tr>
                     </thead>
                     <tbody>${rows}</tbody>
