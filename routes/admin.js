@@ -390,12 +390,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
     router.get('/attendance/search', async (req, res) => {
   try {
-    const { date, role, userId } = req.query;
-    
+    const { date, role, userId, serviceType } = req.query;
+
     if (!date) {
       return res.status(400).json({ success: false, error: '日付が指定されていません' });
     }
-    
+
     let query = `
       SELECT
         a.id, a.user_id, a.date, a.clock_in, a.clock_out, a.status,
@@ -416,17 +416,22 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     `;
 
     const params = [date, date, date, date, date];
-    
+
     if (role) {
       query += ' AND u.role = ?';
       params.push(role);
     }
-    
+
+    if (serviceType) {
+      query += ' AND u.service_type = ?';
+      params.push(serviceType);
+    }
+
     if (userId) {
       query += ' AND u.id = ?';
       params.push(userId);
     }
-    
+
     query += ' ORDER BY u.role, u.name';
     
     const records = await dbAll(query, params);

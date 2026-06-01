@@ -65,6 +65,8 @@ export class SharedAttendanceManagement {
               <select class="form-control" id="searchRole">
                 <option value="">利用者・スタッフ</option>
                 <option value="user">利用者のみ</option>
+                <option value="user_commute">利用者のみ（通所）</option>
+                <option value="user_home">利用者のみ（在宅）</option>
                 <option value="staff">スタッフのみ</option>
               </select>
             </div>
@@ -74,6 +76,8 @@ export class SharedAttendanceManagement {
               <select class="form-control" id="searchRole">
                 <option value="">全て</option>
                 <option value="user" selected>利用者</option>
+                <option value="user_commute">利用者のみ（通所）</option>
+                <option value="user_home">利用者のみ（在宅）</option>
                 <option value="staff">スタッフ</option>
               </select>
             </div>
@@ -476,21 +480,23 @@ async searchAttendanceRecords() {
     const params = new URLSearchParams({ date: searchDate });
     
     // スタッフ画面と管理者画面で異なる制御
-    if (this.userRole === 'staff') {
-      // スタッフ画面：利用者のみ表示（デフォルト）
-      if (searchRole && searchRole.value) {
-        params.append('role', searchRole.value);
+    const roleValue = searchRole ? searchRole.value : '';
+    if (roleValue === 'user_commute') {
+      params.append('role', 'user');
+      params.append('serviceType', 'commute');
+    } else if (roleValue === 'user_home') {
+      params.append('role', 'user');
+      params.append('serviceType', 'home');
+    } else if (this.userRole === 'staff') {
+      if (roleValue) {
+        params.append('role', roleValue);
       } else {
-        // 何も選択されていない場合は利用者のみ
         params.append('role', 'user');
       }
     } else if (this.userRole === 'admin') {
-      // 管理者画面：adminロールを除外
-      if (searchRole && searchRole.value) {
-        // 特定の権限が選択されている場合
-        params.append('role', searchRole.value);
+      if (roleValue) {
+        params.append('role', roleValue);
       } else {
-        // 「利用者・スタッフ」が選択されている場合はadminを除外
         params.append('excludeAdmin', 'true');
       }
     }
