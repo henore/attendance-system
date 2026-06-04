@@ -4,7 +4,7 @@
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { MESSAGES, EXTERNAL_WORK_LOCATION } from '../../constants/labels.js';
 import { formatAppetite, formatSleepQuality, formatInterviewRequest, formatMedicationTime } from '../../utils/formatter.js';
-import { getCurrentDate } from '../../utils/date-time.js';
+import { getCurrentDate, formatDateTime } from '../../utils/date-time.js';
 
 export class UserReportHandler {
   constructor(apiCall, showNotification) {
@@ -710,7 +710,7 @@ export class UserReportHandler {
               <div class="col-md-6 text-md-end">
                 <small class="text-muted">
                   <i class="fas fa-clock text-info"></i> 
-                  記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                  記入日時: ${formatDateTime(comment.created_at)}
                 </small>
               </div>
             </div>

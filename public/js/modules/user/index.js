@@ -6,7 +6,7 @@ import { UserAttendanceCalendar } from './calendar.js';
 import { TermsModal } from './terms-modal.js';
 import { LastReportModal } from './last-report-modal.js';
 import { ConfirmationModal } from './confirmation-modal.js';
-import { getCurrentTime } from '../../utils/date-time.js';
+import { getCurrentTime, formatDateTime } from '../../utils/date-time.js';
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 
 export default class UserModule extends BaseModule {
@@ -578,7 +578,7 @@ export default class UserModule extends BaseModule {
             <div class="col-md-6 text-md-end">
               <small class="text-muted">
                 <i class="fas fa-clock text-secondary"></i> 
-                記入日時: ${new Date(data.comment.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                記入日時: ${formatDateTime(data.comment.created_at)}
               </small>
             </div>
           </div>

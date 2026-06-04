@@ -1,7 +1,7 @@
 // modules/user/last-report-modal.js
 // 前回出勤記録確認モーダルの管理
 
-import { formatDate } from '../../utils/date-time.js';
+import { formatDate, formatDateTime } from '../../utils/date-time.js';
 
 export class LastReportModal {
   constructor(updateClockInButtonState, showNotification) {
@@ -98,7 +98,7 @@ export class LastReportModal {
               </small>
               <small class="text-muted d-block mt-1">
                 <i class="fas fa-clock text-info"></i> 
-                記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                記入日時: ${formatDateTime(staffComment.created_at)}
               </small>
           </div>
         </div>

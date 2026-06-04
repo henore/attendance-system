@@ -2,7 +2,7 @@
 // 利用者の出勤履歴カレンダー（修正版 - 休憩時間表示対応・モーダル一意性修正）
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
-import { formatDate, getDaysInMonth } from '../../utils/date-time.js';
+import { formatDate, formatDateTime, getDaysInMonth } from '../../utils/date-time.js';
 import { modalManager } from '../shared/modal-manager.js';
 import { isJapaneseHoliday, preloadHolidays } from '../../utils/holidays.js';
 
@@ -616,7 +616,7 @@ export class UserAttendanceCalendar {
               <div class="col-6 text-end">
                 <small class="text-muted">
                   <i class="fas fa-clock text-info"></i> 
-                  ${new Date(staffComment.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                  ${formatDateTime(staffComment.created_at)}
                 </small>
               </div>
             </div>
