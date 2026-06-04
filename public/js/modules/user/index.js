@@ -578,7 +578,7 @@ export default class UserModule extends BaseModule {
             <div class="col-md-6 text-md-end">
               <small class="text-muted">
                 <i class="fas fa-clock text-secondary"></i> 
-                記入日時: ${new Date(data.comment.created_at).toLocaleString('ja-JP')}
+                記入日時: ${new Date(data.comment.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               </small>
             </div>
           </div>

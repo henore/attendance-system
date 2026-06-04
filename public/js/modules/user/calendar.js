@@ -616,7 +616,7 @@ export class UserAttendanceCalendar {
               <div class="col-6 text-end">
                 <small class="text-muted">
                   <i class="fas fa-clock text-info"></i> 
-                  ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
+                  ${new Date(staffComment.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                 </small>
               </div>
             </div>

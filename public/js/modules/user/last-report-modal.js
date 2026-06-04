@@ -98,7 +98,7 @@ export class LastReportModal {
               </small>
               <small class="text-muted d-block mt-1">
                 <i class="fas fa-clock text-info"></i> 
-                記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP')}
+                記入日時: ${new Date(staffComment.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               </small>
           </div>
         </div>

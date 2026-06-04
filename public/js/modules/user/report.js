@@ -710,7 +710,7 @@ export class UserReportHandler {
               <div class="col-md-6 text-md-end">
                 <small class="text-muted">
                   <i class="fas fa-clock text-info"></i> 
-                  記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP')}
+                  記入日時: ${new Date(comment.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                 </small>
               </div>
             </div>
