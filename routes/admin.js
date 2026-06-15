@@ -476,6 +476,29 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       return processed;
     });
     
+    // 承認待ちの申請を取得してレコードに付与
+    const pendingLogs = await dbAll(
+      `SELECT target_id, new_value FROM audit_log
+       WHERE approval_status = 'pending'
+         AND action_type IN ('staff_attendance_correction', 'staff_attendance_creation')`,
+      []
+    );
+
+    const pendingByRecordId = new Set(pendingLogs.filter(l => l.target_id).map(l => l.target_id));
+    const pendingByUserDate = new Set();
+    pendingLogs.forEach(l => {
+      try {
+        const nv = JSON.parse(l.new_value);
+        if (nv.user_id && nv.date) {
+          pendingByUserDate.add(`${nv.user_id}_${nv.date}`);
+        }
+      } catch (e) { /* ignore */ }
+    });
+
+    processedRecords.forEach(r => {
+      r.has_pending_correction = pendingByRecordId.has(r.id) || pendingByUserDate.has(`${r.user_id}_${r.date}`);
+    });
+
     res.json({ success: true, records: processedRecords });
   } catch (error) {
     console.error('出勤記録検索エラー:', error);
