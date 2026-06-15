@@ -436,9 +436,10 @@ export default class SharedMonthlyReport {
             if (this.isStaff) {
                 // スタッフ：利用者のみ（シンプル表示）
                 users.forEach(user => {
-                    const serviceDisplay = user.service_type ? 
+                    const serviceDisplay = user.service_type ?
                         ` (${this.parent.getServiceTypeDisplayName(user.service_type)})` : '';
-                    html += `<option value="${user.id}">${user.name}${serviceDisplay}</option>`;
+                    const retiredLabel = user.is_active === 2 ? ' [退職]' : '';
+                    html += `<option value="${user.id}">${user.name}${serviceDisplay}${retiredLabel}</option>`;
                 });
             } else {
                 // 管理者：権限別にグループ化
@@ -461,9 +462,10 @@ export default class SharedMonthlyReport {
                         html += `<optgroup label="${groupLabel}">`;
                         
                         usersByRole[role].forEach(user => {
-                            const serviceDisplay = user.service_type && role === 'user' ? 
+                            const serviceDisplay = user.service_type && role === 'user' ?
                                 ` (${this.parent.getServiceTypeDisplayName(user.service_type)})` : '';
-                            html += `<option value="${user.id}">${user.name}${serviceDisplay}</option>`;
+                            const retiredLabel = user.is_active === 2 ? ' [退職]' : '';
+                            html += `<option value="${user.id}">${user.name}${serviceDisplay}${retiredLabel}</option>`;
                         });
                         
                         html += '</optgroup>';

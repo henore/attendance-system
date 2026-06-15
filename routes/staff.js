@@ -242,14 +242,15 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     console.log('[STAFF API] ユーザー取得パラメータ:', { role });
     
     let query = `
-      SELECT 
-        u.id, 
-        u.name, 
-        u.role, 
+      SELECT
+        u.id,
+        u.name,
+        u.role,
         u.service_type,
+        u.is_active,
         u.created_at
       FROM users u
-      WHERE u.is_active = 1
+      WHERE u.is_active >= 1
     `;
     const params = [];
     
@@ -282,14 +283,15 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 router.get('/users/list', async (req, res) => {
   try {
     const users = await dbAll(`
-      SELECT 
-        u.id, 
-        u.name, 
-        u.role, 
-        u.service_type
+      SELECT
+        u.id,
+        u.name,
+        u.role,
+        u.service_type,
+        u.is_active
       FROM users u
-      WHERE u.role = 'user' 
-        AND u.is_active = 1
+      WHERE u.role = 'user'
+        AND u.is_active >= 1
       ORDER BY u.name
     `);
     
@@ -647,7 +649,7 @@ router.post('/break/end', async (req, res) => {
       
       // 指定されたユーザーが利用者かチェック
       const targetUser = await dbGet(
-        'SELECT id, name, role, service_type, service_no, transportation, hourly_wage FROM users WHERE id = ? AND is_active = 1',
+        'SELECT id, name, role, service_type, service_no, transportation, hourly_wage FROM users WHERE id = ? AND is_active >= 1',
         [userId]
       );
       

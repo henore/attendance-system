@@ -339,25 +339,34 @@ export default class AdminUserManagement {
             console.warn('モーダル登録エラー:', error);
         }
 
-        // イベント委譲で動的ボタンを処理（修正）
+        // イベント委譲で動的ボタンを処理
         this.container.addEventListener('click', (e) => {
+            // 退職/復職トグルボタン
+            if (e.target.closest('.btn-toggle-retire')) {
+                e.preventDefault();
+                const btn = e.target.closest('.btn-toggle-retire');
+                const userId = btn.getAttribute('data-user-id');
+                const userName = btn.getAttribute('data-user-name');
+                const isActive = parseInt(btn.getAttribute('data-is-active'));
+                this.toggleRetire(userId, userName, isActive);
+            }
+
             // 無効化ボタン
             if (e.target.closest('.btn-deactivate-user')) {
-                e.preventDefault();  // 追加
+                e.preventDefault();
                 const btn = e.target.closest('.btn-deactivate-user');
                 const userId = btn.getAttribute('data-user-id');
                 const userName = btn.getAttribute('data-user-name');
                 this.deactivateUser(userId, userName);
             }
-            
-        // 詳細ボタン
-        if (e.target.closest('.btn-user-detail')) {
-            e.preventDefault();  // 追加
-            const btn = e.target.closest('.btn-user-detail');
-            const userId = btn.getAttribute('data-user-id');
-            this.showUserEditModal(userId);
-        }
 
+            // 詳細ボタン
+            if (e.target.closest('.btn-user-detail')) {
+                e.preventDefault();
+                const btn = e.target.closest('.btn-user-detail');
+                const userId = btn.getAttribute('data-user-id');
+                this.showUserEditModal(userId);
+            }
         });
     }
 
@@ -905,21 +914,31 @@ export default class AdminUserManagement {
                         <code>${user.username}</code>
                         ${isDefaultUser ? '<span class="badge bg-secondary ms-1">デフォルト</span>' : ''}
                     </td>
-                    <td><strong>${user.name}</strong></td>
+                    <td>
+                        <strong>${user.name}</strong>
+                        ${user.is_active === 2 ? '<span class="badge bg-secondary ms-1">退職</span>' : ''}
+                    </td>
                     <td><span class="badge bg-${roleClass}">${this.parent.getRoleDisplayName(user.role)}</span></td>
                     <td>${serviceType}</td>
                     <td><small>${registrationDate}</small></td>
                     <td>
                         <div class="btn-group" role="group">
-                            <button class="btn btn-sm btn-outline-info btn-user-detail" 
+                            <button class="btn btn-sm btn-outline-info btn-user-detail"
                                     data-user-id="${user.id}"
                                     title="詳細表示">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-danger btn-deactivate-user" 
+                            <button class="btn btn-sm ${user.is_active === 2 ? 'btn-outline-success' : 'btn-outline-secondary'} btn-toggle-retire"
                                     data-user-id="${user.id}"
                                     data-user-name="${user.name}"
-                                    ${isDefaultUser ? 'disabled title="デフォルトユーザーは無効化できません"' : 'title="無効化"'}>
+                                    data-is-active="${user.is_active}"
+                                    ${isDefaultUser ? 'disabled title="デフォルトユーザーは退職処理できません"' : `title="${user.is_active === 2 ? '復職' : '退職'}"`}>
+                                <i class="fas ${user.is_active === 2 ? 'fa-undo' : 'fa-user-slash'}"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger btn-deactivate-user"
+                                    data-user-id="${user.id}"
+                                    data-user-name="${user.name}"
+                                    ${isDefaultUser || user.is_active === 2 ? `disabled title="${isDefaultUser ? 'デフォルトユーザーは無効化できません' : '退職者は先に復職してください'}"` : 'title="無効化"'}>
                                 <i class="fas fa-ban"></i>
                             </button>
                         </div>
@@ -1012,7 +1031,7 @@ export default class AdminUserManagement {
                         </tr>
                         <tr>
                             <th>状態:</th>
-                            <td><span class="badge bg-success">有効</span></td>
+                            <td><span class="badge bg-${user.is_active === 2 ? 'secondary' : 'success'}">${user.is_active === 2 ? '退職' : '有効'}</span></td>
                         </tr>
                     </table>
                 </div>
@@ -1034,6 +1053,36 @@ export default class AdminUserManagement {
                 </div>
             ` : ''}
         `;
+    }
+
+    async toggleRetire(userId, userName, currentStatus) {
+        const isRetiring = currentStatus === 1;
+        const actionLabel = isRetiring ? '退職' : '復職';
+
+        const confirmed = await this.parent.showConfirm({
+            title: `${actionLabel}処理`,
+            message: isRetiring
+                ? `${userName}さんを退職処理しますか？<br><small class="text-muted">退職後もデータは閲覧可能です。出勤記録管理からは除外されます。</small>`
+                : `${userName}さんを復職させますか？`,
+            confirmText: actionLabel,
+            confirmClass: isRetiring ? 'btn-secondary' : 'btn-success',
+            icon: isRetiring ? 'fas fa-user-slash' : 'fas fa-undo'
+        });
+
+        if (!confirmed) return;
+
+        try {
+            await this.parent.callApi(API_ENDPOINTS.ADMIN.TOGGLE_RETIRE(userId), {
+                method: 'PUT'
+            });
+
+            this.parent.showNotification(`${userName}さんを${actionLabel}しました`, 'info');
+            await this.loadExistingUsers();
+
+        } catch (error) {
+            console.error(`${actionLabel}処理エラー:`, error);
+            this.parent.showNotification(error.message || `${actionLabel}処理に失敗しました`, 'danger');
+        }
     }
 
     async deactivateUser(userId, userName) {

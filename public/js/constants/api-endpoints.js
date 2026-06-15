@@ -92,7 +92,8 @@ export const API_ENDPOINTS = {
     USER_UPDATE: (userId) => `/api/admin/users/${userId}`,
     USER_DELETE: (userId) => `/api/admin/users/${userId}`,
     USER_TOGGLE: (userId) => `/api/admin/users/${userId}/toggle`,
-    RETIRE_USER: (userId) => `/api/admin/retire/${userId}`, // 追加
+    RETIRE_USER: (userId) => `/api/admin/retire/${userId}`,
+    TOGGLE_RETIRE: (userId) => `/api/admin/users/${userId}/toggle-retire`,
     MONTHLY_REPORT: '/api/admin/monthly-report',
     EXPORT_CSV: '/api/admin/export/csv',
     AUDIT_LOG: '/api/admin/audit-log',

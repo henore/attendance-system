@@ -364,9 +364,10 @@ async updateUserSelectOptions() {
     if (userSelect && response.users) {
       let html = '<option value="">全て</option>';
       
-      const filteredUsers = selectedRole 
-        ? response.users.filter(user => user.role === selectedRole)
-        : response.users;
+      const activeUsers = response.users.filter(user => user.is_active === 1);
+      const filteredUsers = selectedRole
+        ? activeUsers.filter(user => user.role === selectedRole)
+        : activeUsers;
       
       filteredUsers.forEach(user => {
         const roleDisplay = this.parent.getRoleDisplayName(user.role);
@@ -440,10 +441,12 @@ async loadData() {
     if (userSelect && response.users) {
       let html = '<option value="">全て</option>';
       
-      // admin画面では管理者を除外
-      const filteredUsers = this.userRole === 'admin' 
-        ? response.users.filter(user => user.role !== 'admin')
-        : response.users;
+      // 退職者(is_active=2)と管理者(admin画面のみ)を除外
+      const filteredUsers = response.users.filter(user => {
+        if (user.is_active === 2) return false;
+        if (this.userRole === 'admin' && user.role === 'admin') return false;
+        return true;
+      });
       
       // 利用者、スタッフの順で表示
       const sortedUsers = filteredUsers.sort((a, b) => {

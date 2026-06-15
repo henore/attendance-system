@@ -319,14 +319,14 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         }
     });
 
-    // 全ユーザー取得（退職者除く）
+    // 全ユーザー取得（無効化ユーザーを除く、退職者は含む）
     router.get('/users', requireAuth, requireRole(['admin']), async (req, res) => {
         try {
             const { role } = req.query;
             let query = `
-                SELECT id, username, name, role, service_type, created_at, service_no, workweek, transportation, skills, hourly_wage, certificate_expiry
+                SELECT id, username, name, role, service_type, is_active, created_at, service_no, workweek, transportation, skills, hourly_wage, certificate_expiry
                 FROM users
-                WHERE is_active = 1
+                WHERE is_active >= 1
             `;
             const params = [];
             
@@ -739,7 +739,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             // ユーザー情報取得（passwordは返さない）
             const user = await dbGet(
                 `SELECT id, username, name, role, service_type, service_no, workweek, transportation, hourly_wage
-                 FROM users WHERE id = ? AND is_active = 1`,
+                 FROM users WHERE id = ? AND is_active >= 1`,
                 [userId]
             );
 
@@ -781,12 +781,33 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 ORDER BY a.date
             `, [userId, startDate, endDate]);
             
-            // 管理者操作は監査ログに記録しない
-            
-            res.json({ 
+            // 承認待ちの申請を取得してレコードに付与
+            const pendingLogs = await dbAll(
+              `SELECT target_id, new_value FROM audit_log
+               WHERE approval_status = 'pending'
+                 AND action_type IN ('staff_attendance_correction', 'staff_attendance_creation')`,
+              []
+            );
+
+            const pendingByRecordId = new Set(pendingLogs.filter(l => l.target_id).map(l => l.target_id));
+            const pendingByUserDate = new Set();
+            pendingLogs.forEach(l => {
+              try {
+                const nv = JSON.parse(l.new_value);
+                if (nv.user_id && nv.date) {
+                  pendingByUserDate.add(`${nv.user_id}_${nv.date}`);
+                }
+              } catch (e) { /* ignore */ }
+            });
+
+            records.forEach(r => {
+              r.has_pending_correction = pendingByRecordId.has(r.id) || pendingByUserDate.has(`${r.user_id}_${r.date}`);
+            });
+
+            res.json({
                 success: true,
-                records, 
-                user 
+                records,
+                user
             });
             
         } catch (error) {
@@ -805,7 +826,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             
             // ユーザー情報取得
             const user = await dbGet(
-                'SELECT * FROM users WHERE id = ? AND is_active = 1',
+                'SELECT * FROM users WHERE id = ? AND is_active >= 1',
                 [userId]
             );
             
@@ -931,7 +952,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             
             // ユーザー存在確認
             const user = await dbGet(
-                'SELECT username, name FROM users WHERE id = ? AND is_active = 1', 
+                'SELECT username, name, is_active FROM users WHERE id = ? AND is_active >= 1',
                 [userId]
             );
             
@@ -969,6 +990,69 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             res.status(500).json({ 
                 success: false,
                 error: 'ユーザー無効化処理でエラーが発生しました' 
+            });
+        }
+    });
+
+    // 退職/復職トグル
+    router.put('/users/:userId/toggle-retire', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { userId } = req.params;
+
+            const user = await dbGet(
+                'SELECT id, username, name, is_active FROM users WHERE id = ? AND is_active >= 1',
+                [userId]
+            );
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'ユーザーが見つかりません'
+                });
+            }
+
+            const defaultUsers = ['admin', 'staff1', 'user1', 'user2'];
+            if (defaultUsers.includes(user.username)) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'デフォルトユーザーは退職処理できません'
+                });
+            }
+
+            const newStatus = user.is_active === 1 ? 2 : 1;
+            const actionLabel = newStatus === 2 ? '退職' : '復職';
+
+            await dbRun(
+                'UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [newStatus, userId]
+            );
+
+            // 監査ログに記録
+            await dbRun(
+                `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, old_value, new_value, reason, ip_address)
+                 VALUES (?, ?, ?, 'user', ?, ?, ?, ?)`,
+                [
+                    req.session.user.id,
+                    newStatus === 2 ? 'user_retire' : 'user_reinstate',
+                    userId,
+                    JSON.stringify({ is_active: user.is_active }),
+                    JSON.stringify({ is_active: newStatus }),
+                    `${user.name}を${actionLabel}処理`,
+                    req.ip
+                ]
+            );
+
+            res.json({
+                success: true,
+                message: `${user.name}さんを${actionLabel}しました`,
+                is_active: newStatus
+            });
+
+        } catch (error) {
+            console.error('退職/復職処理エラー:', error);
+            res.status(500).json({
+                success: false,
+                error: '退職/復職処理でエラーが発生しました'
             });
         }
     });
