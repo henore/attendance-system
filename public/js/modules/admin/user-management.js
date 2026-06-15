@@ -347,8 +347,9 @@ export default class AdminUserManagement {
                 const btn = e.target.closest('.btn-toggle-retire');
                 const userId = btn.getAttribute('data-user-id');
                 const userName = btn.getAttribute('data-user-name');
+                const userRole = btn.getAttribute('data-user-role');
                 const isActive = parseInt(btn.getAttribute('data-is-active'));
-                this.toggleRetire(userId, userName, isActive);
+                this.toggleRetire(userId, userName, isActive, userRole);
             }
 
             // 無効化ボタン
@@ -908,6 +909,9 @@ export default class AdminUserManagement {
             const defaultUsers = ['admin', 'staff1', 'user1', 'user2'];
             const isDefaultUser = defaultUsers.includes(user.username);
 
+            const retireLabel = user.role === 'user' ? '退所' : '退職';
+            const reinstateLabel = '復帰';
+
             html += `
                 <tr>
                     <td>
@@ -916,7 +920,7 @@ export default class AdminUserManagement {
                     </td>
                     <td>
                         <strong>${user.name}</strong>
-                        ${user.is_active === 2 ? '<span class="badge bg-secondary ms-1">退職</span>' : ''}
+                        ${user.is_active === 2 ? `<span class="badge bg-secondary ms-1">${retireLabel}</span>` : ''}
                     </td>
                     <td><span class="badge bg-${roleClass}">${this.parent.getRoleDisplayName(user.role)}</span></td>
                     <td>${serviceType}</td>
@@ -931,14 +935,15 @@ export default class AdminUserManagement {
                             <button class="btn btn-sm ${user.is_active === 2 ? 'btn-outline-success' : 'btn-outline-secondary'} btn-toggle-retire"
                                     data-user-id="${user.id}"
                                     data-user-name="${user.name}"
+                                    data-user-role="${user.role}"
                                     data-is-active="${user.is_active}"
-                                    ${isDefaultUser ? 'disabled title="デフォルトユーザーは退職処理できません"' : `title="${user.is_active === 2 ? '復職' : '退職'}"`}>
+                                    ${isDefaultUser ? `disabled title="デフォルトユーザーは${retireLabel}処理できません"` : `title="${user.is_active === 2 ? reinstateLabel : retireLabel}"`}>
                                 <i class="fas ${user.is_active === 2 ? 'fa-undo' : 'fa-user-slash'}"></i>
                             </button>
                             <button class="btn btn-sm btn-outline-danger btn-deactivate-user"
                                     data-user-id="${user.id}"
                                     data-user-name="${user.name}"
-                                    ${isDefaultUser || user.is_active === 2 ? `disabled title="${isDefaultUser ? 'デフォルトユーザーは無効化できません' : '退職者は先に復職してください'}"` : 'title="無効化"'}>
+                                    ${isDefaultUser || user.is_active === 2 ? `disabled title="${isDefaultUser ? 'デフォルトユーザーは無効化できません' : `${retireLabel}者は先に復帰してください`}"` : 'title="無効化"'}>
                                 <i class="fas fa-ban"></i>
                             </button>
                         </div>
@@ -1031,7 +1036,7 @@ export default class AdminUserManagement {
                         </tr>
                         <tr>
                             <th>状態:</th>
-                            <td><span class="badge bg-${user.is_active === 2 ? 'secondary' : 'success'}">${user.is_active === 2 ? '退職' : '有効'}</span></td>
+                            <td><span class="badge bg-${user.is_active === 2 ? 'secondary' : 'success'}">${user.is_active === 2 ? (user.role === 'user' ? '退所' : '退職') : '有効'}</span></td>
                         </tr>
                     </table>
                 </div>
@@ -1055,15 +1060,17 @@ export default class AdminUserManagement {
         `;
     }
 
-    async toggleRetire(userId, userName, currentStatus) {
+    async toggleRetire(userId, userName, currentStatus, userRole) {
         const isRetiring = currentStatus === 1;
-        const actionLabel = isRetiring ? '退職' : '復職';
+        const retireLabel = userRole === 'user' ? '退所' : '退職';
+        const reinstateLabel = '復帰';
+        const actionLabel = isRetiring ? retireLabel : reinstateLabel;
 
         const confirmed = await this.parent.showConfirm({
             title: `${actionLabel}処理`,
             message: isRetiring
-                ? `${userName}さんを退職処理しますか？<br><small class="text-muted">退職後もデータは閲覧可能です。出勤記録管理からは除外されます。</small>`
-                : `${userName}さんを復職させますか？`,
+                ? `${userName}さんを${actionLabel}処理しますか？<br><small class="text-muted">${actionLabel}後もデータは閲覧可能です。出勤記録管理からは除外されます。</small>`
+                : `${userName}さんを${actionLabel}させますか？`,
             confirmText: actionLabel,
             confirmClass: isRetiring ? 'btn-secondary' : 'btn-success',
             icon: isRetiring ? 'fas fa-user-slash' : 'fas fa-undo'

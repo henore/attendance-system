@@ -1023,7 +1023,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             const { userId } = req.params;
 
             const user = await dbGet(
-                'SELECT id, username, name, is_active FROM users WHERE id = ? AND is_active >= 1',
+                'SELECT id, username, name, role, is_active FROM users WHERE id = ? AND is_active >= 1',
                 [userId]
             );
 
@@ -1035,15 +1035,16 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             }
 
             const defaultUsers = ['admin', 'staff1', 'user1', 'user2'];
+            const retireLabel = user.role === 'user' ? '退所' : '退職';
             if (defaultUsers.includes(user.username)) {
                 return res.status(400).json({
                     success: false,
-                    error: 'デフォルトユーザーは退職処理できません'
+                    error: `デフォルトユーザーは${retireLabel}処理できません`
                 });
             }
 
             const newStatus = user.is_active === 1 ? 2 : 1;
-            const actionLabel = newStatus === 2 ? '退職' : '復職';
+            const actionLabel = newStatus === 2 ? retireLabel : '復帰';
 
             await dbRun(
                 'UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',

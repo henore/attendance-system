@@ -438,7 +438,7 @@ export default class SharedMonthlyReport {
                 users.forEach(user => {
                     const serviceDisplay = user.service_type ?
                         ` (${this.parent.getServiceTypeDisplayName(user.service_type)})` : '';
-                    const retiredLabel = user.is_active === 2 ? ' [退職]' : '';
+                    const retiredLabel = user.is_active === 2 ? ' [退所]' : '';
                     html += `<option value="${user.id}">${user.name}${serviceDisplay}${retiredLabel}</option>`;
                 });
             } else {
@@ -464,7 +464,7 @@ export default class SharedMonthlyReport {
                         usersByRole[role].forEach(user => {
                             const serviceDisplay = user.service_type && role === 'user' ?
                                 ` (${this.parent.getServiceTypeDisplayName(user.service_type)})` : '';
-                            const retiredLabel = user.is_active === 2 ? ' [退職]' : '';
+                            const retiredLabel = user.is_active === 2 ? ` [${role === 'user' ? '退所' : '退職'}]` : '';
                             html += `<option value="${user.id}">${user.name}${serviceDisplay}${retiredLabel}</option>`;
                         });
                         
