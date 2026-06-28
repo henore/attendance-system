@@ -941,11 +941,8 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 params.push(hashedPassword);
             }
             
-            if(workweek){
-                const updateworkweek = workweek
-                updateQuery += ', workweek = ?';
-                params.push(updateworkweek);
-            }
+            updateQuery += ', workweek = ?';
+            params.push(workweek || '');
             
             updateQuery += ' WHERE id = ?';
             params.push(userId);
