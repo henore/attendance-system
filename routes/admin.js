@@ -212,7 +212,7 @@ function generateRandomReportData(isHome, clockInValue, clockOutValue, userSkill
         workContent,
         workLocation: isHome ? 'home' : 'office',
         pcNumber,
-        externalWorkLocation: isHome ? '施設外就労先名（佐藤美幸）' : null,
+        externalWorkLocation: isHome ? null : '施設外就労先名（佐藤美幸）',
         temperature,
         appetite,
         bedtime,
