@@ -140,12 +140,6 @@ export class StaffDailyReportModal {
               <form id="staffDailyReportForm">
                 <div class="mb-3">
                   <label class="form-label required">本日のサービス提供記録及び業務報告</label>
-                  <textarea
-                    class="form-control mb-2"
-                    id="modalFreeText"
-                    rows="2"
-                    placeholder="全体の業務報告・特記事項など"
-                  >${this.escapeHtml(freeText)}</textarea>
                   ${users.length > 0 ? `
                   <div class="service-record-table-wrapper">
                     <table class="table table-sm table-bordered mb-0 service-record-table">
@@ -170,13 +164,13 @@ export class StaffDailyReportModal {
                 </div>
 
                 <div class="mb-3">
-                  <label for="communication" class="form-label">連絡事項</label>
+                  <label for="communication" class="form-label">業務報告</label>
                   <textarea
                     class="form-control"
                     id="communication"
                     name="communication"
                     rows="2"
-                    placeholder="連絡事項があれば記入してください"
+                    placeholder="業務報告や特記事項があれば記入してください"
                   >${communication}</textarea>
                 </div>
               </form>
@@ -215,7 +209,7 @@ export class StaffDailyReportModal {
           color: #dc3545;
         }
         .service-record-table-wrapper {
-          max-height: 130px;
+          max-height: 195px;
           overflow-y: auto;
           border: 1px solid #dee2e6;
           border-radius: 4px;
@@ -272,7 +266,6 @@ export class StaffDailyReportModal {
   async handleSubmit(attendance, onSubmit) {
     try {
       const communication = document.getElementById('communication')?.value || '';
-      const freeText = document.getElementById('modalFreeText')?.value?.trim() || '';
       const users = this.clockedInUsers || [];
       const userEntries = users.map(u => ({
         user_id: u.id,
@@ -284,7 +277,7 @@ export class StaffDailyReportModal {
 
       const data = {
         date: attendance.date,
-        work_report: JSON.stringify({ free_text: freeText, entries: userEntries }),
+        work_report: JSON.stringify({ free_text: '', entries: userEntries }),
         communication: communication
       };
 

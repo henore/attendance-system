@@ -728,7 +728,7 @@ export class ReportDetailModal {
 
           ${staffReport.communication ? `
             <div class="mb-3">
-              <label class="past-form-label"><i class="fas fa-comment-dots"></i> 連絡事項</label>
+              <label class="past-form-label"><i class="fas fa-clipboard"></i> 業務報告</label>
               <div class="text-content bg-light p-3 rounded">${staffReport.communication}</div>
             </div>
           ` : ''}

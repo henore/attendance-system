@@ -1034,7 +1034,7 @@ async searchAttendanceRecords() {
                 ${report.communication ? `
                   <div class="mb-3">
                     <label class="form-label fw-bold">
-                      <i class="fas fa-comment-dots"></i> 連絡事項
+                      <i class="fas fa-clipboard"></i> 業務報告
                     </label>
                     <div class="border rounded p-3 bg-light" style="white-space: pre-wrap;">
                       ${report.communication}

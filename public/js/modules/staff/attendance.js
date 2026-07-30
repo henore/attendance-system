@@ -881,12 +881,6 @@ export class StaffAttendanceUI {
               <label class="form-label required">
                 <i class="fas fa-tasks"></i> 本日のサービス提供記録及び業務報告
               </label>
-              <textarea
-                class="form-control mb-2"
-                id="staffFreeText"
-                rows="2"
-                placeholder="全体の業務報告・特記事項など"
-              >${this.escapeHtml(freeText)}</textarea>
               ${users.length > 0 ? `
               <div class="service-record-table-wrapper">
                 <table class="table table-sm table-bordered mb-0 service-record-table">
@@ -912,13 +906,13 @@ export class StaffAttendanceUI {
 
             <div class="mb-3">
               <label for="staffCommunication" class="form-label">
-                <i class="fas fa-comment-dots"></i> 連絡事項
+                <i class="fas fa-clipboard"></i> 業務報告
               </label>
               <textarea
                 class="form-control"
                 id="staffCommunication"
                 rows="2"
-                placeholder="連絡事項があれば記入してください"
+                placeholder="業務報告や特記事項があれば記入してください"
               >${communication}</textarea>
             </div>
 
@@ -953,7 +947,7 @@ export class StaffAttendanceUI {
           color: #dc3545;
         }
         .service-record-table-wrapper {
-          max-height: 130px;
+          max-height: 195px;
           overflow-y: auto;
           border: 1px solid #dee2e6;
           border-radius: 4px;
@@ -1014,7 +1008,6 @@ export class StaffAttendanceUI {
   async handleReportSubmit() {
     try {
       const communication = document.getElementById('staffCommunication').value;
-      const freeText = document.getElementById('staffFreeText')?.value?.trim() || '';
 
       // ユーザー別記録を収集
       const userEntries = [];
@@ -1034,7 +1027,7 @@ export class StaffAttendanceUI {
 
       const data = {
         date: this.currentAttendance.date,
-        work_report: JSON.stringify({ free_text: freeText, entries: userEntries }),
+        work_report: JSON.stringify({ free_text: '', entries: userEntries }),
         communication: communication
       };
 
