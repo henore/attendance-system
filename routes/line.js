@@ -817,6 +817,45 @@ function generateStaffReportHTML(staffReportData, userData, date) {
       `${attendance.break_start}〜`;
   }
 
+  // work_reportをパースしてHTML化
+  let workReportHTML = '';
+  if (work_report) {
+    try {
+      const parsed = JSON.parse(work_report);
+      let entries = [];
+      let freeText = '';
+      if (parsed && parsed.entries && Array.isArray(parsed.entries)) {
+        entries = parsed.entries;
+        freeText = parsed.free_text || '';
+      } else if (Array.isArray(parsed)) {
+        entries = parsed;
+      }
+
+      if (freeText) {
+        workReportHTML += `<div style="margin-bottom:12px;">${freeText}</div>`;
+      }
+
+      const filled = entries.filter(e =>
+        (e.work_content && e.work_content.trim()) ||
+        (e.support_content && e.support_content.trim()) ||
+        (e.user_condition && e.user_condition.trim())
+      );
+      filled.forEach(e => {
+        const parts = [];
+        if (e.work_content) parts.push(`<span style="color:#888;">作業内容:</span>${e.work_content}`);
+        if (e.support_content) parts.push(`<span style="color:#888;">支援内容:</span>${e.support_content}`);
+        if (e.user_condition) parts.push(`<span style="color:#888;">利用者の様子:</span>${e.user_condition}`);
+        workReportHTML += `<div style="padding:8px 0;border-bottom:1px solid #e0e0e0;"><strong>${e.user_name || '不明'}</strong>　${parts.join('　')}</div>`;
+      });
+
+      if (!freeText && filled.length === 0) {
+        workReportHTML = '<div style="color:#999;">記録なし</div>';
+      }
+    } catch {
+      workReportHTML = work_report;
+    }
+  }
+
   return `
     <!DOCTYPE html>
     <html lang="ja">
@@ -939,7 +978,7 @@ function generateStaffReportHTML(staffReportData, userData, date) {
     <body>
       <div class="container">
         <div class="header">
-          <div class="title">スタッフ日報</div>
+          <div class="title">サービス提供記録</div>
           <div class="subtitle">${userData.name || 'スタッフ'}</div>
         </div>
 
@@ -961,13 +1000,13 @@ function generateStaffReportHTML(staffReportData, userData, date) {
         </div>
 
         <div class="section">
-          <div class="section-title">業務報告</div>
-          <div class="content-box">${work_report || ''}</div>
+          <div class="section-title">サービス提供記録及び業務報告</div>
+          <div class="content-box">${workReportHTML || ''}</div>
         </div>
 
         ${communication ? `
           <div class="section">
-            <div class="section-title">連絡事項</div>
+            <div class="section-title">業務報告</div>
             <div class="content-box">${communication}</div>
           </div>
         ` : ''}
