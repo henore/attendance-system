@@ -777,17 +777,22 @@ export class StaffAttendanceUI {
   /**
    * 既存データからユーザー別記録をパース
    */
-  parseExistingUserEntries(workReport) {
-    if (!workReport) return {};
+  parseExistingReport(workReport) {
+    if (!workReport) return { freeText: '', entries: {} };
     try {
-      const entries = JSON.parse(workReport);
-      if (Array.isArray(entries)) {
+      const parsed = JSON.parse(workReport);
+      if (parsed && parsed.entries && Array.isArray(parsed.entries)) {
         const map = {};
-        entries.forEach(e => { map[e.user_id] = e; });
-        return map;
+        parsed.entries.forEach(e => { map[e.user_id] = e; });
+        return { freeText: parsed.free_text || '', entries: map };
       }
-    } catch { /* 旧形式のテキストデータ */ }
-    return {};
+      if (Array.isArray(parsed)) {
+        const map = {};
+        parsed.forEach(e => { map[e.user_id] = e; });
+        return { freeText: '', entries: map };
+      }
+    } catch { /* 旧形式 */ }
+    return { freeText: '', entries: {} };
   }
 
   /**
@@ -795,7 +800,7 @@ export class StaffAttendanceUI {
    */
   generateReportForm(workHours, existingReport, breakMinutes = 0, canSubmit = true, nakanukeMinutes = 0) {
     const communication = existingReport?.communication || '';
-    const existingEntries = this.parseExistingUserEntries(existingReport?.work_report);
+    const { freeText, entries: existingEntries } = this.parseExistingReport(existingReport?.work_report);
     const attendance = this.currentAttendance || {};
     const clockInDisplay = attendance.clock_in || '-';
     const clockOutDisplay = attendance.clock_out || '-';
@@ -876,15 +881,21 @@ export class StaffAttendanceUI {
               <label class="form-label required">
                 <i class="fas fa-tasks"></i> 本日のサービス提供記録及び業務報告
               </label>
+              <textarea
+                class="form-control mb-2"
+                id="staffFreeText"
+                rows="2"
+                placeholder="全体の業務報告・特記事項など"
+              >${this.escapeHtml(freeText)}</textarea>
               ${users.length > 0 ? `
               <div class="service-record-table-wrapper">
                 <table class="table table-sm table-bordered mb-0 service-record-table">
                   <thead>
                     <tr>
                       <th class="sr-col-name">利用者名</th>
-                      <th class="sr-col-equal">作業内容</th>
-                      <th class="sr-col-equal">支援内容</th>
-                      <th class="sr-col-equal">利用者の様子</th>
+                      <th class="sr-col-work">作業内容</th>
+                      <th class="sr-col-wide">支援内容</th>
+                      <th class="sr-col-wide">利用者の様子</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -942,7 +953,7 @@ export class StaffAttendanceUI {
           color: #dc3545;
         }
         .service-record-table-wrapper {
-          max-height: 350px;
+          max-height: 130px;
           overflow-y: auto;
           border: 1px solid #dee2e6;
           border-radius: 4px;
@@ -967,8 +978,9 @@ export class StaffAttendanceUI {
           padding: 3px 4px;
           vertical-align: middle;
         }
-        .sr-col-name { width: 15%; }
-        .sr-col-equal { width: 28.33%; }
+        .sr-col-name { width: 10%; }
+        .sr-col-work { width: 20%; }
+        .sr-col-wide { width: 35%; }
         .service-record-table .form-control-sm {
           font-size: 0.78rem;
           padding: 2px 6px;
@@ -1002,6 +1014,7 @@ export class StaffAttendanceUI {
   async handleReportSubmit() {
     try {
       const communication = document.getElementById('staffCommunication').value;
+      const freeText = document.getElementById('staffFreeText')?.value?.trim() || '';
 
       // ユーザー別記録を収集
       const userEntries = [];
@@ -1021,7 +1034,7 @@ export class StaffAttendanceUI {
 
       const data = {
         date: this.currentAttendance.date,
-        work_report: JSON.stringify(userEntries),
+        work_report: JSON.stringify({ free_text: freeText, entries: userEntries }),
         communication: communication
       };
 

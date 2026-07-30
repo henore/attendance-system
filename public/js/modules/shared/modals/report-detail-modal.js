@@ -1175,23 +1175,40 @@ export class ReportDetailModal {
   renderStaffWorkReport(workReport) {
     if (!workReport) return '<div class="text-content bg-light p-3 rounded">-</div>';
     try {
-      const entries = JSON.parse(workReport);
-      if (Array.isArray(entries)) {
-        const filled = entries.filter(e =>
-          (e.work_content && e.work_content.trim()) ||
-          (e.support_content && e.support_content.trim()) ||
-          (e.user_condition && e.user_condition.trim())
-        );
-        if (filled.length === 0) return '<div class="text-muted small">記録なし</div>';
-        return filled.map(e => `
-          <div class="border rounded p-2 mb-2 bg-light">
-            <div class="fw-bold small mb-1">${e.user_name || '不明'}</div>
-            ${e.work_content ? `<div class="small"><span class="text-muted">作業内容:</span> ${e.work_content}</div>` : ''}
-            ${e.support_content ? `<div class="small"><span class="text-muted">支援内容:</span> ${e.support_content}</div>` : ''}
-            ${e.user_condition ? `<div class="small"><span class="text-muted">利用者の様子:</span> ${e.user_condition}</div>` : ''}
-          </div>
-        `).join('');
+      const parsed = JSON.parse(workReport);
+      let freeText = '';
+      let entries = [];
+
+      if (parsed && parsed.entries && Array.isArray(parsed.entries)) {
+        freeText = parsed.free_text || '';
+        entries = parsed.entries;
+      } else if (Array.isArray(parsed)) {
+        entries = parsed;
       }
+
+      let html = '';
+      if (freeText) {
+        html += `<div class="border rounded p-2 mb-2 bg-light" style="white-space: pre-wrap;">${freeText}</div>`;
+      }
+
+      const filled = entries.filter(e =>
+        (e.work_content && e.work_content.trim()) ||
+        (e.support_content && e.support_content.trim()) ||
+        (e.user_condition && e.user_condition.trim())
+      );
+
+      if (filled.length === 0 && !freeText) return '<div class="text-muted small">記録なし</div>';
+
+      filled.forEach(e => {
+        const parts = [];
+        parts.push(`<span class="fw-bold">${e.user_name || '不明'}</span>`);
+        if (e.work_content) parts.push(e.work_content);
+        if (e.support_content) parts.push(e.support_content);
+        if (e.user_condition) parts.push(e.user_condition);
+        html += `<div class="small border-bottom py-1">${parts.join(' ｜ ')}</div>`;
+      });
+
+      return html;
     } catch { /* 旧テキスト形式 */ }
     return `<div class="text-content bg-light p-3 rounded">${workReport}</div>`;
   }

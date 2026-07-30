@@ -869,34 +869,48 @@ async searchAttendanceRecords() {
   parseWorkReport(workReport) {
     if (!workReport) return null;
     try {
-      const entries = JSON.parse(workReport);
-      if (Array.isArray(entries)) return entries;
+      const parsed = JSON.parse(workReport);
+      if (parsed && parsed.entries && Array.isArray(parsed.entries)) {
+        return { freeText: parsed.free_text || '', entries: parsed.entries };
+      }
+      if (Array.isArray(parsed)) {
+        return { freeText: '', entries: parsed };
+      }
     } catch { /* 旧形式 */ }
     return null;
   }
 
   /**
-   * ユーザー別サービス提供記録のHTML生成
+   * ユーザー別サービス提供記録のHTML生成（横一列表示）
    */
-  generateUserEntriesHTML(entries) {
+  generateUserEntriesHTML(data) {
+    const { freeText, entries } = data;
+    let html = '';
+
+    if (freeText) {
+      html += `<div class="border rounded p-2 mb-2 bg-light" style="white-space: pre-wrap;">${freeText}</div>`;
+    }
+
     const filledEntries = entries.filter(e =>
       (e.work_content && e.work_content.trim()) ||
       (e.support_content && e.support_content.trim()) ||
       (e.user_condition && e.user_condition.trim())
     );
 
-    if (filledEntries.length === 0) {
+    if (filledEntries.length === 0 && !freeText) {
       return '<div class="text-muted small">記録なし</div>';
     }
 
-    return filledEntries.map(e => `
-      <div class="border rounded p-2 mb-2 bg-light">
-        <div class="fw-bold small mb-1">${e.user_name || '不明'}</div>
-        ${e.work_content ? `<div class="small"><span class="text-muted">作業内容:</span> ${e.work_content}</div>` : ''}
-        ${e.support_content ? `<div class="small"><span class="text-muted">支援内容:</span> ${e.support_content}</div>` : ''}
-        ${e.user_condition ? `<div class="small"><span class="text-muted">利用者の様子:</span> ${e.user_condition}</div>` : ''}
-      </div>
-    `).join('');
+    filledEntries.forEach(e => {
+      const parts = [];
+      parts.push(`<span class="fw-bold">${e.user_name || '不明'}</span>`);
+      if (e.work_content) parts.push(e.work_content);
+      if (e.support_content) parts.push(e.support_content);
+      if (e.user_condition) parts.push(e.user_condition);
+      html += `<div class="small border-bottom py-1">${parts.join(' ｜ ')}</div>`;
+    });
+
+    return html;
   }
 
   async showStaffReportModal(userId, userName, date) {
@@ -924,15 +938,15 @@ async searchAttendanceRecords() {
       }
 
       // work_reportのパース（JSON形式 or 旧テキスト形式）
-      const userEntries = this.parseWorkReport(report.work_report);
+      const parsedReport = this.parseWorkReport(report.work_report);
       let reportContentHTML;
-      if (userEntries) {
+      if (parsedReport) {
         reportContentHTML = `
           <div class="mb-3">
             <label class="form-label fw-bold">
               <i class="fas fa-tasks"></i> 本日のサービス提供記録及び業務報告
             </label>
-            <div class="p-0">${this.generateUserEntriesHTML(userEntries)}</div>
+            <div class="p-0">${this.generateUserEntriesHTML(parsedReport)}</div>
           </div>`;
       } else {
         reportContentHTML = `
