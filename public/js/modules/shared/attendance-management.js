@@ -904,9 +904,9 @@ async searchAttendanceRecords() {
     filledEntries.forEach(e => {
       const parts = [];
       parts.push(`<span class="fw-bold">${e.user_name || '不明'}</span>`);
-      if (e.work_content) parts.push(e.work_content);
-      if (e.support_content) parts.push(e.support_content);
-      if (e.user_condition) parts.push(e.user_condition);
+      if (e.work_content) parts.push(`<span class="text-muted">作業内容:</span>${e.work_content}`);
+      if (e.support_content) parts.push(`<span class="text-muted">支援内容:</span>${e.support_content}`);
+      if (e.user_condition) parts.push(`<span class="text-muted">利用者の様子:</span>${e.user_condition}`);
       html += `<div class="small border-bottom py-1">${parts.join(' ｜ ')}</div>`;
     });
 
