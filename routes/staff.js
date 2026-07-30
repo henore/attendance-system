@@ -32,7 +32,19 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
           uncommentedReports: uncommentedReports
         });
       }
-      
+
+      // サービス提供記録未提出チェック
+      const staffReport = await dbGet(
+        'SELECT id FROM staff_daily_reports WHERE staff_id = ? AND date = ?',
+        [staffId, today]
+      );
+      if (!staffReport) {
+        return res.status(400).json({
+          success: false,
+          error: 'サービス提供記録が未提出です'
+        });
+      }
+
       // 休憩中・中抜け中は退勤不可
       const attendance = await dbGet(
         'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
@@ -1346,6 +1358,60 @@ router.post('/break/end', async (req, res) => {
           error: '出勤記録がありません。先に出勤処理を完了してください'
         });
       }
+
+      // 他スタッフが記入済みのユーザーとの重複チェック
+      try {
+        const submitted = JSON.parse(work_report);
+        const submittedEntries = (submitted && submitted.entries && Array.isArray(submitted.entries))
+          ? submitted.entries : (Array.isArray(submitted) ? submitted : []);
+        const submittedUserIds = submittedEntries
+          .filter(e => e.user_id && (
+            (e.work_content && e.work_content.trim()) ||
+            (e.support_content && e.support_content.trim()) ||
+            (e.user_condition && e.user_condition.trim()) ||
+            (e.attendance_info && e.attendance_info.trim())
+          ))
+          .map(e => e.user_id);
+
+        if (submittedUserIds.length > 0) {
+          const otherReports = await dbAll(
+            'SELECT work_report FROM staff_daily_reports WHERE date = ? AND staff_id != ?',
+            [date, staffId]
+          );
+          const takenUserIds = new Set();
+          for (const r of otherReports) {
+            if (!r.work_report) continue;
+            try {
+              const p = JSON.parse(r.work_report);
+              const entries = (p && p.entries && Array.isArray(p.entries)) ? p.entries : (Array.isArray(p) ? p : []);
+              entries.forEach(e => {
+                if (e.user_id && (
+                  (e.work_content && e.work_content.trim()) ||
+                  (e.support_content && e.support_content.trim()) ||
+                  (e.user_condition && e.user_condition.trim()) ||
+                  (e.attendance_info && e.attendance_info.trim())
+                )) {
+                  takenUserIds.add(e.user_id);
+                }
+              });
+            } catch { /* 旧形式は無視 */ }
+          }
+          const conflicts = submittedEntries.filter(e => takenUserIds.has(e.user_id) && (
+            (e.work_content && e.work_content.trim()) ||
+            (e.support_content && e.support_content.trim()) ||
+            (e.user_condition && e.user_condition.trim()) ||
+            (e.attendance_info && e.attendance_info.trim())
+          ));
+          if (conflicts.length > 0) {
+            const names = conflicts.map(e => e.user_name || '不明').join('、');
+            return res.status(409).json({
+              success: false,
+              error: `以下の利用者は他のスタッフが既に記録済みです：${names}`,
+              conflictUsers: conflicts.map(e => e.user_id)
+            });
+          }
+        }
+      } catch { /* JSON解析失敗時はチェックスキップ */ }
 
       // 既存の日報があるかチェック
       const existingReport = await dbGet(

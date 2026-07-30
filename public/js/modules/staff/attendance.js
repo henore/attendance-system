@@ -122,7 +122,14 @@ export class StaffAttendanceUI {
     } catch (error) {
       console.error('退勤処理エラー:', error);
 
-      if (error.message && error.message.includes('未コメント')) {
+      if (error.message && error.message.includes('サービス提供記録が未提出')) {
+        const shouldProceed = confirm(
+          'サービス提供記録が未提出です。\n\n未提出のまま退勤しますか？'
+        );
+        if (shouldProceed) {
+          await this.forceClockOut();
+        }
+      } else if (error.message && error.message.includes('未コメント')) {
         const uncommentedReports = error.uncommentedReports || [];
         const userNames = uncommentedReports.map(r => r.user_name).join('、');
 
@@ -1052,6 +1059,9 @@ export class StaffAttendanceUI {
     } catch (error) {
       console.error('サービス提供記録提出エラー:', error);
       this.app.showNotification(error.message, 'danger');
+      if (error.message && error.message.includes('既に記録済み')) {
+        await this.updateReportSection();
+      }
     }
   }
 
