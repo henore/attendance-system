@@ -1330,6 +1330,42 @@ router.post('/break/end', async (req, res) => {
     }
   });
 
+  router.post('/daily-report-delete-entry', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const staffId = req.session.user.id;
+      const { date, user_id } = req.body;
+
+      if (!date || !user_id) {
+        return res.status(400).json({ success: false, error: '日付とユーザーIDは必須です' });
+      }
+
+      const report = await dbGet(
+        'SELECT * FROM staff_daily_reports WHERE staff_id = ? AND date = ?',
+        [staffId, date]
+      );
+      if (!report || !report.work_report) {
+        return res.status(404).json({ success: false, error: '該当の記録が見つかりません' });
+      }
+
+      const parsed = JSON.parse(report.work_report);
+      const entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
+        ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+
+      const filtered = entries.filter(e => e.user_id !== user_id);
+      const updated = JSON.stringify({ free_text: parsed.free_text || '', entries: filtered });
+
+      await dbRun(
+        'UPDATE staff_daily_reports SET work_report = ?, updated_at = CURRENT_TIMESTAMP WHERE staff_id = ? AND date = ?',
+        [updated, staffId, date]
+      );
+
+      res.json({ success: true, message: '支援記録を削除しました' });
+    } catch (error) {
+      console.error('支援記録削除エラー:', error);
+      res.status(500).json({ success: false, error: '支援記録の削除に失敗しました' });
+    }
+  });
+
   /**
    * スタッフ日報提出
    */

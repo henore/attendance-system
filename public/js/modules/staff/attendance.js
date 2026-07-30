@@ -840,6 +840,7 @@ export class StaffAttendanceUI {
           <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="support_content" value="${this.escapeHtml(entry.support_content || '')}" /></td>
           <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="user_condition" value="${this.escapeHtml(entry.user_condition || '')}" /></td>
           <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="attendance_info" value="${this.escapeHtml(entry.attendance_info || '')}" /></td>
+          <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm sr-delete-btn" data-user-id="${u.id}" data-user-name="${this.escapeHtml(u.name)}" title="削除"><i class="fas fa-trash-alt"></i></button></td>
         </tr>`;
     }).join('');
 
@@ -899,6 +900,7 @@ export class StaffAttendanceUI {
                       <th class="sr-col-support">支援内容</th>
                       <th class="sr-col-condition">利用者の様子</th>
                       <th class="sr-col-attendance">勤怠</th>
+                      <th class="sr-col-delete"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -983,13 +985,19 @@ export class StaffAttendanceUI {
         }
         .sr-col-name { width: 7%; }
         .sr-col-work { width: 20%; }
-        .sr-col-support { width: 25%; }
-        .sr-col-condition { width: 25%; }
-        .sr-col-attendance { width: 23%; }
+        .sr-col-support { width: 27%; }
+        .sr-col-condition { width: 27%; }
+        .sr-col-attendance { width: 15%; }
+        .sr-col-delete { width: 4%; }
         .service-record-table .form-control-sm {
           font-size: 0.78rem;
           padding: 2px 6px;
           height: auto;
+        }
+        .sr-delete-btn {
+          padding: 1px 5px;
+          font-size: 0.7rem;
+          line-height: 1;
         }
       </style>
     `;
@@ -1010,6 +1018,34 @@ export class StaffAttendanceUI {
         e.preventDefault();
         this.handleReportSubmit();
       });
+    }
+
+    document.querySelectorAll('.sr-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const userId = parseInt(e.currentTarget.dataset.userId);
+        const userName = e.currentTarget.dataset.userName;
+        this.handleDeleteEntry(userId, userName);
+      });
+    });
+  }
+
+  async handleDeleteEntry(userId, userName) {
+    if (!confirm(`${userName} の支援記録を削除しますか？`)) return;
+
+    try {
+      const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_DELETE_ENTRY, {
+        method: 'POST',
+        body: JSON.stringify({ date: this.currentAttendance.date, user_id: userId })
+      });
+      if (response.success) {
+        this.app.showNotification(`${userName} の記録を削除しました`, 'success');
+        await this.updateReportSection();
+      } else {
+        throw new Error(response.error);
+      }
+    } catch (error) {
+      console.error('記録削除エラー:', error);
+      this.app.showNotification(error.message || '記録の削除に失敗しました', 'danger');
     }
   }
 

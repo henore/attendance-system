@@ -71,6 +71,7 @@ export const API_ENDPOINTS = {
     DAILY_REPORT_TODAY: '/api/staff/daily-report-today',
     DAILY_REPORT: (date) => `/api/staff/daily-report/${date}`,
     DAILY_REPORT_CLOCKED_IN_USERS: '/api/staff/daily-report-clocked-in-users',
+    DAILY_REPORT_DELETE_ENTRY: '/api/staff/daily-report-delete-entry',
     // 体験入所管理
     TRIAL_VISITS_TODAY: '/api/trial-visits/today',
     TRIAL_VISITS_BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,
