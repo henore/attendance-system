@@ -66,10 +66,11 @@ export const API_ENDPOINTS = {
         `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`,
     ATTENDANCE_CORRECT: '/api/staff/attendance/correct',
     ATTENDANCE_DELETE_REQUEST: '/api/staff/attendance/delete-request',
-    // スタッフ日報
+    // スタッフ日報（サービス提供記録）
     DAILY_REPORT_SUBMIT: '/api/staff/daily-report',
     DAILY_REPORT_TODAY: '/api/staff/daily-report-today',
     DAILY_REPORT: (date) => `/api/staff/daily-report/${date}`,
+    DAILY_REPORT_CLOCKED_IN_USERS: '/api/staff/daily-report-clocked-in-users',
     // 体験入所管理
     TRIAL_VISITS_TODAY: '/api/trial-visits/today',
     TRIAL_VISITS_BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,

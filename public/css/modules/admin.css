@@ -17,3 +17,17 @@
     opacity: 1;
   }
 }
+
+/* スタッフサービス提供記録モーダルの余白修正 */
+#staffReportDetailModal .modal-body {
+  padding: 1rem;
+}
+
+#staffReportDetailModal .detail-section {
+  text-align: center;
+}
+
+#staffReportDetailModal .mb-4 .row {
+  margin-left: 0;
+  margin-right: 0;
+}

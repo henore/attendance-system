@@ -699,7 +699,7 @@ export class StaffAttendanceUI {
         if (nakanukeEndBtn) nakanukeEndBtn.disabled = true;
       }
 
-      // 中抜け中は日報提出ボタンを無効化
+      // 中抜け中はサービス提供記録提出ボタンを無効化
       const submitBtn = document.getElementById('staffSubmitReportBtn');
       if (submitBtn) {
         submitBtn.disabled = this.isOnNakanuke || this.isOnBreak || !this.currentAttendance.clock_in;
@@ -719,7 +719,7 @@ export class StaffAttendanceUI {
   }
 
   /**
-   * 日報セクションの更新（常に表示。退勤前は提出ボタンを無効化）
+   * サービス提供記録セクションの更新（常に表示。退勤前は提出ボタンを無効化）
    */
   async updateReportSection() {
     const reportSection = document.getElementById('staffReportSection');
@@ -733,23 +733,22 @@ export class StaffAttendanceUI {
    */
   async loadReportForm(container) {
     try {
-      const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY);
-      const existingReport = response.report;
+      const [reportResponse, usersResponse] = await Promise.all([
+        this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY),
+        this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_CLOCKED_IN_USERS)
+      ]);
+      const existingReport = reportResponse.report;
+      this.clockedInUsers = usersResponse.users || [];
 
       const attendance = this.currentAttendance || {};
-      // 出勤後は提出可能（退勤を待たない）
       const canSubmit = !!attendance.clock_in && !this.isOnNakanuke && !this.isOnBreak;
 
-      // 休憩時間を計算（実際の開始・終了時刻から）
       const breakMinutes = (attendance.break_start && attendance.break_end)
         ? calculateBreakDuration(attendance.break_start, attendance.break_end)
         : 0;
 
-      // 中抜け時間
       const nakanukeMinutes = attendance.nakanuke_minutes || 0;
 
-      // 実働時間は退勤後のみ計算、それ以外は'-'表示
-      // 休憩と中抜けの時間を除外
       let workHours = '-';
       if (attendance.clock_in && attendance.clock_out) {
         const totalDeduction = breakMinutes + nakanukeMinutes;
@@ -766,21 +765,37 @@ export class StaffAttendanceUI {
       this.setupReportEventListeners();
 
     } catch (error) {
-      console.error('日報フォーム読み込みエラー:', error);
+      console.error('サービス提供記録読み込みエラー:', error);
       container.innerHTML = `
         <div class="alert alert-danger">
-          <i class="fas fa-exclamation-triangle"></i> 日報フォームの読み込みに失敗しました
+          <i class="fas fa-exclamation-triangle"></i> サービス提供記録の読み込みに失敗しました
         </div>
       `;
     }
   }
 
   /**
-   * 日報フォームHTML生成
+   * 既存データからユーザー別記録をパース
+   */
+  parseExistingUserEntries(workReport) {
+    if (!workReport) return {};
+    try {
+      const entries = JSON.parse(workReport);
+      if (Array.isArray(entries)) {
+        const map = {};
+        entries.forEach(e => { map[e.user_id] = e; });
+        return map;
+      }
+    } catch { /* 旧形式のテキストデータ */ }
+    return {};
+  }
+
+  /**
+   * サービス提供記録フォームHTML生成
    */
   generateReportForm(workHours, existingReport, breakMinutes = 0, canSubmit = true, nakanukeMinutes = 0) {
-    const workReport = existingReport?.work_report || '';
     const communication = existingReport?.communication || '';
+    const existingEntries = this.parseExistingUserEntries(existingReport?.work_report);
     const attendance = this.currentAttendance || {};
     const clockInDisplay = attendance.clock_in || '-';
     const clockOutDisplay = attendance.clock_out || '-';
@@ -800,13 +815,25 @@ export class StaffAttendanceUI {
     }
 
     const isResubmit = !!existingReport;
-    const submitBtnLabel = isResubmit ? '日報を再提出' : '日報を提出';
+    const submitBtnLabel = isResubmit ? 'サービス提供記録を再提出' : 'サービス提供記録を提出';
     const submitBtnDisabled = canSubmit ? '' : 'disabled';
+
+    const users = this.clockedInUsers || [];
+    const userRows = users.map(u => {
+      const entry = existingEntries[u.id] || {};
+      return `
+        <tr>
+          <td class="align-middle fw-bold text-nowrap">${u.name}</td>
+          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="work_content" value="${this.escapeHtml(entry.work_content || '')}" /></td>
+          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="support_content" value="${this.escapeHtml(entry.support_content || '')}" /></td>
+          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="user_condition" value="${this.escapeHtml(entry.user_condition || '')}" /></td>
+        </tr>`;
+    }).join('');
 
     return `
       <div class="card">
         <div class="card-header bg-primary text-white">
-          <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> スタッフ日報</h5>
+          <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> サービス提供記録</h5>
         </div>
         <div class="card-body">
           <div class="row mb-3">
@@ -846,16 +873,30 @@ export class StaffAttendanceUI {
 
           <form id="staffDailyReportForm">
             <div class="mb-3">
-              <label for="staffWorkReport" class="form-label required">
-                <i class="fas fa-tasks"></i> 本日の業務報告
+              <label class="form-label required">
+                <i class="fas fa-tasks"></i> 本日のサービス提供記録及び業務報告
               </label>
-              <textarea
-                class="form-control"
-                id="staffWorkReport"
-                rows="8"
-                required
-                placeholder="本日の業務内容、対応した利用者の状況、特記事項などを記入してください"
-              >${workReport}</textarea>
+              ${users.length > 0 ? `
+              <div class="service-record-table-wrapper">
+                <table class="table table-sm table-bordered mb-0 service-record-table">
+                  <thead>
+                    <tr>
+                      <th class="sr-col-name">利用者名</th>
+                      <th class="sr-col-equal">作業内容</th>
+                      <th class="sr-col-equal">支援内容</th>
+                      <th class="sr-col-equal">利用者の様子</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${userRows}
+                  </tbody>
+                </table>
+              </div>
+              ` : `
+              <div class="alert alert-info mb-0">
+                <i class="fas fa-info-circle"></i> 本日出勤している利用者はいません
+              </div>
+              `}
             </div>
 
             <div class="mb-3">
@@ -865,8 +906,8 @@ export class StaffAttendanceUI {
               <textarea
                 class="form-control"
                 id="staffCommunication"
-                rows="5"
-                placeholder="次のシフトのスタッフへの申し送りや、重要な連絡事項があれば記入してください"
+                rows="2"
+                placeholder="連絡事項があれば記入してください"
               >${communication}</textarea>
             </div>
 
@@ -900,8 +941,46 @@ export class StaffAttendanceUI {
           content: " *";
           color: #dc3545;
         }
+        .service-record-table-wrapper {
+          max-height: 350px;
+          overflow-y: auto;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+        }
+        .service-record-table {
+          font-size: 0.8rem;
+          margin-bottom: 0;
+        }
+        .service-record-table thead {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          background: #e9ecef;
+        }
+        .service-record-table thead th {
+          font-size: 0.75rem;
+          padding: 6px 4px;
+          white-space: nowrap;
+          border-bottom: 2px solid #dee2e6;
+        }
+        .service-record-table tbody td {
+          padding: 3px 4px;
+          vertical-align: middle;
+        }
+        .sr-col-name { width: 15%; }
+        .sr-col-equal { width: 28.33%; }
+        .service-record-table .form-control-sm {
+          font-size: 0.78rem;
+          padding: 2px 6px;
+          height: auto;
+        }
       </style>
     `;
+  }
+
+  escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   /**
@@ -918,21 +997,31 @@ export class StaffAttendanceUI {
   }
 
   /**
-   * 日報提出処理
+   * サービス提供記録提出処理
    */
   async handleReportSubmit() {
     try {
-      const workReport = document.getElementById('staffWorkReport').value;
       const communication = document.getElementById('staffCommunication').value;
 
-      if (!workReport || !workReport.trim()) {
-        this.app.showNotification('業務報告を入力してください', 'warning');
-        return;
-      }
+      // ユーザー別記録を収集
+      const userEntries = [];
+      const users = this.clockedInUsers || [];
+      users.forEach(u => {
+        const workContent = document.querySelector(`input[data-user-id="${u.id}"][data-field="work_content"]`)?.value?.trim() || '';
+        const supportContent = document.querySelector(`input[data-user-id="${u.id}"][data-field="support_content"]`)?.value?.trim() || '';
+        const userCondition = document.querySelector(`input[data-user-id="${u.id}"][data-field="user_condition"]`)?.value?.trim() || '';
+        userEntries.push({
+          user_id: u.id,
+          user_name: u.name,
+          work_content: workContent,
+          support_content: supportContent,
+          user_condition: userCondition
+        });
+      });
 
       const data = {
         date: this.currentAttendance.date,
-        work_report: workReport,
+        work_report: JSON.stringify(userEntries),
         communication: communication
       };
 
@@ -942,16 +1031,14 @@ export class StaffAttendanceUI {
       });
 
       if (response.success) {
-        this.app.showNotification('日報を提出しました', 'success');
-
-        // フォームは非表示にせず、再提出可能な状態で維持する
+        this.app.showNotification('サービス提供記録を提出しました', 'success');
         await this.updateReportSection();
       } else {
-        throw new Error(response.error || '日報の提出に失敗しました');
+        throw new Error(response.error || 'サービス提供記録の提出に失敗しました');
       }
 
     } catch (error) {
-      console.error('日報提出エラー:', error);
+      console.error('サービス提供記録提出エラー:', error);
       this.app.showNotification(error.message, 'danger');
     }
   }

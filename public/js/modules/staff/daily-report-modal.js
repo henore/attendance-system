@@ -1,5 +1,5 @@
 // modules/staff/daily-report-modal.js
-// スタッフ日報モーダル
+// サービス提供記録モーダル
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { getCurrentDate, calculateWorkHours, calculateBreakDuration } from '../../utils/date-time.js';
@@ -9,31 +9,41 @@ export class StaffDailyReportModal {
     this.apiCall = apiCall;
     this.showNotification = showNotification;
     this.modalId = 'staffDailyReportModal';
+    this.clockedInUsers = [];
   }
 
-  /**
-   * 日報モーダルを表示
-   * @param {Object} attendance - 出勤記録
-   * @param {Function} onSubmit - 提出完了時のコールバック
-   */
+  escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  parseExistingUserEntries(workReport) {
+    if (!workReport) return {};
+    try {
+      const entries = JSON.parse(workReport);
+      if (Array.isArray(entries)) {
+        const map = {};
+        entries.forEach(e => { map[e.user_id] = e; });
+        return map;
+      }
+    } catch { /* 旧形式 */ }
+    return {};
+  }
+
   async show(attendance, onSubmit) {
     try {
-
-      // 既存の日報があるか確認
-      const response = await this.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY);
+      const [response, usersResponse] = await Promise.all([
+        this.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY),
+        this.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_CLOCKED_IN_USERS)
+      ]);
       const existingReport = response.report;
+      this.clockedInUsers = usersResponse.users || [];
 
-      // 休憩時間を計算（実際の開始・終了時刻から）
       const breakMinutes = (attendance.break_start && attendance.break_end)
         ? calculateBreakDuration(attendance.break_start, attendance.break_end)
         : 0;
 
-      // 実働時間を計算（HH:MM形式）
-      const rawHours = calculateWorkHours(
-        attendance.clock_in,
-        attendance.clock_out,
-        breakMinutes
-      );
+      const rawHours = calculateWorkHours(attendance.clock_in, attendance.clock_out, breakMinutes);
       let workHours = '-';
       if (rawHours && rawHours > 0) {
         const totalMin = Math.round(rawHours * 60);
@@ -42,19 +52,11 @@ export class StaffDailyReportModal {
         workHours = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       }
 
-      // モーダルHTMLを生成
       const modalHTML = this.generateModalHTML(attendance, workHours, existingReport, breakMinutes);
-
-      // 既存のモーダルを削除
       this.removeExistingModal();
-
-      // モーダルをDOMに追加
       document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-      // イベントリスナー設定
       this.setupEventListeners(attendance, onSubmit);
 
-      // モーダル表示
       const modalElement = document.getElementById(this.modalId);
       const modal = new bootstrap.Modal(modalElement, {
         backdrop: 'static',
@@ -63,23 +65,15 @@ export class StaffDailyReportModal {
       modal.show();
 
     } catch (error) {
-      console.error('日報モーダル表示エラー:', error);
-      this.showNotification('日報モーダルの表示に失敗しました', 'danger');
+      console.error('サービス提供記録モーダル表示エラー:', error);
+      this.showNotification('サービス提供記録モーダルの表示に失敗しました', 'danger');
     }
   }
 
-  /**
-   * モーダルHTMLを生成
-   * @param {Object} attendance - 出勤記録
-   * @param {string} workHours - 実働時間
-   * @param {Object} existingReport - 既存の日報
-   * @param {number} breakMinutes - 休憩時間（分）
-   */
   generateModalHTML(attendance, workHours, existingReport, breakMinutes = 0) {
-    const workReport = existingReport?.work_report || '';
     const communication = existingReport?.communication || '';
+    const existingEntries = this.parseExistingUserEntries(existingReport?.work_report);
 
-    // 休憩時間の表示（時刻と分数を表示）
     let breakDisplay = 'なし';
     if (attendance.break_start && attendance.break_end) {
       breakDisplay = `${attendance.break_start}〜${attendance.break_end}（${breakMinutes}分）`;
@@ -87,17 +81,28 @@ export class StaffDailyReportModal {
       breakDisplay = `${attendance.break_start}〜（進行中）`;
     }
 
+    const users = this.clockedInUsers || [];
+    const userRows = users.map(u => {
+      const entry = existingEntries[u.id] || {};
+      return `
+        <tr>
+          <td class="align-middle fw-bold text-nowrap">${u.name}</td>
+          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="work_content" value="${this.escapeHtml(entry.work_content || '')}" /></td>
+          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="support_content" value="${this.escapeHtml(entry.support_content || '')}" /></td>
+          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="user_condition" value="${this.escapeHtml(entry.user_condition || '')}" /></td>
+        </tr>`;
+    }).join('');
+
     return `
       <div class="modal fade" id="${this.modalId}" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg">
           <div class="modal-content">
             <div class="modal-header bg-primary text-white">
               <h5 class="modal-title">
-                <i class="fas fa-file-alt"></i> スタッフ日報入力
+                <i class="fas fa-file-alt"></i> サービス提供記録入力
               </h5>
             </div>
             <div class="modal-body">
-              <!-- 出勤情報 -->
               <div class="row mb-3">
                 <div class="col-md-3">
                   <div class="info-box">
@@ -127,18 +132,30 @@ export class StaffDailyReportModal {
 
               <hr>
 
-              <!-- 日報フォーム -->
               <form id="staffDailyReportForm">
                 <div class="mb-3">
-                  <label for="workReport" class="form-label required">本日の業務報告</label>
-                  <textarea
-                    class="form-control"
-                    id="workReport"
-                    name="work_report"
-                    rows="8"
-                    required
-                    placeholder="本日の業務内容、対応した利用者の状況、特記事項などを記入してください"
-                  >${workReport}</textarea>
+                  <label class="form-label required">本日のサービス提供記録及び業務報告</label>
+                  ${users.length > 0 ? `
+                  <div class="service-record-table-wrapper">
+                    <table class="table table-sm table-bordered mb-0 service-record-table">
+                      <thead>
+                        <tr>
+                          <th class="sr-col-name">利用者名</th>
+                          <th class="sr-col-equal">作業内容</th>
+                          <th class="sr-col-equal">支援内容</th>
+                          <th class="sr-col-equal">利用者の様子</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${userRows}
+                      </tbody>
+                    </table>
+                  </div>
+                  ` : `
+                  <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle"></i> 本日出勤している利用者はいません
+                  </div>
+                  `}
                 </div>
 
                 <div class="mb-3">
@@ -147,8 +164,8 @@ export class StaffDailyReportModal {
                     class="form-control"
                     id="communication"
                     name="communication"
-                    rows="5"
-                    placeholder="次のシフトのスタッフへの申し送りや、重要な連絡事項があれば記入してください"
+                    rows="2"
+                    placeholder="連絡事項があれば記入してください"
                   >${communication}</textarea>
                 </div>
               </form>
@@ -186,25 +203,50 @@ export class StaffDailyReportModal {
           content: " *";
           color: #dc3545;
         }
+        .service-record-table-wrapper {
+          max-height: 300px;
+          overflow-y: auto;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+        }
+        .service-record-table {
+          font-size: 0.8rem;
+          margin-bottom: 0;
+        }
+        .service-record-table thead {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          background: #e9ecef;
+        }
+        .service-record-table thead th {
+          font-size: 0.75rem;
+          padding: 6px 4px;
+          white-space: nowrap;
+          border-bottom: 2px solid #dee2e6;
+        }
+        .service-record-table tbody td {
+          padding: 3px 4px;
+          vertical-align: middle;
+        }
+        .sr-col-name { width: 15%; }
+        .sr-col-equal { width: 28.33%; }
+        .service-record-table .form-control-sm {
+          font-size: 0.78rem;
+          padding: 2px 6px;
+          height: auto;
+        }
       </style>
     `;
   }
 
-  /**
-   * イベントリスナーを設定
-   */
   setupEventListeners(attendance, onSubmit) {
     const submitBtn = document.getElementById('submitReportBtn');
     const skipBtn = document.getElementById('skipReportBtn');
-    const form = document.getElementById('staffDailyReportForm');
 
     if (submitBtn) {
       submitBtn.addEventListener('click', () => {
-        if (form.checkValidity()) {
-          this.handleSubmit(attendance, onSubmit);
-        } else {
-          form.reportValidity();
-        }
+        this.handleSubmit(attendance, onSubmit);
       });
     }
 
@@ -215,18 +257,22 @@ export class StaffDailyReportModal {
     }
   }
 
-  /**
-   * 日報提出処理
-   */
   async handleSubmit(attendance, onSubmit) {
     try {
-      const form = document.getElementById('staffDailyReportForm');
-      const formData = new FormData(form);
+      const communication = document.getElementById('communication')?.value || '';
+      const users = this.clockedInUsers || [];
+      const userEntries = users.map(u => ({
+        user_id: u.id,
+        user_name: u.name,
+        work_content: document.querySelector(`input[data-user-id="${u.id}"][data-field="work_content"]`)?.value?.trim() || '',
+        support_content: document.querySelector(`input[data-user-id="${u.id}"][data-field="support_content"]`)?.value?.trim() || '',
+        user_condition: document.querySelector(`input[data-user-id="${u.id}"][data-field="user_condition"]`)?.value?.trim() || ''
+      }));
 
       const data = {
         date: attendance.date,
-        work_report: formData.get('work_report'),
-        communication: formData.get('communication')
+        work_report: JSON.stringify(userEntries),
+        communication: communication
       };
 
       const response = await this.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_SUBMIT, {
@@ -235,28 +281,21 @@ export class StaffDailyReportModal {
       });
 
       if (response.success) {
-        this.showNotification('日報を提出しました', 'success');
+        this.showNotification('サービス提供記録を提出しました', 'success');
         this.closeModal();
-
-        if (onSubmit) {
-          onSubmit();
-        }
+        if (onSubmit) onSubmit();
       } else {
-        throw new Error(response.error || '日報の提出に失敗しました');
+        throw new Error(response.error || 'サービス提供記録の提出に失敗しました');
       }
-
     } catch (error) {
-      console.error('日報提出エラー:', error);
+      console.error('サービス提供記録提出エラー:', error);
       this.showNotification(error.message, 'danger');
     }
   }
 
-  /**
-   * スキップ処理
-   */
   handleSkip() {
-    if (confirm('日報の入力をスキップしますか？\n※後から出勤簿から入力できます')) {
-      this.showNotification('日報の入力をスキップしました', 'info');
+    if (confirm('サービス提供記録の入力をスキップしますか？\n※後から出勤簿から入力できます')) {
+      this.showNotification('サービス提供記録の入力をスキップしました', 'info');
       this.closeModal();
     }
   }

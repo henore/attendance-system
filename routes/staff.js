@@ -1264,6 +1264,27 @@ router.post('/break/end', async (req, res) => {
   // ===== スタッフ日報機能 =====
 
   /**
+   * 当日出勤しているユーザー一覧取得
+   */
+  router.get('/daily-report-clocked-in-users', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const today = getCurrentDate();
+      const users = await dbAll(`
+        SELECT u.id, u.name, u.service_type
+        FROM users u
+        JOIN attendance a ON u.id = a.user_id AND a.date = ?
+        WHERE u.role = 'user' AND u.is_active = 1 AND a.clock_in IS NOT NULL
+        ORDER BY u.name
+      `, [today]);
+
+      res.json({ success: true, users: users || [] });
+    } catch (error) {
+      console.error('出勤ユーザー取得エラー:', error);
+      res.status(500).json({ success: false, error: '出勤ユーザーの取得に失敗しました' });
+    }
+  });
+
+  /**
    * スタッフ日報提出
    */
   router.post('/daily-report', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
@@ -1275,7 +1296,7 @@ router.post('/break/end', async (req, res) => {
       if (!date || !work_report) {
         return res.status(400).json({
           success: false,
-          error: '日付と業務報告は必須です'
+          error: '日付とサービス提供記録は必須です'
         });
       }
 
@@ -1326,14 +1347,14 @@ router.post('/break/end', async (req, res) => {
 
       res.json({
         success: true,
-        message: '日報を提出しました'
+        message: 'サービス提供記録を提出しました'
       });
 
     } catch (error) {
-      console.error('スタッフ日報提出エラー:', error);
+      console.error('サービス提供記録提出エラー:', error);
       res.status(500).json({
         success: false,
-        error: '日報の提出に失敗しました'
+        error: 'サービス提供記録の提出に失敗しました'
       });
     }
   });

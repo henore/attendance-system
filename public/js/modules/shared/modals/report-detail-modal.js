@@ -59,7 +59,7 @@ export class ReportDetailModal {
           <div class="modal-content">
             <div class="modal-header bg-primary text-white">
               <h5 class="modal-title" id="${this.modalId}Title">
-                <i class="fas fa-file-alt"></i> 日報詳細
+                <i class="fas fa-file-alt"></i> 詳細
               </h5>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -716,18 +716,16 @@ export class ReportDetailModal {
       <hr>
       ` : ''}
 
-      <!-- スタッフ日報（staff/adminの場合） -->
+      <!-- サービス提供記録（staff/adminの場合） -->
       ${(user.role === 'staff' || user.role === 'admin') && staffReport ? `
         <div class="staff-daily-report-section">
-          <h6><i class="fas fa-clipboard-list"></i> スタッフ日報</h6>
+          <h6><i class="fas fa-clipboard-list"></i> サービス提供記録</h6>
 
-          <!-- 業務報告 -->
           <div class="mb-3">
-            <label class="past-form-label"><i class="fas fa-tasks"></i> 本日の業務報告</label>
-            <div class="text-content bg-light p-3 rounded">${staffReport.work_report || ''}</div>
+            <label class="past-form-label"><i class="fas fa-tasks"></i> 本日のサービス提供記録及び業務報告</label>
+            ${this.renderStaffWorkReport(staffReport.work_report)}
           </div>
 
-          <!-- 連絡事項 -->
           ${staffReport.communication ? `
             <div class="mb-3">
               <label class="past-form-label"><i class="fas fa-comment-dots"></i> 連絡事項</label>
@@ -1169,6 +1167,33 @@ export class ReportDetailModal {
       'home': '在宅'
     };
     return labels[value] || value;
+  }
+
+  /**
+   * スタッフのwork_reportを表示用HTMLに変換（JSON形式・旧テキスト形式両対応）
+   */
+  renderStaffWorkReport(workReport) {
+    if (!workReport) return '<div class="text-content bg-light p-3 rounded">-</div>';
+    try {
+      const entries = JSON.parse(workReport);
+      if (Array.isArray(entries)) {
+        const filled = entries.filter(e =>
+          (e.work_content && e.work_content.trim()) ||
+          (e.support_content && e.support_content.trim()) ||
+          (e.user_condition && e.user_condition.trim())
+        );
+        if (filled.length === 0) return '<div class="text-muted small">記録なし</div>';
+        return filled.map(e => `
+          <div class="border rounded p-2 mb-2 bg-light">
+            <div class="fw-bold small mb-1">${e.user_name || '不明'}</div>
+            ${e.work_content ? `<div class="small"><span class="text-muted">作業内容:</span> ${e.work_content}</div>` : ''}
+            ${e.support_content ? `<div class="small"><span class="text-muted">支援内容:</span> ${e.support_content}</div>` : ''}
+            ${e.user_condition ? `<div class="small"><span class="text-muted">利用者の様子:</span> ${e.user_condition}</div>` : ''}
+          </div>
+        `).join('');
+      }
+    } catch { /* 旧テキスト形式 */ }
+    return `<div class="text-content bg-light p-3 rounded">${workReport}</div>`;
   }
 
 

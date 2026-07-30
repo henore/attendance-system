@@ -863,19 +863,54 @@ async searchAttendanceRecords() {
   /**
    * スタッフ日報詳細モーダルを表示
    */
+  /**
+   * work_reportからユーザー別記録をパース
+   */
+  parseWorkReport(workReport) {
+    if (!workReport) return null;
+    try {
+      const entries = JSON.parse(workReport);
+      if (Array.isArray(entries)) return entries;
+    } catch { /* 旧形式 */ }
+    return null;
+  }
+
+  /**
+   * ユーザー別サービス提供記録のHTML生成
+   */
+  generateUserEntriesHTML(entries) {
+    const filledEntries = entries.filter(e =>
+      (e.work_content && e.work_content.trim()) ||
+      (e.support_content && e.support_content.trim()) ||
+      (e.user_condition && e.user_condition.trim())
+    );
+
+    if (filledEntries.length === 0) {
+      return '<div class="text-muted small">記録なし</div>';
+    }
+
+    return filledEntries.map(e => `
+      <div class="border rounded p-2 mb-2 bg-light">
+        <div class="fw-bold small mb-1">${e.user_name || '不明'}</div>
+        ${e.work_content ? `<div class="small"><span class="text-muted">作業内容:</span> ${e.work_content}</div>` : ''}
+        ${e.support_content ? `<div class="small"><span class="text-muted">支援内容:</span> ${e.support_content}</div>` : ''}
+        ${e.user_condition ? `<div class="small"><span class="text-muted">利用者の様子:</span> ${e.user_condition}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
   async showStaffReportModal(userId, userName, date) {
     try {
       const response = await this.app.apiCall(`/api/staff/daily-report/${date}?staffId=${userId}`);
 
       if (!response.report) {
-        this.parent.showNotification('日報が見つかりません', 'warning');
+        this.parent.showNotification('サービス提供記録が見つかりません', 'warning');
         return;
       }
 
       const report = response.report;
       const attendance = response.attendance;
 
-      // 休憩時間表示の計算
       let breakTimeDisplay = '-';
       if (attendance && attendance.break_start) {
         breakTimeDisplay = attendance.break_end ?
@@ -883,25 +918,45 @@ async searchAttendanceRecords() {
           `${attendance.break_start}〜 (進行中)`;
       }
 
-      // 中抜け表示
       let nakanukeDisplay = '-';
       if (attendance && attendance.nakanuke_minutes > 0) {
         nakanukeDisplay = `${attendance.nakanuke_minutes}分`;
       }
 
-      // モーダルHTML生成
+      // work_reportのパース（JSON形式 or 旧テキスト形式）
+      const userEntries = this.parseWorkReport(report.work_report);
+      let reportContentHTML;
+      if (userEntries) {
+        reportContentHTML = `
+          <div class="mb-3">
+            <label class="form-label fw-bold">
+              <i class="fas fa-tasks"></i> 本日のサービス提供記録及び業務報告
+            </label>
+            <div class="p-0">${this.generateUserEntriesHTML(userEntries)}</div>
+          </div>`;
+      } else {
+        reportContentHTML = `
+          <div class="mb-3">
+            <label class="form-label fw-bold">
+              <i class="fas fa-tasks"></i> 本日のサービス提供記録及び業務報告
+            </label>
+            <div class="border rounded p-3 bg-light" style="white-space: pre-wrap; min-height: 100px;">
+              ${report.work_report || ''}
+            </div>
+          </div>`;
+      }
+
       const modalHTML = `
         <div class="modal fade" id="staffReportDetailModal" tabindex="-1">
           <div class="modal-dialog modal-lg">
             <div class="modal-content">
               <div class="modal-header bg-info text-white">
                 <h5 class="modal-title">
-                  <i class="fas fa-file-alt"></i> スタッフ日報詳細
+                  <i class="fas fa-file-alt"></i> サービス提供記録詳細
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
-              <div class="modal-body" id="staffReportModalBody">
-                <!-- 基本情報 -->
+              <div class="modal-body p-3" id="staffReportModalBody">
                 <div class="mb-4">
                   <div class="row">
                     <div class="col-6">
@@ -915,7 +970,6 @@ async searchAttendanceRecords() {
                   </div>
                 </div>
 
-                <!-- 出勤情報 -->
                 <div class="row mb-4">
                   <div class="col-4">
                     <div class="detail-section border rounded p-3 bg-light">
@@ -961,15 +1015,7 @@ async searchAttendanceRecords() {
 
                 <hr>
 
-                <!-- 日報内容 -->
-                <div class="mb-3">
-                  <label class="form-label fw-bold">
-                    <i class="fas fa-tasks"></i> 本日の業務報告
-                  </label>
-                  <div class="border rounded p-3 bg-light" style="white-space: pre-wrap; min-height: 100px;">
-                    ${report.work_report || ''}
-                  </div>
-                </div>
+                ${reportContentHTML}
 
                 ${report.communication ? `
                   <div class="mb-3">

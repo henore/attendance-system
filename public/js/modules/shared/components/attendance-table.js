@@ -425,7 +425,7 @@ export class AttendanceTable {
                 data-user-id="${record.user_id}"
                 data-user-name="${record.user_name}"
                 data-date="${date}"
-                title="スタッフ日報詳細">
+                title="サービス提供記録詳細">
           <i class="fas fa-file-alt"></i>
         </button>
       `);
