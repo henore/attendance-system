@@ -95,6 +95,7 @@ export class StaffDailyReportModal {
           <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="work_content" value="${this.escapeHtml(entry.work_content || '')}" /></td>
           <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="support_content" value="${this.escapeHtml(entry.support_content || '')}" /></td>
           <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="user_condition" value="${this.escapeHtml(entry.user_condition || '')}" /></td>
+          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="attendance_info" value="${this.escapeHtml(entry.attendance_info || '')}" /></td>
         </tr>`;
     }).join('');
 
@@ -147,8 +148,9 @@ export class StaffDailyReportModal {
                         <tr>
                           <th class="sr-col-name">利用者名</th>
                           <th class="sr-col-work">作業内容</th>
-                          <th class="sr-col-wide">支援内容</th>
-                          <th class="sr-col-wide">利用者の様子</th>
+                          <th class="sr-col-support">支援内容</th>
+                          <th class="sr-col-condition">利用者の様子</th>
+                          <th class="sr-col-attendance">勤怠</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -209,7 +211,7 @@ export class StaffDailyReportModal {
           color: #dc3545;
         }
         .service-record-table-wrapper {
-          max-height: 195px;
+          max-height: 234px;
           overflow-y: auto;
           border: 1px solid #dee2e6;
           border-radius: 4px;
@@ -234,9 +236,11 @@ export class StaffDailyReportModal {
           padding: 3px 4px;
           vertical-align: middle;
         }
-        .sr-col-name { width: 10%; }
+        .sr-col-name { width: 7%; }
         .sr-col-work { width: 20%; }
-        .sr-col-wide { width: 35%; }
+        .sr-col-support { width: 25%; }
+        .sr-col-condition { width: 25%; }
+        .sr-col-attendance { width: 23%; }
         .service-record-table .form-control-sm {
           font-size: 0.78rem;
           padding: 2px 6px;
@@ -272,7 +276,8 @@ export class StaffDailyReportModal {
         user_name: u.name,
         work_content: document.querySelector(`input[data-user-id="${u.id}"][data-field="work_content"]`)?.value?.trim() || '',
         support_content: document.querySelector(`input[data-user-id="${u.id}"][data-field="support_content"]`)?.value?.trim() || '',
-        user_condition: document.querySelector(`input[data-user-id="${u.id}"][data-field="user_condition"]`)?.value?.trim() || ''
+        user_condition: document.querySelector(`input[data-user-id="${u.id}"][data-field="user_condition"]`)?.value?.trim() || '',
+        attendance_info: document.querySelector(`input[data-user-id="${u.id}"][data-field="attendance_info"]`)?.value?.trim() || ''
       }));
 
       const data = {

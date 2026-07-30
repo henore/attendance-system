@@ -1269,7 +1269,10 @@ router.post('/break/end', async (req, res) => {
   router.get('/daily-report-clocked-in-users', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
     try {
       const today = getCurrentDate();
-      const users = await dbAll(`
+      const currentStaffId = req.session.user.id;
+      const MAX_USERS_PER_STAFF = 6;
+
+      const allUsers = await dbAll(`
         SELECT u.id, u.name, u.service_type
         FROM users u
         JOIN attendance a ON u.id = a.user_id AND a.date = ?
@@ -1277,7 +1280,38 @@ router.post('/break/end', async (req, res) => {
         ORDER BY u.name
       `, [today]);
 
-      res.json({ success: true, users: users || [] });
+      // 他スタッフが記入済みのユーザーを除外
+      const otherReports = await dbAll(
+        'SELECT work_report FROM staff_daily_reports WHERE date = ? AND staff_id != ?',
+        [today, currentStaffId]
+      );
+
+      const reportedUserIds = new Set();
+      for (const report of otherReports) {
+        if (!report.work_report) continue;
+        try {
+          const parsed = JSON.parse(report.work_report);
+          const entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
+            ? parsed.entries
+            : (Array.isArray(parsed) ? parsed : []);
+          entries.forEach(e => {
+            if (e.user_id && (
+              (e.work_content && e.work_content.trim()) ||
+              (e.support_content && e.support_content.trim()) ||
+              (e.user_condition && e.user_condition.trim()) ||
+              (e.attendance_info && e.attendance_info.trim())
+            )) {
+              reportedUserIds.add(e.user_id);
+            }
+          });
+        } catch { /* 旧形式は無視 */ }
+      }
+
+      const availableUsers = (allUsers || [])
+        .filter(u => !reportedUserIds.has(u.id))
+        .slice(0, MAX_USERS_PER_STAFF);
+
+      res.json({ success: true, users: availableUsers });
     } catch (error) {
       console.error('出勤ユーザー取得エラー:', error);
       res.status(500).json({ success: false, error: '出勤ユーザーの取得に失敗しました' });

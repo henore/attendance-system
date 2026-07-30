@@ -1205,6 +1205,7 @@ export class ReportDetailModal {
         if (e.work_content) parts.push(`<span class="text-muted">作業内容:</span>${e.work_content}`);
         if (e.support_content) parts.push(`<span class="text-muted">支援内容:</span>${e.support_content}`);
         if (e.user_condition) parts.push(`<span class="text-muted">利用者の様子:</span>${e.user_condition}`);
+        if (e.attendance_info) parts.push(`<span class="text-muted">勤怠:</span>${e.attendance_info}`);
         html += `<div class="small border-bottom py-1">${parts.join(' ｜ ')}</div>`;
       });
 

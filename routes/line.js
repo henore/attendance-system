@@ -171,6 +171,7 @@ router.get('/download-image/:fileName', (req, res) => {
   // クエリパラメータで表示用ファイル名を指定可能
   const downloadName = req.query.name || fileName;
 
+  res.set('Content-Type', 'image/jpeg');
   res.download(filePath, downloadName, (err) => {
     // ダウンロード完了後（成功・失敗問わず）ファイルを削除
     fs.unlink(filePath).catch(unlinkErr => {
@@ -817,6 +818,9 @@ function generateStaffReportHTML(staffReportData, userData, date) {
       `${attendance.break_start}〜`;
   }
 
+  // HTMLエスケープ
+  const esc = (str) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
   // work_reportをパースしてHTML化
   let workReportHTML = '';
   if (work_report) {
@@ -832,27 +836,29 @@ function generateStaffReportHTML(staffReportData, userData, date) {
       }
 
       if (freeText) {
-        workReportHTML += `<div style="margin-bottom:12px;">${freeText}</div>`;
+        workReportHTML += `<div style="margin-bottom:12px;">${esc(freeText)}</div>`;
       }
 
       const filled = entries.filter(e =>
         (e.work_content && e.work_content.trim()) ||
         (e.support_content && e.support_content.trim()) ||
-        (e.user_condition && e.user_condition.trim())
+        (e.user_condition && e.user_condition.trim()) ||
+        (e.attendance_info && e.attendance_info.trim())
       );
       filled.forEach(e => {
         const parts = [];
-        if (e.work_content) parts.push(`<span style="color:#888;">作業内容:</span>${e.work_content}`);
-        if (e.support_content) parts.push(`<span style="color:#888;">支援内容:</span>${e.support_content}`);
-        if (e.user_condition) parts.push(`<span style="color:#888;">利用者の様子:</span>${e.user_condition}`);
-        workReportHTML += `<div style="padding:8px 0;border-bottom:1px solid #e0e0e0;"><strong>${e.user_name || '不明'}</strong>　${parts.join('　')}</div>`;
+        if (e.work_content) parts.push(`<span style="color:#888;">作業内容:</span>${esc(e.work_content)}`);
+        if (e.support_content) parts.push(`<span style="color:#888;">支援内容:</span>${esc(e.support_content)}`);
+        if (e.user_condition) parts.push(`<span style="color:#888;">利用者の様子:</span>${esc(e.user_condition)}`);
+        if (e.attendance_info) parts.push(`<span style="color:#888;">勤怠:</span>${esc(e.attendance_info)}`);
+        workReportHTML += `<div style="padding:8px 0;border-bottom:1px solid #e0e0e0;"><strong>${esc(e.user_name) || '不明'}</strong>　${parts.join('　')}</div>`;
       });
 
       if (!freeText && filled.length === 0) {
         workReportHTML = '<div style="color:#999;">記録なし</div>';
       }
     } catch {
-      workReportHTML = work_report;
+      workReportHTML = esc(work_report);
     }
   }
 
@@ -967,6 +973,16 @@ function generateStaffReportHTML(staffReportData, userData, date) {
           white-space: pre-wrap;
         }
 
+        .content-box-html {
+          background: #f8f9fa;
+          padding: 20px;
+          border-radius: 12px;
+          min-height: 120px;
+          font-size: 18px;
+          line-height: 1.8;
+          color: #333;
+        }
+
         .footer {
           margin-top: 32px;
           text-align: center;
@@ -1001,13 +1017,13 @@ function generateStaffReportHTML(staffReportData, userData, date) {
 
         <div class="section">
           <div class="section-title">サービス提供記録及び業務報告</div>
-          <div class="content-box">${workReportHTML || ''}</div>
+          <div class="content-box-html">${workReportHTML || ''}</div>
         </div>
 
         ${communication ? `
           <div class="section">
             <div class="section-title">業務報告</div>
-            <div class="content-box">${communication}</div>
+            <div class="content-box">${esc(communication)}</div>
           </div>
         ` : ''}
 
