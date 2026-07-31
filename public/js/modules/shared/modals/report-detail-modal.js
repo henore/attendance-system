@@ -843,7 +843,7 @@ export class ReportDetailModal {
     
     // 編集可能（スタッフ・管理者）
     const existingComment = comment ? comment.comment : '';
-    const isEditable = !comment || this.userRole === 'admin';
+    const isEditable = !comment || this.userRole === 'admin' || (comment && comment.staff_id === this.app.currentUser.id);
 
     // サービス提供記録
     const { serviceEntry, serviceEntryTaken, serviceEntryLimitReached } = this.currentData;
@@ -972,9 +972,9 @@ export class ReportDetailModal {
     
     // 編集可否の判定
     const { comment } = this.currentData;
-    const isEditable = !comment || this.userRole === 'admin';
-    
-    
+    const isEditable = !comment || this.userRole === 'admin' || (comment && comment.staff_id === this.app.currentUser.id);
+
+
     // ボタンの表示制御
     saveBtn.style.display = isEditable ? 'inline-block' : 'none';
     saveAndSendBtn.style.display = isEditable ? 'inline-block' : 'none';
