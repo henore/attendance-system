@@ -1169,12 +1169,32 @@ export class ReportDetailModal {
         // 画像DL処理
         if (sendToLine) {
           try {
+            // サービス提供記録を収集（自分の記入 or 他スタッフの記入）
+            let serviceEntryForImage = null;
+            const seWC = document.getElementById('seWorkContent')?.value?.trim() || '';
+            const seSC = document.getElementById('seSupportContent')?.value?.trim() || '';
+            const seUC = document.getElementById('seUserCondition')?.value?.trim() || '';
+            const seAI = document.getElementById('seAttendanceInfo')?.value?.trim() || '';
+            if (seWC || seSC || seUC || seAI) {
+              serviceEntryForImage = {
+                work_content: seWC, support_content: seSC,
+                user_condition: seUC, attendance_info: seAI,
+                staff_name: this.app.currentUser.name
+              };
+            } else if (this.currentData.serviceEntryTakenEntry) {
+              serviceEntryForImage = {
+                ...this.currentData.serviceEntryTakenEntry,
+                staff_name: this.currentData.serviceEntryTaken
+              };
+            }
+
             await this.lineSender.sendReportCompletion(
               {
                 ...this.currentData.report,
                 attendance: this.currentData.attendance,
                 breakRecord: this.currentData.breakRecord,
-                date: this.currentData.date
+                date: this.currentData.date,
+                serviceEntry: serviceEntryForImage
               },
               this.currentData.user,
               {

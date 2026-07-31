@@ -190,7 +190,12 @@ router.get('/download-image/:fileName', (req, res) => {
 /**
  * 正方形レイアウト用HTMLテンプレート生成（全内容表示版）
  */
+function escapeHtml(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function generateSquareLayoutHTML(data) {
+  const esc = escapeHtml;
   return `
     <!DOCTYPE html>
     <html lang="ja">
@@ -403,6 +408,43 @@ function generateSquareLayoutHTML(data) {
           font-size: 26px;
           padding: 3px 6px;
         }
+
+        /* サービス提供記録 */
+        .service-entry-section {
+          background: #f0f7ff;
+          padding: 12px;
+          border-radius: 8px;
+          border-left: 4px solid #4a90d9;
+          margin-top: 8px;
+        }
+        .service-entry-title {
+          font-size: 18px;
+          font-weight: bold;
+          color: #333;
+          margin-bottom: 8px;
+        }
+        .service-entry-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 6px;
+        }
+        .service-entry-item {
+          font-size: 16px;
+          color: #333;
+          background: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+        }
+        .service-entry-label {
+          color: #666;
+          font-weight: 600;
+        }
+        .service-entry-author {
+          font-size: 14px;
+          color: #888;
+          text-align: right;
+          margin-top: 6px;
+        }
       </style>
     </head>
     <body>
@@ -539,6 +581,20 @@ function generateSquareLayoutHTML(data) {
             <div class="comment-author">記入者: ${data.comment.staff_name}</div>
           </div>
         ` : ''}
+
+        ${data.serviceEntry ? `
+          <!-- サービス提供記録 -->
+          <div class="service-entry-section">
+            <div class="service-entry-title">📋 サービス提供記録</div>
+            <div class="service-entry-grid">
+              ${data.serviceEntry.work_content ? `<div class="service-entry-item"><span class="service-entry-label">作業内容:</span> ${esc(data.serviceEntry.work_content)}</div>` : ''}
+              ${data.serviceEntry.support_content ? `<div class="service-entry-item"><span class="service-entry-label">支援内容:</span> ${esc(data.serviceEntry.support_content)}</div>` : ''}
+              ${data.serviceEntry.user_condition ? `<div class="service-entry-item"><span class="service-entry-label">利用者の様子:</span> ${esc(data.serviceEntry.user_condition)}</div>` : ''}
+              ${data.serviceEntry.attendance_info ? `<div class="service-entry-item"><span class="service-entry-label">勤怠:</span> ${esc(data.serviceEntry.attendance_info)}</div>` : ''}
+            </div>
+            ${data.serviceEntry.staff_name ? `<div class="service-entry-author">記入者: ${esc(data.serviceEntry.staff_name)}</div>` : ''}
+          </div>
+        ` : ''}
       </div>
     </body>
     </html>
@@ -593,7 +649,8 @@ function normalizeReportData(reportData, userData, commentData, date) {
       comment: commentData.comment,
       staff_name: commentData.staff_name,
       created_at: commentData.created_at
-    } : null
+    } : null,
+    serviceEntry: reportData.serviceEntry || null
   };
 }
 
