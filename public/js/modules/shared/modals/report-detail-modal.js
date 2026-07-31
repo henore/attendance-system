@@ -186,6 +186,23 @@ export class ReportDetailModal {
         return;
       }
 
+      // 利用者の場合、自分のサービス提供記録エントリを取得
+      let serviceEntry = null;
+      let serviceEntryTaken = null;
+      let serviceEntryLimitReached = false;
+      if ((response.user?.role === 'user') && this.canComment) {
+        try {
+          const entryResponse = await this.app.apiCall(
+            API_ENDPOINTS.STAFF.DAILY_REPORT_ENTRY(date, userId)
+          );
+          serviceEntry = entryResponse.entry || null;
+          serviceEntryTaken = entryResponse.takenByStaff || null;
+          serviceEntryLimitReached = entryResponse.limitReached || false;
+        } catch (error) {
+          console.error('支援記録エントリ取得エラー:', error);
+        }
+      }
+
       // 現在のデータを保存
       this.currentData = {
         userId: userId,
@@ -196,7 +213,10 @@ export class ReportDetailModal {
         report: response.report || {},
         comment: response.comment || null,
         breakRecord: response.breakRecord || null,
-        staffReport: staffReport || null // スタッフ日報を追加
+        staffReport: staffReport || null,
+        serviceEntry: serviceEntry,
+        serviceEntryTaken: serviceEntryTaken,
+        serviceEntryLimitReached: serviceEntryLimitReached
       };
 
       // コメントのタイムスタンプを保存（競合検知用）
@@ -825,6 +845,16 @@ export class ReportDetailModal {
     const existingComment = comment ? comment.comment : '';
     const isEditable = !comment || this.userRole === 'admin';
 
+    // サービス提供記録
+    const { serviceEntry, serviceEntryTaken, serviceEntryLimitReached } = this.currentData;
+    const hasServiceEntry = serviceEntry && (
+      (serviceEntry.work_content && serviceEntry.work_content.trim()) ||
+      (serviceEntry.support_content && serviceEntry.support_content.trim()) ||
+      (serviceEntry.user_condition && serviceEntry.user_condition.trim()) ||
+      (serviceEntry.attendance_info && serviceEntry.attendance_info.trim())
+    );
+    const serviceEditable = !serviceEntryTaken && !serviceEntryLimitReached || hasServiceEntry || this.userRole === 'admin';
+
     return `
       <div class="staff-comment-section">
         <h6><i class="fas fa-comment-plus"></i> スタッフコメント</h6>
@@ -863,6 +893,60 @@ export class ReportDetailModal {
         ` : ''}
 
         ${this.generateCertificateExpiryWarning()}
+
+        <hr class="my-3">
+
+        <h6><i class="fas fa-clipboard-list"></i> 本日のサービス提供記録及び業務報告</h6>
+
+        ${serviceEntryTaken ? `
+          <div class="alert alert-secondary mb-3 py-2">
+            <i class="fas fa-lock"></i> ${serviceEntryTaken}さんが記録済みです
+          </div>
+        ` : ''}
+
+        ${serviceEntryLimitReached && !hasServiceEntry ? `
+          <div class="alert alert-warning mb-3 py-2">
+            <i class="fas fa-exclamation-triangle"></i> 記録上限（6名）に達しています
+          </div>
+        ` : ''}
+
+        <div class="service-entry-fields ${!serviceEditable ? 'opacity-50' : ''}">
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small mb-1">作業内容</label>
+              <input type="text" class="form-control form-control-sm" id="seWorkContent"
+                value="${this.escapeAttr(serviceEntry?.work_content || '')}"
+                ${!serviceEditable ? 'readonly' : ''}>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">支援内容</label>
+              <input type="text" class="form-control form-control-sm" id="seSupportContent"
+                value="${this.escapeAttr(serviceEntry?.support_content || '')}"
+                ${!serviceEditable ? 'readonly' : ''}>
+            </div>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small mb-1">利用者の様子</label>
+              <input type="text" class="form-control form-control-sm" id="seUserCondition"
+                value="${this.escapeAttr(serviceEntry?.user_condition || '')}"
+                ${!serviceEditable ? 'readonly' : ''}>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">勤怠</label>
+              <input type="text" class="form-control form-control-sm" id="seAttendanceInfo"
+                value="${this.escapeAttr(serviceEntry?.attendance_info || '')}"
+                ${!serviceEditable ? 'readonly' : ''}>
+            </div>
+          </div>
+          ${hasServiceEntry ? `
+            <div class="text-end">
+              <button type="button" class="btn btn-outline-danger btn-sm" id="seDeleteBtn">
+                <i class="fas fa-trash-alt"></i> 支援記録削除
+              </button>
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
   }
@@ -908,10 +992,30 @@ export class ReportDetailModal {
     newSaveBtn.addEventListener('click', () => {
       this.saveComment(false);
     });
-    
+
     newSaveAndSendBtn.addEventListener('click', () => {
       this.saveComment(true);
     });
+
+    // 支援記録削除ボタン
+    const deleteBtn = document.getElementById('seDeleteBtn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        if (!confirm(`${this.currentData.userName} の支援記録を削除しますか？`)) return;
+        try {
+          const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_DELETE_ENTRY, {
+            method: 'POST',
+            body: JSON.stringify({ date: this.currentData.date, user_id: this.currentData.userId })
+          });
+          if (response.success) {
+            this.app.showNotification('支援記録を削除しました', 'success');
+            await this.show(this.currentData.userId, this.currentData.userName, this.currentData.date);
+          }
+        } catch (error) {
+          this.app.showNotification(error.message || '削除に失敗しました', 'danger');
+        }
+      });
+    }
   }
 
   /**
@@ -1004,7 +1108,33 @@ export class ReportDetailModal {
       }
       
       
-      // API呼び出し
+      // サービス提供記録の保存
+      const seWorkContent = document.getElementById('seWorkContent')?.value?.trim() || '';
+      const seSupportContent = document.getElementById('seSupportContent')?.value?.trim() || '';
+      const seUserCondition = document.getElementById('seUserCondition')?.value?.trim() || '';
+      const seAttendanceInfo = document.getElementById('seAttendanceInfo')?.value?.trim() || '';
+      const hasServiceData = seWorkContent || seSupportContent || seUserCondition || seAttendanceInfo;
+
+      if (hasServiceData) {
+        try {
+          const seResponse = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_SAVE_ENTRY, {
+            method: 'POST',
+            body: JSON.stringify({
+              date: date, user_id: userId, user_name: userName,
+              work_content: seWorkContent, support_content: seSupportContent,
+              user_condition: seUserCondition, attendance_info: seAttendanceInfo
+            })
+          });
+          if (!seResponse.success) {
+            this.app.showNotification(seResponse.error || '支援記録の保存に失敗しました', 'warning');
+          }
+        } catch (seError) {
+          console.error('支援記録保存エラー:', seError);
+          this.app.showNotification(seError.message || '支援記録の保存に失敗しました', 'warning');
+        }
+      }
+
+      // コメントAPI呼び出し
       const saveResponse = await this.app.apiCall(API_ENDPOINTS.STAFF.COMMENT, {
         method: 'POST',
         body: JSON.stringify({
@@ -1013,7 +1143,7 @@ export class ReportDetailModal {
           comment: comment
         })
       });
-      
+
       // 保存成功後の処理
       if (saveResponse.success !== false) {
         this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
@@ -1167,6 +1297,11 @@ export class ReportDetailModal {
       'home': '在宅'
     };
     return labels[value] || value;
+  }
+
+  escapeAttr(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   /**

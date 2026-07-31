@@ -1366,6 +1366,191 @@ router.post('/break/end', async (req, res) => {
     }
   });
 
+  router.get('/daily-report-entry/:date/:userId', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const currentStaffId = req.session.user.id;
+      const { date, userId } = req.params;
+      const targetUserId = parseInt(userId);
+      const MAX_USERS_PER_STAFF = 6;
+
+      // 自分の記録から該当ユーザーのエントリを取得
+      const myReport = await dbGet(
+        'SELECT work_report FROM staff_daily_reports WHERE staff_id = ? AND date = ?',
+        [currentStaffId, date]
+      );
+      let myEntry = null;
+      let myEntryCount = 0;
+      if (myReport && myReport.work_report) {
+        try {
+          const parsed = JSON.parse(myReport.work_report);
+          const entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
+            ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+          myEntry = entries.find(e => e.user_id === targetUserId) || null;
+          myEntryCount = entries.filter(e =>
+            (e.work_content && e.work_content.trim()) ||
+            (e.support_content && e.support_content.trim()) ||
+            (e.user_condition && e.user_condition.trim()) ||
+            (e.attendance_info && e.attendance_info.trim())
+          ).length;
+        } catch { /* 旧形式 */ }
+      }
+
+      // 他スタッフが記入済みか確認
+      const otherReports = await dbAll(
+        'SELECT staff_id, work_report FROM staff_daily_reports WHERE date = ? AND staff_id != ?',
+        [date, currentStaffId]
+      );
+      let takenByStaff = null;
+      for (const r of otherReports) {
+        if (!r.work_report) continue;
+        try {
+          const parsed = JSON.parse(r.work_report);
+          const entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
+            ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+          const found = entries.find(e => e.user_id === targetUserId && (
+            (e.work_content && e.work_content.trim()) ||
+            (e.support_content && e.support_content.trim()) ||
+            (e.user_condition && e.user_condition.trim()) ||
+            (e.attendance_info && e.attendance_info.trim())
+          ));
+          if (found) {
+            const staffUser = await dbGet('SELECT name FROM users WHERE id = ?', [r.staff_id]);
+            takenByStaff = staffUser ? staffUser.name : '他のスタッフ';
+            break;
+          }
+        } catch { /* 旧形式は無視 */ }
+      }
+
+      const hasContent = myEntry && (
+        (myEntry.work_content && myEntry.work_content.trim()) ||
+        (myEntry.support_content && myEntry.support_content.trim()) ||
+        (myEntry.user_condition && myEntry.user_condition.trim()) ||
+        (myEntry.attendance_info && myEntry.attendance_info.trim())
+      );
+      const limitReached = !hasContent && myEntryCount >= MAX_USERS_PER_STAFF;
+
+      res.json({
+        success: true,
+        entry: myEntry,
+        takenByStaff: takenByStaff,
+        limitReached: limitReached,
+        currentCount: myEntryCount
+      });
+    } catch (error) {
+      console.error('支援記録エントリ取得エラー:', error);
+      res.status(500).json({ success: false, error: '支援記録の取得に失敗しました' });
+    }
+  });
+
+  router.post('/daily-report-save-entry', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
+    try {
+      const staffId = req.session.user.id;
+      const { date, user_id, user_name, work_content, support_content, user_condition, attendance_info } = req.body;
+      const MAX_USERS_PER_STAFF = 6;
+
+      if (!date || !user_id) {
+        return res.status(400).json({ success: false, error: '日付とユーザーIDは必須です' });
+      }
+
+      // 他スタッフが記入済みか確認（adminは除外）
+      const userRole = req.session.user.role;
+      if (userRole !== 'admin') {
+        const otherReports = await dbAll(
+          'SELECT work_report FROM staff_daily_reports WHERE date = ? AND staff_id != ?',
+          [date, staffId]
+        );
+        for (const r of otherReports) {
+          if (!r.work_report) continue;
+          try {
+            const parsed = JSON.parse(r.work_report);
+            const entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
+              ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+            const taken = entries.find(e => e.user_id === user_id && (
+              (e.work_content && e.work_content.trim()) ||
+              (e.support_content && e.support_content.trim()) ||
+              (e.user_condition && e.user_condition.trim()) ||
+              (e.attendance_info && e.attendance_info.trim())
+            ));
+            if (taken) {
+              return res.status(409).json({ success: false, error: 'この利用者は他のスタッフが既に記録済みです' });
+            }
+          } catch { /* 旧形式は無視 */ }
+        }
+      }
+
+      // 既存のレポートを取得
+      let report = await dbGet(
+        'SELECT * FROM staff_daily_reports WHERE staff_id = ? AND date = ?',
+        [staffId, date]
+      );
+
+      let entries = [];
+      let freeText = '';
+      if (report && report.work_report) {
+        try {
+          const parsed = JSON.parse(report.work_report);
+          entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
+            ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+          freeText = (parsed && parsed.free_text) || '';
+        } catch { /* 旧形式はリセット */ }
+      }
+
+      // 6名制限チェック
+      const existingIdx = entries.findIndex(e => e.user_id === user_id);
+      if (existingIdx === -1) {
+        const filledCount = entries.filter(e =>
+          (e.work_content && e.work_content.trim()) ||
+          (e.support_content && e.support_content.trim()) ||
+          (e.user_condition && e.user_condition.trim()) ||
+          (e.attendance_info && e.attendance_info.trim())
+        ).length;
+        if (filledCount >= MAX_USERS_PER_STAFF && userRole !== 'admin') {
+          return res.status(400).json({ success: false, error: '1スタッフあたりの記録上限（6名）に達しています' });
+        }
+      }
+
+      const newEntry = {
+        user_id, user_name: user_name || '',
+        work_content: work_content || '', support_content: support_content || '',
+        user_condition: user_condition || '', attendance_info: attendance_info || ''
+      };
+
+      if (existingIdx >= 0) {
+        entries[existingIdx] = newEntry;
+      } else {
+        entries.push(newEntry);
+      }
+
+      const updatedJson = JSON.stringify({ free_text: freeText, entries });
+
+      if (report) {
+        await dbRun(
+          'UPDATE staff_daily_reports SET work_report = ?, updated_at = CURRENT_TIMESTAMP WHERE staff_id = ? AND date = ?',
+          [updatedJson, staffId, date]
+        );
+      } else {
+        // 新規作成
+        const attendance = await dbGet(
+          'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
+          [staffId, date]
+        );
+        const nakanukeMinutes = attendance ? (attendance.nakanuke_minutes || 0) : 0;
+        await dbRun(
+          'INSERT INTO staff_daily_reports (staff_id, date, work_report, communication, nakanuke_minutes) VALUES (?, ?, ?, ?, ?)',
+          [staffId, date, updatedJson, null, nakanukeMinutes]
+        );
+        if (attendance) {
+          await dbRun('UPDATE attendance SET has_report = 1 WHERE user_id = ? AND date = ?', [staffId, date]);
+        }
+      }
+
+      res.json({ success: true, message: '支援記録を保存しました' });
+    } catch (error) {
+      console.error('支援記録保存エラー:', error);
+      res.status(500).json({ success: false, error: '支援記録の保存に失敗しました' });
+    }
+  });
+
   /**
    * スタッフ日報提出
    */
