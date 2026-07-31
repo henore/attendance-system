@@ -63,11 +63,12 @@ export class SharedAttendanceManagement {
             <div class="col-md-3">
               <label for="searchRole" class="form-label">権限</label>
               <select class="form-control" id="searchRole">
-                <option value="">利用者・スタッフ</option>
+                <option value="">全て</option>
                 <option value="user">利用者のみ</option>
                 <option value="user_commute">利用者のみ（通所）</option>
                 <option value="user_home">利用者のみ（在宅）</option>
                 <option value="staff">スタッフのみ</option>
+                <option value="admin">管理者のみ</option>
               </select>
             </div>
           ` : `
@@ -499,8 +500,6 @@ async searchAttendanceRecords() {
     } else if (this.userRole === 'admin') {
       if (roleValue) {
         params.append('role', roleValue);
-      } else {
-        params.append('excludeAdmin', 'true');
       }
     }
     
