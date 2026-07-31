@@ -189,6 +189,7 @@ export class ReportDetailModal {
       // 利用者の場合、自分のサービス提供記録エントリを取得
       let serviceEntry = null;
       let serviceEntryTaken = null;
+      let serviceEntryTakenEntry = null;
       let serviceEntryLimitReached = false;
       if ((response.user?.role === 'user') && this.canComment) {
         try {
@@ -197,6 +198,7 @@ export class ReportDetailModal {
           );
           serviceEntry = entryResponse.entry || null;
           serviceEntryTaken = entryResponse.takenByStaff || null;
+          serviceEntryTakenEntry = entryResponse.takenEntry || null;
           serviceEntryLimitReached = entryResponse.limitReached || false;
         } catch (error) {
           console.error('支援記録エントリ取得エラー:', error);
@@ -216,6 +218,7 @@ export class ReportDetailModal {
         staffReport: staffReport || null,
         serviceEntry: serviceEntry,
         serviceEntryTaken: serviceEntryTaken,
+        serviceEntryTakenEntry: serviceEntryTakenEntry,
         serviceEntryLimitReached: serviceEntryLimitReached
       };
 
@@ -846,7 +849,7 @@ export class ReportDetailModal {
     const isEditable = !comment || this.userRole === 'admin' || (comment && comment.staff_id === this.app.currentUser.id);
 
     // サービス提供記録
-    const { serviceEntry, serviceEntryTaken, serviceEntryLimitReached } = this.currentData;
+    const { serviceEntry, serviceEntryTaken, serviceEntryTakenEntry, serviceEntryLimitReached } = this.currentData;
     const hasServiceEntry = serviceEntry && (
       (serviceEntry.work_content && serviceEntry.work_content.trim()) ||
       (serviceEntry.support_content && serviceEntry.support_content.trim()) ||
@@ -898,7 +901,19 @@ export class ReportDetailModal {
 
         <h6><i class="fas fa-clipboard-list"></i> 本日のサービス提供記録及び業務報告</h6>
 
-        ${serviceEntryTaken ? `
+        ${serviceEntryTaken && serviceEntryTakenEntry ? `
+          <div class="alert alert-info mb-3 py-2">
+            <i class="fas fa-user-check"></i> <strong>${serviceEntryTaken}さん</strong>が記録済み
+          </div>
+          <div class="border rounded p-2 mb-3 bg-light small">
+            <div class="row g-2">
+              ${serviceEntryTakenEntry.work_content ? `<div class="col-6"><span class="text-muted">作業内容:</span> ${this.escapeAttr(serviceEntryTakenEntry.work_content)}</div>` : ''}
+              ${serviceEntryTakenEntry.support_content ? `<div class="col-6"><span class="text-muted">支援内容:</span> ${this.escapeAttr(serviceEntryTakenEntry.support_content)}</div>` : ''}
+              ${serviceEntryTakenEntry.user_condition ? `<div class="col-6"><span class="text-muted">利用者の様子:</span> ${this.escapeAttr(serviceEntryTakenEntry.user_condition)}</div>` : ''}
+              ${serviceEntryTakenEntry.attendance_info ? `<div class="col-6"><span class="text-muted">勤怠:</span> ${this.escapeAttr(serviceEntryTakenEntry.attendance_info)}</div>` : ''}
+            </div>
+          </div>
+        ` : serviceEntryTaken ? `
           <div class="alert alert-secondary mb-3 py-2">
             <i class="fas fa-lock"></i> ${serviceEntryTaken}さんが記録済みです
           </div>

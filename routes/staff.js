@@ -1402,6 +1402,7 @@ router.post('/break/end', async (req, res) => {
         [date, currentStaffId]
       );
       let takenByStaff = null;
+      let takenEntry = null;
       for (const r of otherReports) {
         if (!r.work_report) continue;
         try {
@@ -1417,6 +1418,12 @@ router.post('/break/end', async (req, res) => {
           if (found) {
             const staffUser = await dbGet('SELECT name FROM users WHERE id = ?', [r.staff_id]);
             takenByStaff = staffUser ? staffUser.name : '他のスタッフ';
+            takenEntry = {
+              work_content: found.work_content || '',
+              support_content: found.support_content || '',
+              user_condition: found.user_condition || '',
+              attendance_info: found.attendance_info || ''
+            };
             break;
           }
         } catch { /* 旧形式は無視 */ }
@@ -1434,6 +1441,7 @@ router.post('/break/end', async (req, res) => {
         success: true,
         entry: myEntry,
         takenByStaff: takenByStaff,
+        takenEntry: takenEntry,
         limitReached: limitReached,
         currentCount: myEntryCount
       });
