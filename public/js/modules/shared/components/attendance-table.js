@@ -418,8 +418,8 @@ export class AttendanceTable {
       `);
     }
 
-    // スタッフ日報詳細ボタン（adminのみ、スタッフの日報がある場合）
-    if (this.userRole === 'admin' && record.user_role === 'staff' && record.staff_report_id) {
+    // スタッフ日報詳細ボタン（adminのみ、スタッフ/管理者の日報がある場合）
+    if (this.userRole === 'admin' && (record.user_role === 'staff' || record.user_role === 'admin') && record.staff_report_id) {
       buttons.push(`
         <button class="btn btn-sm btn-outline-info btn-show-staff-report"
                 data-user-id="${record.user_id}"
