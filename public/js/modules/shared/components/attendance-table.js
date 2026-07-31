@@ -25,13 +25,16 @@ export class AttendanceTable {
       currentDate = null             // 現在の日付（月別出勤簿用）
     } = options;
 
-    // 出勤者、出勤予定者のみフィルタリング
+    // 出勤者、出勤予定者のみフィルタリング（管理者はサービス提供記録の有無で判定）
       const filteredRecords = showOnlyWorking
         ? records.filter(record => {
+            if (record.user_role === 'admin') {
+              return !!record.staff_report_id;
+            }
             const day = getJapaneseDayOfWeek(record.date);
             const workweekArray = (record.workweek ?? '').split(',');
-            const isPlanned = workweekArray.includes(day);      //曜日で予定者を抽出
-            const isPresent = !!record.clock_in;      //出勤時刻判定
+            const isPlanned = workweekArray.includes(day);
+            const isPresent = !!record.clock_in;
             return isPlanned || isPresent;
           })
         : records;
