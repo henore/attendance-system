@@ -1005,7 +1005,7 @@ export class ReportDetailModal {
         try {
           const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_DELETE_ENTRY, {
             method: 'POST',
-            body: JSON.stringify({ date: this.currentData.date, user_id: this.currentData.userId })
+            body: JSON.stringify({ date: this.currentData.date, user_id: parseInt(this.currentData.userId) })
           });
           if (response.success) {
             this.app.showNotification('支援記録を削除しました', 'success');
@@ -1120,7 +1120,7 @@ export class ReportDetailModal {
           const seResponse = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_SAVE_ENTRY, {
             method: 'POST',
             body: JSON.stringify({
-              date: date, user_id: userId, user_name: userName,
+              date: date, user_id: parseInt(userId), user_name: userName,
               work_content: seWorkContent, support_content: seSupportContent,
               user_condition: seUserCondition, attendance_info: seAttendanceInfo
             })

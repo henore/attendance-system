@@ -1333,7 +1333,8 @@ router.post('/break/end', async (req, res) => {
   router.post('/daily-report-delete-entry', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
     try {
       const staffId = req.session.user.id;
-      const { date, user_id } = req.body;
+      const { date } = req.body;
+      const user_id = parseInt(req.body.user_id);
 
       if (!date || !user_id) {
         return res.status(400).json({ success: false, error: '日付とユーザーIDは必須です' });
@@ -1445,7 +1446,8 @@ router.post('/break/end', async (req, res) => {
   router.post('/daily-report-save-entry', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
     try {
       const staffId = req.session.user.id;
-      const { date, user_id, user_name, work_content, support_content, user_condition, attendance_info } = req.body;
+      const { date, user_name, work_content, support_content, user_condition, attendance_info } = req.body;
+      const user_id = parseInt(req.body.user_id);
       const MAX_USERS_PER_STAFF = 6;
 
       if (!date || !user_id) {
