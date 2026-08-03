@@ -72,7 +72,7 @@ export class ReportDetailModal {
                   <i class="fas fa-save"></i> コメントを保存
                 </button>
                 <button type="button" class="btn btn-success" id="${this.modalId}SaveAndSendBtn" style="display: none;">
-                  <i class="fas fa-share"></i> 保存して画像にする
+                  <i class="fas fa-file-pdf"></i> 保存してPDF出力
                 </button>
               ` : ''}
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -94,15 +94,15 @@ export class ReportDetailModal {
       const saveBtn = document.getElementById(`${this.modalId}SaveCommentBtn`);
       if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-          this.saveComment(false); // 画像保存なし
+          this.saveComment(false);
         });
       }
       
-      // 画像付き保存ボタン（新規追加）
+      // PDF付き保存ボタン
       const saveAndSendBtn = document.getElementById(`${this.modalId}SaveAndSendBtn`);
       if (saveAndSendBtn) {
         saveAndSendBtn.addEventListener('click', () => {
-          this.saveComment(true); // 画像DLあり
+          this.saveComment(true);
         });
       }
     }
@@ -1171,6 +1171,12 @@ export class ReportDetailModal {
           try {
             // サービス提供記録を収集（自分の記入 or 他スタッフの記入）
             let serviceEntryForImage = null;
+            if (this.currentData.serviceEntryTakenEntry) {
+              serviceEntryForImage = {
+                ...this.currentData.serviceEntryTakenEntry,
+                staff_name: this.currentData.serviceEntryTaken
+              };
+            }
             const seWC = document.getElementById('seWorkContent')?.value?.trim() || '';
             const seSC = document.getElementById('seSupportContent')?.value?.trim() || '';
             const seUC = document.getElementById('seUserCondition')?.value?.trim() || '';
@@ -1180,11 +1186,6 @@ export class ReportDetailModal {
                 work_content: seWC, support_content: seSC,
                 user_condition: seUC, attendance_info: seAI,
                 staff_name: this.app.currentUser.name
-              };
-            } else if (this.currentData.serviceEntryTakenEntry) {
-              serviceEntryForImage = {
-                ...this.currentData.serviceEntryTakenEntry,
-                staff_name: this.currentData.serviceEntryTaken
               };
             }
 
@@ -1205,7 +1206,7 @@ export class ReportDetailModal {
             );
           } catch (lineError) {
             console.error('[画像DL] エラー:', lineError);
-            this.app.showNotification('画像の保存に失敗しました', 'warning');
+            this.app.showNotification('PDFの保存に失敗しました', 'warning');
           }
         }
         

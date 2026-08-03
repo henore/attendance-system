@@ -1050,7 +1050,7 @@ async searchAttendanceRecords() {
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-success" id="downloadStaffReportImageBtn">
-                  <i class="fas fa-download"></i> 画像として保存
+                  <i class="fas fa-file-pdf"></i> PDFとして保存
                 </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                   <i class="fas fa-times"></i> 閉じる
@@ -1101,14 +1101,14 @@ async searchAttendanceRecords() {
             downloadBtn.innerHTML = '<i class="fas fa-check"></i> 保存完了';
             setTimeout(() => {
               downloadBtn.disabled = false;
-              downloadBtn.innerHTML = '<i class="fas fa-download"></i> 画像として保存';
+              downloadBtn.innerHTML = '<i class="fas fa-file-pdf"></i> PDFとして保存';
             }, 2000);
 
           } catch (error) {
-            console.error('画像保存エラー:', error);
-            this.parent.showNotification('画像の保存に失敗しました', 'danger');
+            console.error('PDF保存エラー:', error);
+            this.parent.showNotification('PDFの保存に失敗しました', 'danger');
             downloadBtn.disabled = false;
-            downloadBtn.innerHTML = '<i class="fas fa-download"></i> 画像として保存';
+            downloadBtn.innerHTML = '<i class="fas fa-file-pdf"></i> PDFとして保存';
           }
         });
       }
