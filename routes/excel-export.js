@@ -280,7 +280,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
         ws.getCell(row, C + 10).border = thinBorder;
         row++;
 
-        // 情報行2
+        // 情報行2（高さ半分）
         ws.getCell(row, C).value = '契約支給量';
         ws.getCell(row, C).fill = headerFill;
         ws.getCell(row, C).font = { size: 8, bold: true };
@@ -290,15 +290,17 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
         ws.getCell(row, C + 1).value = '就労支援B型　原則の日数';
         ws.getCell(row, C + 1).alignment = centerAlign;
         ws.getCell(row, C + 1).border = thinBorder;
+        ws.mergeCells(row, C + 6, row, C + 8);
         ws.getCell(row, C + 6).value = '事業者及びその事業所';
         ws.getCell(row, C + 6).fill = headerFill;
         ws.getCell(row, C + 6).font = { size: 8, bold: true };
         ws.getCell(row, C + 6).alignment = centerAlign;
         ws.getCell(row, C + 6).border = thinBorder;
-        ws.mergeCells(row, C + 7, row, C + 13);
-        ws.getCell(row, C + 7).value = 'はっぴぃたいむ渋沢';
-        ws.getCell(row, C + 7).alignment = centerAlign;
-        ws.getCell(row, C + 7).border = thinBorder;
+        ws.mergeCells(row, C + 9, row, C + 13);
+        ws.getCell(row, C + 9).value = 'はっぴぃたいむ渋沢';
+        ws.getCell(row, C + 9).alignment = centerAlign;
+        ws.getCell(row, C + 9).border = thinBorder;
+        ws.getRow(row).height = 10;
         row++;
 
         // メインテーブルヘッダー（3行）
@@ -344,14 +346,18 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
         row++;
 
         // ヘッダーセルのスタイル適用
+        const smallFontCols = [C + 8, C + 9, C + 10, C + 11];
         for (let r = headerStartRow; r < row; r++) {
             for (let c = C; c <= LAST; c++) {
                 const cell = ws.getCell(r, c);
                 cell.fill = headerFill;
-                cell.font = { size: 7, bold: true };
+                cell.font = smallFontCols.includes(c)
+                    ? { size: 5.5, bold: true }
+                    : { size: 7, bold: true };
                 cell.alignment = centerAlign;
                 cell.border = thinBorder;
             }
+            ws.getRow(r).height = 18;
         }
 
         // データ行（31行固定、行高2倍、縦横中央）
@@ -807,6 +813,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                     indexWs.getCell(indexRow, c).alignment = centerAlign;
                     indexWs.getCell(indexRow, c).font = { size: 9 };
                 }
+                indexWs.getRow(indexRow).height = 45;
 
                 if (date.getDay() === 0) {
                     indexWs.getCell(indexRow, 2).font = { size: 9, color: { argb: 'FFFF0000' } };
@@ -827,7 +834,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                 ws.pageSetup = { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 };
                 ws.columns = [
                     { width: 16 },
-                    { width: 40 },
+                    { width: 60 },
                 ];
                 sheetsCreated++;
 
@@ -876,13 +883,18 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
 
                     const reportItems = [
                         ['作業内容', report.work_content || ''],
+                        ['作業場所', report.work_location || ''],
+                        ['施設外就労先', report.external_work_location || ''],
+                        ['PC番号', report.pc_number || ''],
                         ['体温', report.temperature ? `${report.temperature}℃` : ''],
                         ['食欲', report.appetite === 'good' ? 'あり' : report.appetite === 'none' ? 'なし' : ''],
+                        ['服薬時間', report.medication_time || ''],
                         ['就寝時間', report.bedtime || ''],
                         ['起床時間', report.wakeup_time || ''],
                         ['睡眠の質', report.sleep_quality === 'good' ? '良い' : report.sleep_quality === 'poor' ? '普通' : report.sleep_quality === 'bad' ? '悪い' : ''],
                         ['振り返り', report.reflection || ''],
-                        ['作業場所', report.external_work_location || ''],
+                        ['連絡時間1', report.contact_time_1 || ''],
+                        ['連絡時間2', report.contact_time_2 || ''],
                     ];
 
                     if (report.interview_request) {
@@ -890,6 +902,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                         reportItems.push(['面談希望', reqLabel]);
                     }
 
+                    const longTextLabels = ['振り返り', '作業内容'];
                     reportItems.forEach(([label, value]) => {
                         if (!value) return;
                         ws.getCell(row, 1).value = label;
@@ -901,7 +914,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                         ws.getCell(row, 2).border = thinBorder;
                         ws.getCell(row, 2).font = { size: 9 };
                         ws.getCell(row, 2).alignment = { vertical: 'middle', wrapText: true };
-                        ws.getRow(row).height = 30;
+                        ws.getRow(row).height = longTextLabels.includes(label) ? 75 : 30;
                         row++;
                     });
                 }
@@ -917,7 +930,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                     ws.getCell(row, 2).border = thinBorder;
                     ws.getCell(row, 2).font = { size: 9 };
                     ws.getCell(row, 2).alignment = { vertical: 'middle', wrapText: true };
-                    ws.getRow(row).height = 30;
+                    ws.getRow(row).height = 75;
                     row++;
                 }
 
@@ -957,7 +970,6 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                             ['利用者の様子', svc.user_condition],
                             ['出退勤情報', svc.attendance_info],
                         ];
-
                         svcItems.forEach(([label, value]) => {
                             if (!value) return;
                             ws.getCell(row, 1).value = label;
