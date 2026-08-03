@@ -205,7 +205,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
     // 利用者の実績記録票シート生成
     async function buildUserJissekiSheet(workbook, year, month, user, recordMap, daysInMonth) {
         const ws = workbook.addWorksheet(`${month}月`);
-        ws.pageSetup = { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 1 };
+        ws.pageSetup = { paperSize: 9, orientation: 'landscape' };
 
         // A列は空列、B〜Oにデータ配置（15列）
         const C = 2; // データ開始列オフセット
@@ -498,7 +498,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
     // スタッフ・管理者の月別出勤簿シート生成
     async function buildStaffAttendanceSheet(workbook, year, month, user, recordMap, daysInMonth) {
         const ws = workbook.addWorksheet(`${month}月`);
-        ws.pageSetup = { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 };
+        ws.pageSetup = { paperSize: 9, orientation: 'portrait' };
 
         const thinBorder = {
             top: { style: 'thin' },
@@ -833,7 +833,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
 
                 const sheetName = `${y}${String(m).padStart(2, '0')}${String(day).padStart(2, '0')}`;
                 const ws = workbook.addWorksheet(sheetName);
-                ws.pageSetup = { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 };
+                ws.pageSetup = { paperSize: 9, orientation: 'portrait' };
                 ws.columns = [
                     { width: 16 },
                     { width: 90 },
