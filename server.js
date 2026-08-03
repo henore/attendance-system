@@ -212,6 +212,7 @@ app.listen(PORT, () => {
     let lastAutoBreakDate = null;
     setInterval(async () => {
         const now = getCurrentTime();
+        if (now < '11:30') return;
         const today = getCurrentDate();
         if (now >= '11:46' && now < '11:47' && lastAutoBreakDate !== today) {
             lastAutoBreakDate = today;
