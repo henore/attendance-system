@@ -883,7 +883,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
 
                     const reportItems = [
                         ['作業内容', report.work_content || ''],
-                        ['作業場所', report.work_location || ''],
+                        ['作業場所', report.work_location === 'home' ? '在宅' : report.work_location === 'office' ? '通所' : (report.work_location || '')],
                         ['施設外就労先', report.external_work_location || ''],
                         ['PC番号', report.pc_number || ''],
                         ['体温', report.temperature ? `${report.temperature}℃` : ''],
@@ -902,7 +902,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                         reportItems.push(['面談希望', reqLabel]);
                     }
 
-                    const longTextLabels = ['振り返り', '作業内容'];
+                    const dynamicHeightLabels = ['振り返り'];
                     reportItems.forEach(([label, value]) => {
                         if (!value) return;
                         ws.getCell(row, 1).value = label;
@@ -914,7 +914,14 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                         ws.getCell(row, 2).border = thinBorder;
                         ws.getCell(row, 2).font = { size: 9 };
                         ws.getCell(row, 2).alignment = { vertical: 'middle', wrapText: true };
-                        ws.getRow(row).height = longTextLabels.includes(label) ? 75 : 30;
+                        if (dynamicHeightLabels.includes(label)) {
+                            const lines = String(value).split('\n').length;
+                            ws.getRow(row).height = Math.max(30, lines * 15);
+                        } else if (label === '作業内容') {
+                            ws.getRow(row).height = 45;
+                        } else {
+                            ws.getRow(row).height = 30;
+                        }
                         row++;
                     });
                 }
@@ -926,11 +933,13 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                     ws.getCell(row, 1).font = { size: 9, bold: true };
                     ws.getCell(row, 1).border = thinBorder;
                     ws.getCell(row, 1).alignment = centerAlign;
-                    ws.getCell(row, 2).value = `${comment.staff_name}: ${comment.comment}`;
+                    const commentText = `${comment.staff_name}: ${comment.comment}`;
+                    ws.getCell(row, 2).value = commentText;
                     ws.getCell(row, 2).border = thinBorder;
                     ws.getCell(row, 2).font = { size: 9 };
                     ws.getCell(row, 2).alignment = { vertical: 'middle', wrapText: true };
-                    ws.getRow(row).height = 75;
+                    const commentLines = String(commentText).split('\n').length;
+                    ws.getRow(row).height = Math.max(30, commentLines * 15);
                     row++;
                 }
 
