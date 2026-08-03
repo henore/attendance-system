@@ -840,6 +840,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                         ws.getCell(row, 2).border = thinBorder;
                         ws.getCell(row, 2).font = { size: 9 };
                         ws.getCell(row, 2).alignment = { vertical: 'middle', wrapText: true };
+                        ws.getRow(row).height = 30;
                         row++;
                     });
                 }
@@ -855,6 +856,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                     ws.getCell(row, 2).border = thinBorder;
                     ws.getCell(row, 2).font = { size: 9 };
                     ws.getCell(row, 2).alignment = { vertical: 'middle', wrapText: true };
+                    ws.getRow(row).height = 30;
                     row++;
                 }
 
@@ -906,6 +908,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                             ws.getCell(row, 2).border = thinBorder;
                             ws.getCell(row, 2).font = { size: 9 };
                             ws.getCell(row, 2).alignment = { vertical: 'middle', wrapText: true };
+                            ws.getRow(row).height = 30;
                             row++;
                         });
                     });
