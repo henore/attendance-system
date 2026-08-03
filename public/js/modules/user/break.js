@@ -26,6 +26,10 @@ export class UserBreakHandler {
 
     // 中抜け状態
     this.isOnAbsence = false;
+
+    // 通所者の自動休憩更新タイマー
+    this.autoBreakRefreshInterval = null;
+    this.autoBreakRefreshed = false;
   }
 
   /**
@@ -34,11 +38,11 @@ export class UserBreakHandler {
    */
   async loadBreakStatus(attendance) {
     if (!attendance) return;
-    
+
     try {
       const today = getCurrentDate();
       const response = await this.apiCall(API_ENDPOINTS.USER.BREAK_STATUS(today));
-      
+
       if (response.breakRecord) {
         this.hasBreakToday = true;
         if (!response.breakRecord.end_time) {
@@ -47,9 +51,28 @@ export class UserBreakHandler {
           this.startBreakTimeMonitoring();
         }
       }
+
+      // 通所者で未休憩の場合、11:46の自動打刻後にUI更新するタイマー開始
+      if (this.currentUser.service_type === 'commute' && !this.hasBreakToday && attendance.clock_in) {
+        this.startAutoBreakRefresh(attendance);
+      }
     } catch (error) {
       console.error('休憩状況読み込みエラー:', error);
     }
+  }
+
+  startAutoBreakRefresh(attendance) {
+    if (this.autoBreakRefreshInterval) return;
+    this.autoBreakRefreshInterval = setInterval(async () => {
+      const now = getCurrentTime();
+      if (now >= '11:46' && !this.autoBreakRefreshed && !this.hasBreakToday) {
+        this.autoBreakRefreshed = true;
+        clearInterval(this.autoBreakRefreshInterval);
+        this.autoBreakRefreshInterval = null;
+        await this.loadBreakStatus(attendance);
+        this.updateUI();
+      }
+    }, 30000);
   }
 
   /**
@@ -724,10 +747,13 @@ export class UserBreakHandler {
     this.stopBreakTimeMonitoring();
     this.clearAutoBreakEnd();
 
-    // 小休憩タイマーのクリーンアップ
     if (this.shortBreakInterval) {
       clearInterval(this.shortBreakInterval);
       this.shortBreakInterval = null;
+    }
+    if (this.autoBreakRefreshInterval) {
+      clearInterval(this.autoBreakRefreshInterval);
+      this.autoBreakRefreshInterval = null;
     }
   }
 }

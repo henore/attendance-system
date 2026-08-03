@@ -207,6 +207,40 @@ app.listen(PORT, () => {
     console.log(`🚀 サーバー起動: http://localhost:${PORT}`);
     console.log(`📊 環境: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📅 サーバー日時(JST): ${getCurrentDate()} ${getCurrentTime()}`);
+
+    // 通所者の休憩自動打刻（11:46 JSTに実行）
+    let lastAutoBreakDate = null;
+    setInterval(async () => {
+        const now = getCurrentTime();
+        const today = getCurrentDate();
+        if (now >= '11:46' && now < '11:47' && lastAutoBreakDate !== today) {
+            lastAutoBreakDate = today;
+            try {
+                const inserted = await dbAll(`
+                    SELECT u.id, u.name FROM users u
+                    JOIN attendance a ON u.id = a.user_id AND a.date = ?
+                    LEFT JOIN break_records br ON u.id = br.user_id AND br.date = ?
+                    WHERE u.role = 'user' AND u.service_type = 'commute'
+                      AND u.is_active = 1
+                      AND a.clock_in IS NOT NULL AND a.clock_out IS NULL
+                      AND br.id IS NULL
+                `, [today, today]);
+
+                for (const user of inserted) {
+                    await dbRun(`
+                        INSERT INTO break_records (user_id, date, start_time, end_time, duration)
+                        VALUES (?, ?, '11:30', '12:30', 60)
+                    `, [user.id, today]);
+                }
+
+                if (inserted.length > 0) {
+                    console.log(`[自動休憩] ${today} ${inserted.length}名の通所者に休憩を自動記録: ${inserted.map(u => u.name).join(', ')}`);
+                }
+            } catch (error) {
+                console.error('[自動休憩] エラー:', error);
+            }
+        }
+    }, 30000);
 });
 
 // プロセス終了時の処理
