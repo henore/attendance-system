@@ -104,6 +104,10 @@ export default class SharedMonthlyReport {
                         <li><a class="dropdown-item" href="#" id="exportExcelBtn">
                             <i class="fas fa-table me-2"></i>月別出勤簿
                         </a></li>
+                        <li><a class="dropdown-item" href="#" id="exportYearlyExcelBtn">
+                            <i class="fas fa-calendar me-2"></i>月別出勤簿（年間一括）
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#" id="exportDailyReportsBtn">
                             <i class="fas fa-clipboard-list me-2"></i>日報・サービス提供記録
                         </a></li>
@@ -305,6 +309,10 @@ export default class SharedMonthlyReport {
 
             if (exportBtn) {
                 exportBtn.addEventListener('click', (e) => { e.preventDefault(); this.exportToExcel(); });
+            }
+            const exportYearlyBtn = this.container.querySelector('#exportYearlyExcelBtn');
+            if (exportYearlyBtn) {
+                exportYearlyBtn.addEventListener('click', (e) => { e.preventDefault(); this.exportYearlyExcel(); });
             }
             if (exportDailyBtn) {
                 exportDailyBtn.addEventListener('click', (e) => { e.preventDefault(); this.exportDailyReportsExcel(); });
@@ -1128,7 +1136,7 @@ export default class SharedMonthlyReport {
 
             const blob = await response.blob();
             const userName = userSelect.selectedOptions[0]?.text || 'user';
-            const filename = `月別出勤簿_${userName}_${year}年${month}月.xlsx`;
+            const filename = `実績${year}_${userName}.xlsx`;
 
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
@@ -1140,6 +1148,48 @@ export default class SharedMonthlyReport {
         } catch (error) {
             console.error('Excel出力エラー:', error);
             this.app.showNotification(error.message || 'Excel出力に失敗しました', 'danger');
+        }
+    }
+
+    async exportYearlyExcel() {
+        if (!this.isAdmin) return;
+
+        const yearSelect = this.container.querySelector('#monthlyYearSelect');
+        const userSelect = this.container.querySelector('#monthlyUserSelect');
+
+        if (!yearSelect || !userSelect) return;
+
+        const year = yearSelect.value;
+        const userId = userSelect.value;
+
+        if (!userId) {
+            this.app.showNotification('ユーザーを選択してください', 'warning');
+            return;
+        }
+
+        try {
+            const url = API_ENDPOINTS.EXCEL.MONTHLY_ATTENDANCE_YEARLY(year, userId);
+            const response = await fetch(url, { credentials: 'include' });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || '年間Excel出力に失敗しました');
+            }
+
+            const blob = await response.blob();
+            const userName = userSelect.selectedOptions[0]?.text || 'user';
+            const filename = `実績${year}_${userName}.xlsx`;
+
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+
+            this.app.showNotification('年間Excelファイルをダウンロードしました', 'success');
+        } catch (error) {
+            console.error('年間Excel出力エラー:', error);
+            this.app.showNotification(error.message || '年間Excel出力に失敗しました', 'danger');
         }
     }
 

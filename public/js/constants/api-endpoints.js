@@ -122,6 +122,8 @@ export const API_ENDPOINTS = {
   EXCEL: {
     MONTHLY_ATTENDANCE: (year, month, userId) =>
         `/api/excel/monthly-attendance/${year}/${month}/${userId}`,
+    MONTHLY_ATTENDANCE_YEARLY: (year, userId) =>
+        `/api/excel/monthly-attendance-yearly/${year}/${userId}`,
     DAILY_REPORTS: (year, month, userId) =>
         `/api/excel/daily-reports/${year}/${month}/${userId}`
   }

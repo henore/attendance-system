@@ -111,7 +111,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                 await buildStaffAttendanceSheet(workbook, y, m, user, recordMap, daysInMonth);
             }
 
-            const filename = encodeURIComponent(`月別出勤簿_${user.name}_${y}年${m}月.xlsx`);
+            const filename = encodeURIComponent(`実績${y}_${user.name}.xlsx`);
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${filename}`);
 
@@ -124,27 +124,108 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
         }
     });
 
+    // ===============================
+    // パターン1-B: 年間一括（月別シート）
+    // ===============================
+    router.get('/monthly-attendance-yearly/:year/:userId', requireAuth, requireRole(['admin']), async (req, res) => {
+        try {
+            const { year, userId } = req.params;
+            const y = parseInt(year);
+
+            if (!y || !userId) {
+                return res.status(400).json({ success: false, error: 'パラメータが不正です' });
+            }
+
+            const user = await dbGet(
+                `SELECT id, username, name, role, service_type, service_no, workweek, transportation, hourly_wage
+                 FROM users WHERE id = ? AND is_active >= 1`,
+                [userId]
+            );
+            if (!user) {
+                return res.status(404).json({ success: false, error: 'ユーザーが見つかりません' });
+            }
+
+            // 該当年に出勤記録がある月を取得
+            const months = await dbAll(`
+                SELECT DISTINCT CAST(strftime('%m', date) AS INTEGER) as month
+                FROM attendance
+                WHERE user_id = ? AND strftime('%Y', date) = ?
+                ORDER BY month
+            `, [userId, String(y)]);
+
+            if (months.length === 0) {
+                return res.status(404).json({ success: false, error: `${y}年の出勤記録がありません` });
+            }
+
+            const workbook = new ExcelJS.Workbook();
+
+            for (const { month: m } of months) {
+                const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
+                const endDate = `${y}-${String(m).padStart(2, '0')}-31`;
+                const daysInMonth = getDaysInMonth(y, m);
+
+                const records = await dbAll(`
+                    SELECT a.*, a.nakanuke_start, a.nakanuke_minutes, u.service_type,
+                        CASE WHEN u.role = 'user' THEN br.start_time ELSE a.break_start END as break_start,
+                        CASE WHEN u.role = 'user' THEN br.end_time ELSE a.break_end END as break_end,
+                        CASE WHEN u.role = 'user' THEN br.duration ELSE NULL END as break_duration
+                    FROM attendance a
+                    JOIN users u ON a.user_id = u.id
+                    LEFT JOIN break_records br ON a.user_id = br.user_id AND a.date = br.date AND u.role = 'user'
+                    WHERE a.user_id = ? AND a.date BETWEEN ? AND ?
+                    ORDER BY a.date
+                `, [userId, startDate, endDate]);
+
+                const recordMap = {};
+                records.forEach(r => {
+                    const d = new Date(r.date);
+                    recordMap[d.getDate()] = r;
+                });
+
+                if (user.role === 'user') {
+                    await buildUserJissekiSheet(workbook, y, m, user, recordMap, daysInMonth);
+                } else {
+                    await buildStaffAttendanceSheet(workbook, y, m, user, recordMap, daysInMonth);
+                }
+            }
+
+            const filename = encodeURIComponent(`実績${y}_${user.name}.xlsx`);
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${filename}`);
+
+            await workbook.xlsx.write(res);
+            res.end();
+
+        } catch (error) {
+            console.error('年間Excel出力エラー:', error);
+            res.status(500).json({ success: false, error: '年間Excel出力に失敗しました' });
+        }
+    });
+
     // 利用者の実績記録票シート生成
     async function buildUserJissekiSheet(workbook, year, month, user, recordMap, daysInMonth) {
-        const ws = workbook.addWorksheet(`${month}月実績記録票`);
+        const ws = workbook.addWorksheet(`${month}月`);
         ws.pageSetup = { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 1 };
 
-        // 列幅設定（A〜N: 14列）
+        // A列は空列、B〜Oにデータ配置（15列）
+        const C = 2; // データ開始列オフセット
+        const LAST = C + 13; // 最終列 = 15
         ws.columns = [
-            { width: 5 },   // A: 日付
-            { width: 5 },   // B: 曜日
-            { width: 9 },   // C: サービス提供の状況
-            { width: 8 },   // D: 開始時間
-            { width: 8 },   // E: 終了時間
-            { width: 5 },   // F: 送迎往
-            { width: 5 },   // G: 送迎復
-            { width: 8 },   // H: 訪問支援特別加算
-            { width: 7 },   // I: 食事提供加算
-            { width: 7 },   // J: 医療連携体制加算
-            { width: 7 },   // K: 地域協働加算
-            { width: 7 },   // L: 施設外加算
-            { width: 9 },   // M: 利用者確認欄
-            { width: 10 },  // N: 備考
+            { width: 2 },    // A: 空列
+            { width: 5 },    // B: 日付
+            { width: 5 },    // C: 曜日
+            { width: 9 },    // D: サービス提供の状況
+            { width: 8 },    // E: 開始時間
+            { width: 8 },    // F: 終了時間
+            { width: 3.5 },  // G: 送迎往 (70%)
+            { width: 3.5 },  // H: 送迎復 (70%)
+            { width: 8 },    // I: 訪問支援特別加算
+            { width: 5 },    // J: 食事提供加算 (70%)
+            { width: 5 },    // K: 医療連携体制加算 (70%)
+            { width: 5 },    // L: 地域協働加算 (70%)
+            { width: 5 },    // M: 施設外加算 (70%)
+            { width: 6.3 },  // N: 利用者確認欄 (70%)
+            { width: 10 },   // O: 備考
         ];
 
         const thinBorder = {
@@ -156,120 +237,115 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
         const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
         const centerAlign = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-        let row = 1;
+        // 1行目は空行
+        let row = 2;
 
         // ヘッダー行: 和暦 + タイトル
-        ws.mergeCells(row, 1, row, 2);
-        ws.getCell(row, 1).value = `${getWareki(year)} ${month}月`;
-        ws.getCell(row, 1).font = { size: 10 };
-        ws.mergeCells(row, 3, row, 12);
-        ws.getCell(row, 3).value = '就労継続支援提供実績記録票';
-        ws.getCell(row, 3).font = { size: 14, bold: true };
-        ws.getCell(row, 3).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.mergeCells(row, C, row, C + 1);
+        ws.getCell(row, C).value = `${getWareki(year)} ${month}月`;
+        ws.getCell(row, C).font = { size: 10 };
+        ws.mergeCells(row, C + 2, row, C + 10);
+        ws.getCell(row, C + 2).value = '就労継続支援提供実績記録票';
+        ws.getCell(row, C + 2).font = { size: 14, bold: true };
+        ws.getCell(row, C + 2).alignment = { horizontal: 'center', vertical: 'middle' };
         row++;
 
-        // 情報テーブル（2行）
-        const infoRows = [
-            ['受給者番号', user.service_no || '', '', '支給決定障害者氏名', user.name, '', '事業所番号', '1412801597', ''],
-            ['契約支給量', '就労支援B型　原則の日数', '', '', '事業者及びその事業所', 'はっぴぃたいむ渋沢', '', '', '']
-        ];
-
         // 情報行1
-        ws.getCell(row, 1).value = infoRows[0][0];
-        ws.getCell(row, 1).fill = headerFill;
-        ws.getCell(row, 1).font = { size: 8, bold: true };
-        ws.getCell(row, 1).alignment = centerAlign;
-        ws.getCell(row, 1).border = thinBorder;
-        ws.mergeCells(row, 2, row, 4);
-        ws.getCell(row, 2).value = infoRows[0][1];
-        ws.getCell(row, 2).alignment = centerAlign;
-        ws.getCell(row, 2).border = thinBorder;
-        ws.getCell(row, 5).value = infoRows[0][3];
-        ws.getCell(row, 5).fill = headerFill;
-        ws.getCell(row, 5).font = { size: 8, bold: true };
-        ws.getCell(row, 5).alignment = centerAlign;
-        ws.getCell(row, 5).border = thinBorder;
-        ws.mergeCells(row, 6, row, 9);
-        ws.getCell(row, 6).value = infoRows[0][4];
-        ws.getCell(row, 6).alignment = centerAlign;
-        ws.getCell(row, 6).border = thinBorder;
-        ws.getCell(row, 10).value = '事業所番号';
-        ws.getCell(row, 10).fill = headerFill;
-        ws.getCell(row, 10).font = { size: 8, bold: true };
-        ws.getCell(row, 10).alignment = centerAlign;
-        ws.getCell(row, 10).border = thinBorder;
-        ws.mergeCells(row, 11, row, 14);
-        ws.getCell(row, 11).value = '1412801597';
-        ws.getCell(row, 11).alignment = centerAlign;
-        ws.getCell(row, 11).border = thinBorder;
+        ws.getCell(row, C).value = '受給者番号';
+        ws.getCell(row, C).fill = headerFill;
+        ws.getCell(row, C).font = { size: 8, bold: true };
+        ws.getCell(row, C).alignment = centerAlign;
+        ws.getCell(row, C).border = thinBorder;
+        ws.mergeCells(row, C + 1, row, C + 3);
+        ws.getCell(row, C + 1).value = user.service_no || '';
+        ws.getCell(row, C + 1).alignment = centerAlign;
+        ws.getCell(row, C + 1).border = thinBorder;
+        ws.getCell(row, C + 4).value = '支給決定障害者氏名';
+        ws.getCell(row, C + 4).fill = headerFill;
+        ws.getCell(row, C + 4).font = { size: 8, bold: true };
+        ws.getCell(row, C + 4).alignment = centerAlign;
+        ws.getCell(row, C + 4).border = thinBorder;
+        ws.mergeCells(row, C + 5, row, C + 8);
+        ws.getCell(row, C + 5).value = user.name;
+        ws.getCell(row, C + 5).alignment = centerAlign;
+        ws.getCell(row, C + 5).border = thinBorder;
+        ws.getCell(row, C + 9).value = '事業所番号';
+        ws.getCell(row, C + 9).fill = headerFill;
+        ws.getCell(row, C + 9).font = { size: 8, bold: true };
+        ws.getCell(row, C + 9).alignment = centerAlign;
+        ws.getCell(row, C + 9).border = thinBorder;
+        ws.mergeCells(row, C + 10, row, C + 13);
+        ws.getCell(row, C + 10).value = '1412801597';
+        ws.getCell(row, C + 10).alignment = centerAlign;
+        ws.getCell(row, C + 10).border = thinBorder;
         row++;
 
         // 情報行2
-        ws.getCell(row, 1).value = '契約支給量';
-        ws.getCell(row, 1).fill = headerFill;
-        ws.getCell(row, 1).font = { size: 8, bold: true };
-        ws.getCell(row, 1).alignment = centerAlign;
-        ws.getCell(row, 1).border = thinBorder;
-        ws.mergeCells(row, 2, row, 6);
-        ws.getCell(row, 2).value = '就労支援B型　原則の日数';
-        ws.getCell(row, 2).alignment = centerAlign;
-        ws.getCell(row, 2).border = thinBorder;
-        ws.getCell(row, 7).value = '事業者及びその事業所';
-        ws.getCell(row, 7).fill = headerFill;
-        ws.getCell(row, 7).font = { size: 8, bold: true };
-        ws.getCell(row, 7).alignment = centerAlign;
-        ws.getCell(row, 7).border = thinBorder;
-        ws.mergeCells(row, 8, row, 14);
-        ws.getCell(row, 8).value = 'はっぴぃたいむ渋沢';
-        ws.getCell(row, 8).alignment = centerAlign;
-        ws.getCell(row, 8).border = thinBorder;
+        ws.getCell(row, C).value = '契約支給量';
+        ws.getCell(row, C).fill = headerFill;
+        ws.getCell(row, C).font = { size: 8, bold: true };
+        ws.getCell(row, C).alignment = centerAlign;
+        ws.getCell(row, C).border = thinBorder;
+        ws.mergeCells(row, C + 1, row, C + 5);
+        ws.getCell(row, C + 1).value = '就労支援B型　原則の日数';
+        ws.getCell(row, C + 1).alignment = centerAlign;
+        ws.getCell(row, C + 1).border = thinBorder;
+        ws.getCell(row, C + 6).value = '事業者及びその事業所';
+        ws.getCell(row, C + 6).fill = headerFill;
+        ws.getCell(row, C + 6).font = { size: 8, bold: true };
+        ws.getCell(row, C + 6).alignment = centerAlign;
+        ws.getCell(row, C + 6).border = thinBorder;
+        ws.mergeCells(row, C + 7, row, C + 13);
+        ws.getCell(row, C + 7).value = 'はっぴぃたいむ渋沢';
+        ws.getCell(row, C + 7).alignment = centerAlign;
+        ws.getCell(row, C + 7).border = thinBorder;
         row++;
 
         // メインテーブルヘッダー（3行）
         const headerStartRow = row;
 
         // ヘッダー行1
-        ws.getCell(row, 1).value = '日付';
-        ws.mergeCells(row, 1, row + 2, 1);
-        ws.getCell(row, 2).value = '曜日';
-        ws.mergeCells(row, 2, row + 2, 2);
-        ws.mergeCells(row, 3, row, 12);
-        ws.getCell(row, 3).value = 'サービス提供実績';
-        ws.getCell(row, 13).value = '利用者\n確認欄';
-        ws.mergeCells(row, 13, row + 2, 13);
-        ws.getCell(row, 14).value = '備考';
-        ws.mergeCells(row, 14, row + 2, 14);
+        ws.getCell(row, C).value = '日付';
+        ws.mergeCells(row, C, row + 2, C);
+        ws.getCell(row, C + 1).value = '曜日';
+        ws.mergeCells(row, C + 1, row + 2, C + 1);
+        ws.mergeCells(row, C + 2, row, C + 11);
+        ws.getCell(row, C + 2).value = 'サービス提供実績';
+        ws.getCell(row, C + 12).value = '利用者\n確認欄';
+        ws.mergeCells(row, C + 12, row + 2, C + 12);
+        ws.getCell(row, C + 13).value = '備考';
+        ws.mergeCells(row, C + 13, row + 2, C + 13);
         row++;
 
         // ヘッダー行2
-        ws.getCell(row, 3).value = 'サービス提供\nの状況';
-        ws.mergeCells(row, 3, row + 1, 3);
-        ws.getCell(row, 4).value = '開始\n時間';
-        ws.mergeCells(row, 4, row + 1, 4);
-        ws.getCell(row, 5).value = '終了\n時間';
-        ws.mergeCells(row, 5, row + 1, 5);
-        ws.mergeCells(row, 6, row, 7);
-        ws.getCell(row, 6).value = '送迎加算';
-        ws.getCell(row, 8).value = '訪問支援\n特別加算';
-        ws.getCell(row, 9).value = '食事提供\n加算';
-        ws.mergeCells(row, 9, row + 1, 9);
-        ws.getCell(row, 10).value = '医療連携\n体制加算';
-        ws.mergeCells(row, 10, row + 1, 10);
-        ws.getCell(row, 11).value = '地域協働\n加算';
-        ws.mergeCells(row, 11, row + 1, 11);
-        ws.getCell(row, 12).value = '施設外\n加算';
-        ws.mergeCells(row, 12, row + 1, 12);
+        ws.getCell(row, C + 2).value = 'サービス提供\nの状況';
+        ws.mergeCells(row, C + 2, row + 1, C + 2);
+        ws.getCell(row, C + 3).value = '開始\n時間';
+        ws.mergeCells(row, C + 3, row + 1, C + 3);
+        ws.getCell(row, C + 4).value = '終了\n時間';
+        ws.mergeCells(row, C + 4, row + 1, C + 4);
+        ws.mergeCells(row, C + 5, row, C + 6);
+        ws.getCell(row, C + 5).value = '送迎加算';
+        ws.getCell(row, C + 7).value = '訪問支援\n特別加算';
+        ws.getCell(row, C + 8).value = '食事提供\n加算';
+        ws.mergeCells(row, C + 8, row + 1, C + 8);
+        ws.getCell(row, C + 9).value = '医療連携\n体制加算';
+        ws.mergeCells(row, C + 9, row + 1, C + 9);
+        ws.getCell(row, C + 10).value = '地域協働\n加算';
+        ws.mergeCells(row, C + 10, row + 1, C + 10);
+        ws.getCell(row, C + 11).value = '施設外\n加算';
+        ws.mergeCells(row, C + 11, row + 1, C + 11);
         row++;
 
         // ヘッダー行3
-        ws.getCell(row, 6).value = '往';
-        ws.getCell(row, 7).value = '復';
-        ws.getCell(row, 8).value = '時間数';
+        ws.getCell(row, C + 5).value = '往';
+        ws.getCell(row, C + 6).value = '復';
+        ws.getCell(row, C + 7).value = '時間数';
         row++;
 
         // ヘッダーセルのスタイル適用
         for (let r = headerStartRow; r < row; r++) {
-            for (let c = 1; c <= 14; c++) {
+            for (let c = C; c <= LAST; c++) {
                 const cell = ws.getCell(r, c);
                 cell.fill = headerFill;
                 cell.font = { size: 7, bold: true };
@@ -278,11 +354,10 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
             }
         }
 
-        // データ行（31行固定）
+        // データ行（31行固定、行高2倍、縦横中央）
         let totalWorkDays = 0;
         let totalTransport = 0;
         let totalMinutes = 0;
-        const dataStartRow = row;
 
         for (let day = 1; day <= 31; day++) {
             if (day <= daysInMonth) {
@@ -291,27 +366,27 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                 const dayName = DAY_NAMES[date.getDay()];
                 const isAttended = record && record.clock_in;
 
-                ws.getCell(row, 1).value = day;
-                ws.getCell(row, 2).value = dayName;
+                ws.getCell(row, C).value = day;
+                ws.getCell(row, C + 1).value = dayName;
 
                 if (date.getDay() === 0) {
-                    ws.getCell(row, 2).font = { size: 8, color: { argb: 'FFFF0000' } };
+                    ws.getCell(row, C + 1).font = { size: 8, color: { argb: 'FFFF0000' } };
                 } else if (date.getDay() === 6) {
-                    ws.getCell(row, 2).font = { size: 8, color: { argb: 'FF0000FF' } };
+                    ws.getCell(row, C + 1).font = { size: 8, color: { argb: 'FF0000FF' } };
                 } else {
-                    ws.getCell(row, 2).font = { size: 8 };
+                    ws.getCell(row, C + 1).font = { size: 8 };
                 }
 
                 if (isAttended) {
                     totalWorkDays++;
                     const serviceStatus = record.service_type === 'commute' ? '通所' : record.service_type === 'home' ? '在宅' : '';
-                    ws.getCell(row, 3).value = serviceStatus;
-                    ws.getCell(row, 4).value = record.clock_in;
-                    ws.getCell(row, 5).value = record.clock_out || '';
+                    ws.getCell(row, C + 2).value = serviceStatus;
+                    ws.getCell(row, C + 3).value = record.clock_in;
+                    ws.getCell(row, C + 4).value = record.clock_out || '';
 
                     if (user.transportation === 1) {
-                        ws.getCell(row, 6).value = '1';
-                        ws.getCell(row, 7).value = '1';
+                        ws.getCell(row, C + 5).value = '1';
+                        ws.getCell(row, C + 6).value = '1';
                         totalTransport++;
                     }
 
@@ -320,115 +395,101 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                 }
             }
 
-            // 全セルにボーダー適用
-            for (let c = 1; c <= 14; c++) {
+            for (let c = C; c <= LAST; c++) {
                 const cell = ws.getCell(row, c);
                 cell.border = thinBorder;
                 cell.alignment = centerAlign;
                 if (!cell.font) cell.font = { size: 8 };
             }
-            ws.getRow(row).height = 18;
+            ws.getRow(row).height = 36;
             row++;
         }
 
-        // 合計行
-        ws.mergeCells(row, 1, row + 1, 5);
-        ws.getCell(row, 1).value = '合計';
-        ws.getCell(row, 1).font = { size: 9, bold: true };
-        ws.getCell(row, 1).alignment = centerAlign;
-        ws.mergeCells(row, 6, row + 1, 7);
-        ws.getCell(row, 6).value = totalTransport > 0 ? `${totalTransport * 2}回` : '回';
-        ws.getCell(row, 6).alignment = centerAlign;
+        // 合計行（小さめ）
+        const totalRow1 = row;
+        ws.mergeCells(row, C, row + 1, C + 4);
+        ws.getCell(row, C).value = '合計';
+        ws.getCell(row, C).font = { size: 9, bold: true };
+        ws.getCell(row, C).alignment = centerAlign;
+        ws.mergeCells(row, C + 5, row + 1, C + 6);
+        ws.getCell(row, C + 5).value = totalTransport > 0 ? `${totalTransport * 2}回` : '回';
+        ws.getCell(row, C + 5).alignment = centerAlign;
 
-        const addOnCols = [8, 9, 10, 11, 12];
-        addOnCols.forEach(c => {
+        [C + 7, C + 8, C + 9, C + 10, C + 11].forEach(c => {
             ws.mergeCells(row, c, row + 1, c);
             ws.getCell(row, c).value = '回';
             ws.getCell(row, c).alignment = centerAlign;
         });
 
-        ws.getCell(row, 13).value = '施設外支援\n当月　　日';
-        ws.getCell(row, 13).font = { size: 7 };
-        ws.getCell(row, 13).alignment = centerAlign;
-        ws.mergeCells(row, 14, row + 1, 14);
-        ws.getCell(row, 14).value = '';
-
+        ws.getCell(row, C + 12).value = '施設外支援\n当月　　日';
+        ws.getCell(row, C + 12).font = { size: 7 };
+        ws.getCell(row, C + 12).alignment = centerAlign;
+        ws.mergeCells(row, C + 13, row + 1, C + 13);
+        ws.getCell(row, C + 13).value = '';
         row++;
-        ws.getCell(row, 13).value = '累計　　日/180日';
-        ws.getCell(row, 13).font = { size: 7 };
-        ws.getCell(row, 13).alignment = centerAlign;
+        ws.getCell(row, C + 12).value = '累計　　日/180日';
+        ws.getCell(row, C + 12).font = { size: 7 };
+        ws.getCell(row, C + 12).alignment = centerAlign;
 
-        // 合計行のボーダー
-        for (let r = row - 1; r <= row; r++) {
-            for (let c = 1; c <= 14; c++) {
+        for (let r = totalRow1; r <= row; r++) {
+            ws.getRow(r).height = 14;
+            for (let c = C; c <= LAST; c++) {
                 ws.getCell(r, c).border = thinBorder;
             }
         }
         row++;
 
+        // 空行
+        row++;
+
         // 初期加算行
-        const addonLabels = ['初期加算', '利用開始日', '', '30日目', '', '当月算定日数', totalWorkDays];
-        for (let c = 0; c < addonLabels.length; c++) {
-            const colIdx = c + 1;
-            // 7列にまたがる分を適切に配置
-            if (colIdx <= 7) {
-                ws.getCell(row, colIdx * 2 - 1).value = addonLabels[c];
-                ws.getCell(row, colIdx * 2 - 1).border = thinBorder;
-                ws.getCell(row, colIdx * 2 - 1).alignment = centerAlign;
-                ws.getCell(row, colIdx * 2 - 1).font = { size: 8 };
-                if (colIdx * 2 <= 14) {
-                    ws.getCell(row, colIdx * 2).border = thinBorder;
-                }
-            }
-        }
-        // 初期加算行を簡略化
-        ws.mergeCells(row, 1, row, 2);
-        ws.getCell(row, 1).value = '初期加算';
-        ws.getCell(row, 1).border = thinBorder;
-        ws.getCell(row, 1).alignment = centerAlign;
-        ws.getCell(row, 1).font = { size: 8 };
-        ws.mergeCells(row, 3, row, 4);
-        ws.getCell(row, 3).value = '利用開始日';
-        ws.getCell(row, 3).border = thinBorder;
-        ws.getCell(row, 3).alignment = centerAlign;
-        ws.getCell(row, 3).font = { size: 8 };
-        ws.mergeCells(row, 5, row, 6);
-        ws.getCell(row, 5).value = '';
-        ws.getCell(row, 5).border = thinBorder;
-        ws.mergeCells(row, 7, row, 8);
-        ws.getCell(row, 7).value = '30日目';
-        ws.getCell(row, 7).border = thinBorder;
-        ws.getCell(row, 7).alignment = centerAlign;
-        ws.getCell(row, 7).font = { size: 8 };
-        ws.mergeCells(row, 9, row, 10);
-        ws.getCell(row, 9).value = '';
-        ws.getCell(row, 9).border = thinBorder;
-        ws.mergeCells(row, 11, row, 12);
-        ws.getCell(row, 11).value = '当月算定日数';
-        ws.getCell(row, 11).border = thinBorder;
-        ws.getCell(row, 11).alignment = centerAlign;
-        ws.getCell(row, 11).font = { size: 8 };
-        ws.mergeCells(row, 13, row, 14);
-        ws.getCell(row, 13).value = totalWorkDays;
-        ws.getCell(row, 13).border = thinBorder;
-        ws.getCell(row, 13).alignment = centerAlign;
-        ws.getCell(row, 13).font = { size: 8 };
+        ws.mergeCells(row, C, row, C + 1);
+        ws.getCell(row, C).value = '初期加算';
+        ws.getCell(row, C).border = thinBorder;
+        ws.getCell(row, C).alignment = centerAlign;
+        ws.getCell(row, C).font = { size: 8 };
+        ws.mergeCells(row, C + 2, row, C + 3);
+        ws.getCell(row, C + 2).value = '利用開始日';
+        ws.getCell(row, C + 2).border = thinBorder;
+        ws.getCell(row, C + 2).alignment = centerAlign;
+        ws.getCell(row, C + 2).font = { size: 8 };
+        ws.mergeCells(row, C + 4, row, C + 5);
+        ws.getCell(row, C + 4).value = '';
+        ws.getCell(row, C + 4).border = thinBorder;
+        ws.mergeCells(row, C + 6, row, C + 7);
+        ws.getCell(row, C + 6).value = '30日目';
+        ws.getCell(row, C + 6).border = thinBorder;
+        ws.getCell(row, C + 6).alignment = centerAlign;
+        ws.getCell(row, C + 6).font = { size: 8 };
+        ws.mergeCells(row, C + 8, row, C + 9);
+        ws.getCell(row, C + 8).value = '';
+        ws.getCell(row, C + 8).border = thinBorder;
+        ws.mergeCells(row, C + 10, row, C + 11);
+        ws.getCell(row, C + 10).value = '当月算定日数';
+        ws.getCell(row, C + 10).border = thinBorder;
+        ws.getCell(row, C + 10).alignment = centerAlign;
+        ws.getCell(row, C + 10).font = { size: 8 };
+        ws.mergeCells(row, C + 12, row, C + 13);
+        ws.getCell(row, C + 12).value = totalWorkDays;
+        ws.getCell(row, C + 12).border = thinBorder;
+        ws.getCell(row, C + 12).alignment = centerAlign;
+        ws.getCell(row, C + 12).font = { size: 8 };
         row++;
 
         // 勤務時間合計 + 枚数
         row++;
-        ws.mergeCells(row, 1, row, 7);
-        ws.getCell(row, 1).value = `勤務時間　${minToHHMM(totalMinutes)} 時間`;
-        ws.getCell(row, 1).font = { size: 10, bold: true };
-        ws.mergeCells(row, 10, row, 14);
-        ws.getCell(row, 10).value = '1 枚中 1 枚';
-        ws.getCell(row, 10).alignment = { horizontal: 'right', vertical: 'middle' };
-        ws.getCell(row, 10).font = { size: 10 };
+        ws.mergeCells(row, C, row, C + 6);
+        ws.getCell(row, C).value = `勤務時間　${minToHHMM(totalMinutes)} 時間`;
+        ws.getCell(row, C).font = { size: 10, bold: true };
+        ws.mergeCells(row, C + 9, row, C + 13);
+        ws.getCell(row, C + 9).value = '1 枚中 1 枚';
+        ws.getCell(row, C + 9).alignment = { horizontal: 'right', vertical: 'middle' };
+        ws.getCell(row, C + 9).font = { size: 10 };
     }
 
     // スタッフ・管理者の月別出勤簿シート生成
     async function buildStaffAttendanceSheet(workbook, year, month, user, recordMap, daysInMonth) {
-        const ws = workbook.addWorksheet(`${month}月出勤簿`);
+        const ws = workbook.addWorksheet(`${month}月`);
         ws.pageSetup = { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 };
 
         const thinBorder = {
