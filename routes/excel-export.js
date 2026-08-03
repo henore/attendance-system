@@ -219,7 +219,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
             { width: 8 },    // F: 終了時間
             { width: 3.5 },  // G: 送迎往 (70%)
             { width: 3.5 },  // H: 送迎復 (70%)
-            { width: 8 },    // I: 訪問支援特別加算
+            { width: 13 },   // I: 訪問支援特別加算
             { width: 5 },    // J: 食事提供加算 (70%)
             { width: 5 },    // K: 医療連携体制加算 (70%)
             { width: 5 },    // L: 地域協働加算 (70%)
@@ -300,7 +300,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
         ws.getCell(row, C + 9).value = 'はっぴぃたいむ渋沢';
         ws.getCell(row, C + 9).alignment = centerAlign;
         ws.getCell(row, C + 9).border = thinBorder;
-        ws.getRow(row).height = 25;
+        ws.getRow(row).height = 35;
         row++;
 
         // メインテーブルヘッダー（3行）
@@ -328,7 +328,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
         ws.mergeCells(row, C + 4, row + 1, C + 4);
         ws.mergeCells(row, C + 5, row, C + 6);
         ws.getCell(row, C + 5).value = '送迎加算';
-        ws.getCell(row, C + 7).value = '訪問支援\n特別加算';
+        ws.getCell(row, C + 7).value = '訪問支援特別加算';
         ws.getCell(row, C + 8).value = '食事提供\n加算';
         ws.mergeCells(row, C + 8, row + 1, C + 8);
         ws.getCell(row, C + 9).value = '医療連携\n体制加算';
