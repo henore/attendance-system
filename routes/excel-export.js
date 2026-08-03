@@ -300,7 +300,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
         ws.getCell(row, C + 9).value = 'はっぴぃたいむ渋沢';
         ws.getCell(row, C + 9).alignment = centerAlign;
         ws.getCell(row, C + 9).border = thinBorder;
-        ws.getRow(row).height = 10;
+        ws.getRow(row).height = 25;
         row++;
 
         // メインテーブルヘッダー（3行）
@@ -346,18 +346,20 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
         row++;
 
         // ヘッダーセルのスタイル適用
-        const smallFontCols = [C + 8, C + 9, C + 10, C + 11];
+        const smallFontCols = [C + 7, C + 8, C + 9, C + 10, C + 11];
+        const noBoldCols = [C + 5, C + 7, C + 8, C + 9, C + 10, C + 11];
         for (let r = headerStartRow; r < row; r++) {
             for (let c = C; c <= LAST; c++) {
                 const cell = ws.getCell(r, c);
                 cell.fill = headerFill;
+                const isBold = !noBoldCols.includes(c);
                 cell.font = smallFontCols.includes(c)
-                    ? { size: 5.5, bold: true }
-                    : { size: 7, bold: true };
+                    ? { size: 5.5, bold: false }
+                    : { size: 7, bold: isBold };
                 cell.alignment = centerAlign;
                 cell.border = thinBorder;
             }
-            ws.getRow(r).height = 18;
+            ws.getRow(r).height = (r === headerStartRow) ? 22 : 18;
         }
 
         // データ行（31行固定、行高2倍、縦横中央）
@@ -834,7 +836,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                 ws.pageSetup = { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 };
                 ws.columns = [
                     { width: 16 },
-                    { width: 60 },
+                    { width: 90 },
                 ];
                 sheetsCreated++;
 
@@ -842,6 +844,21 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                 const labelFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
                 const sectionFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
                 const serviceFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3F2FD' } };
+
+                const colBWidth = 90;
+                const calcTextHeight = (text, lineH = 15, padding = 30) => {
+                    const str = String(text);
+                    const explicitLines = str.split('\n');
+                    let totalLines = 0;
+                    for (const line of explicitLines) {
+                        let charWidth = 0;
+                        for (const ch of line) {
+                            charWidth += ch.charCodeAt(0) > 255 ? 2 : 1;
+                        }
+                        totalLines += Math.max(1, Math.ceil(charWidth / colBWidth));
+                    }
+                    return totalLines * lineH + padding;
+                };
 
                 // 日付ヘッダー
                 ws.mergeCells(row, 1, row, 2);
@@ -915,8 +932,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                         ws.getCell(row, 2).font = { size: 9 };
                         ws.getCell(row, 2).alignment = { vertical: 'middle', wrapText: true };
                         if (dynamicHeightLabels.includes(label)) {
-                            const lines = String(value).split('\n').length;
-                            ws.getRow(row).height = Math.max(30, lines * 15);
+                            ws.getRow(row).height = calcTextHeight(value);
                         } else if (label === '作業内容') {
                             ws.getRow(row).height = 45;
                         } else {
@@ -938,8 +954,7 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                     ws.getCell(row, 2).border = thinBorder;
                     ws.getCell(row, 2).font = { size: 9 };
                     ws.getCell(row, 2).alignment = { vertical: 'middle', wrapText: true };
-                    const commentLines = String(commentText).split('\n').length;
-                    ws.getRow(row).height = Math.max(30, commentLines * 15);
+                    ws.getRow(row).height = calcTextHeight(commentText);
                     row++;
                 }
 
