@@ -1166,10 +1166,10 @@ export class ReportDetailModal {
         // 受給者証有効期限の通知
         this.showCertificateExpiryPopup();
 
-        // 画像DL処理
+        // PDF出力処理
         if (sendToLine) {
           try {
-            // サービス提供記録を収集（自分の記入 or 他スタッフの記入）
+            // サービス提供記録（保存時に取得済みの値を再利用、DOMが消えている可能性があるため）
             let serviceEntryForImage = null;
             if (this.currentData.serviceEntryTakenEntry) {
               serviceEntryForImage = {
@@ -1177,14 +1177,10 @@ export class ReportDetailModal {
                 staff_name: this.currentData.serviceEntryTaken
               };
             }
-            const seWC = document.getElementById('seWorkContent')?.value?.trim() || '';
-            const seSC = document.getElementById('seSupportContent')?.value?.trim() || '';
-            const seUC = document.getElementById('seUserCondition')?.value?.trim() || '';
-            const seAI = document.getElementById('seAttendanceInfo')?.value?.trim() || '';
-            if (seWC || seSC || seUC || seAI) {
+            if (hasServiceData) {
               serviceEntryForImage = {
-                work_content: seWC, support_content: seSC,
-                user_condition: seUC, attendance_info: seAI,
+                work_content: seWorkContent, support_content: seSupportContent,
+                user_condition: seUserCondition, attendance_info: seAttendanceInfo,
                 staff_name: this.app.currentUser.name
               };
             }
