@@ -2,11 +2,12 @@
 // LINE Messaging API統合（画像要件対応版）
 
 const express = require('express');
-const puppeteer = require('puppeteer');
-const sharp = require('sharp'); // 画像処理ライブラリ（要インストール）
+// const puppeteer = require('puppeteer');
+// const sharp = require('sharp');
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
+const { generateUserReportPDF, generateStaffReportPDF } = require('./pdf-generator');
 
 const router = express.Router();
 
@@ -43,118 +44,82 @@ async function initTempDirectory() {
 initTempDirectory();
 
 /**
- * 日報画像生成（LINE API要件対応版）
+ * 日報PDF生成
  */
 router.post('/generate-report-image', async (req, res) => {
-  let browser = null;
   try {
     const { reportData, userData, commentData, date } = req.body;
 
-    console.log('[画像生成] 開始:', {
+    console.log('[PDF生成] 開始:', {
       userName: userData?.name,
       date: date || reportData?.date,
-      hasReportData: !!reportData,
-      hasUserData: !!userData,
-      hasCommentData: !!commentData
     });
 
-    // 必須データの検証
     if (!reportData || !userData) {
       throw new Error('必須データ（reportData, userData）が不足しています');
     }
 
-    // データの正規化
     const normalizedData = normalizeReportData(reportData, userData, commentData, date);
+    const pdfBuffer = await generateUserReportPDF(normalizedData);
 
-    // HTMLテンプレートを生成（正方形レイアウト対応）
-    const html = generateSquareLayoutHTML(normalizedData);
+    const fileId = `report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+    const fileName = `${fileId}.pdf`;
+    const filePath = path.join(TEMP_DIR, fileName);
+    await fs.writeFile(filePath, pdfBuffer);
 
-    // Puppeteerで画像生成
-  browser = await puppeteer.launch({
-  headless: 'new',
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-accelerated-2d-canvas',
-    '--no-first-run',
-    '--no-zygote',
-    '--disable-gpu',
-    '--single-process',
-    '--disable-web-security',
-    '--disable-features=IsolateOrigins',
-    '--disable-site-isolation-trials'
-  ],
-    // 追加の安定化オプション
-    ignoreDefaultArgs: ['--disable-extensions'],
-    timeout: 30000 // 30秒のタイムアウト
-    });
-
-    // エラーハンドリングを追加
-    browser.on('disconnected', () => {
-      console.log('[Puppeteer] ブラウザが切断されました');
-    });
-
-    const page = await browser.newPage();
-
-    // 日本語フォントの設定
-    await page.evaluateOnNewDocument(() => {
-      document.documentElement.style.fontFamily = '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif';
-    });
-
-    // 正方形のビューポート設定
-    await page.setViewport({ width: 1024, height: 1024, deviceScaleFactor: 2 });
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-
-    // レンダリング完了を待つ
-    const { setTimeout } = require('node:timers/promises');
-    await setTimeout(2000);
-
-    // スクリーンショット取得（PNG形式で一旦取得）
-    const pngBuffer = await page.screenshot({
-      type: 'png',
-      fullPage: false, // ビューポートサイズで固定
-      encoding: 'binary'
-    });
-
-    await browser.close();
-    browser = null;
-
-    // sharpを使用して画像を処理
-    const imageId = `report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-    const fileName = `${imageId}_original.jpg`;
-    const originalPath = path.join(TEMP_DIR, fileName);
-    await sharp(pngBuffer)
-      .resize(1024, 1024, {
-        fit: 'cover',
-        position: 'top'
-      })
-      .jpeg({
-        progressive: true,
-        mozjpeg: true
-      })
-      .toFile(originalPath);
-
-    console.log('[画像生成] 完了:', { imageId });
+    console.log('[PDF生成] 完了:', { fileId });
 
     res.json({
       success: true,
-      imageId,
-      imageUrl: `/api/line/download-image/${encodeURIComponent(fileName)}`,
+      imageId: fileId,
+      imageUrl: `/api/line/download-pdf/${encodeURIComponent(fileName)}`,
       fileName,
-      message: '画像生成完了'
+      message: 'PDF生成完了'
     });
 
   } catch (error) {
-    console.error('[画像生成] エラー:', error);
-    if (browser) await browser.close();
-
+    console.error('[PDF生成] エラー:', error);
     res.status(500).json({
       success: false,
-      message: '画像生成に失敗しました: ' + error.message
+      message: 'PDF生成に失敗しました: ' + error.message
     });
   }
 });
+
+/* === 旧・Puppeteer/Sharp画像生成（コメントアウト） ===
+router.post('/generate-report-image-legacy', async (req, res) => {
+  let browser = null;
+  try {
+    const { reportData, userData, commentData, date } = req.body;
+    if (!reportData || !userData) {
+      throw new Error('必須データ（reportData, userData）が不足しています');
+    }
+    const normalizedData = normalizeReportData(reportData, userData, commentData, date);
+    const html = generateSquareLayoutHTML(normalizedData);
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--disable-gpu','--single-process'],
+      timeout: 30000
+    });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1024, height: 1024, deviceScaleFactor: 2 });
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const { setTimeout } = require('node:timers/promises');
+    await setTimeout(2000);
+    const pngBuffer = await page.screenshot({ type: 'png', fullPage: false, encoding: 'binary' });
+    await browser.close();
+    browser = null;
+    const imageId = `report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+    const fileName = `${imageId}_original.jpg`;
+    const originalPath = path.join(TEMP_DIR, fileName);
+    await sharp(pngBuffer).resize(1024, 1024, { fit: 'cover', position: 'top' }).jpeg({ progressive: true, mozjpeg: true }).toFile(originalPath);
+    res.json({ success: true, imageId, imageUrl: `/api/line/download-image/${encodeURIComponent(fileName)}`, fileName });
+  } catch (error) {
+    if (browser) await browser.close();
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+=== 旧・Puppeteer/Sharp画像生成ここまで === */
 
 /**
  * 画像ダウンロード（ダウンロード完了後に自動削除）
@@ -188,7 +153,35 @@ router.get('/download-image/:fileName', (req, res) => {
 });
 
 /**
- * 正方形レイアウト用HTMLテンプレート生成（全内容表示版）
+ * PDFダウンロード（ダウンロード完了後に自動削除）
+ */
+router.get('/download-pdf/:fileName', (req, res) => {
+  const { fileName } = req.params;
+
+  if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+    return res.status(400).json({ success: false, message: '無効なファイル名です' });
+  }
+
+  const filePath = path.join(TEMP_DIR, fileName);
+  const downloadName = req.query.name || fileName;
+
+  res.set('Content-Type', 'application/pdf');
+  res.download(filePath, downloadName, (err) => {
+    fs.unlink(filePath).catch(unlinkErr => {
+      if (unlinkErr.code !== 'ENOENT') {
+        console.error('[PDF削除] エラー:', unlinkErr.message);
+      }
+    });
+
+    if (err && !res.headersSent) {
+      console.error('[PDFダウンロード] エラー:', err.message);
+      res.status(404).json({ success: false, message: 'ファイルが見つかりません' });
+    }
+  });
+});
+
+/**
+ * 正方形レイアウト用HTMLテンプレート生成（全内容表示版）- コメントアウト済みの旧コードから参照
  */
 function escapeHtml(str) {
   return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -747,118 +740,76 @@ function calculateSleepHours(bedtime, wakeupTime) {
 }
 
 /**
- * スタッフ日報画像生成
+ * スタッフ日報PDF生成
  */
 router.post('/generate-staff-report-image', async (req, res) => {
-  let browser = null;
   try {
     const { staffReportData, userData, date } = req.body;
 
-    console.log('[スタッフ日報画像生成] 開始:', {
+    console.log('[スタッフ日報PDF生成] 開始:', {
       userName: userData?.name,
       date: date || staffReportData?.date,
-      hasStaffReportData: !!staffReportData,
-      hasUserData: !!userData
     });
 
-    // 必須データの検証
     if (!staffReportData || !userData) {
       throw new Error('必須データ（staffReportData, userData）が不足しています');
     }
 
-    // HTMLテンプレートを生成
-    const html = generateStaffReportHTML(staffReportData, userData, date);
+    const pdfBuffer = await generateStaffReportPDF(staffReportData, userData, date);
 
-    // Puppeteerで画像生成
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--single-process',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins',
-        '--disable-site-isolation-trials'
-      ],
-      ignoreDefaultArgs: ['--disable-extensions'],
-      timeout: 30000
-    });
+    const fileId = `staff_report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+    const fileName = `${fileId}.pdf`;
+    const filePath = path.join(TEMP_DIR, fileName);
+    await fs.writeFile(filePath, pdfBuffer);
 
-    browser.on('disconnected', () => {
-      console.log('[Puppeteer] ブラウザが切断されました');
-    });
-
-    const page = await browser.newPage();
-
-    // 日本語フォントの設定
-    await page.evaluateOnNewDocument(() => {
-      document.documentElement.style.fontFamily = '"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif';
-    });
-
-    // ビューポート設定
-    await page.setViewport({ width: 1024, height: 1024, deviceScaleFactor: 2 });
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-
-    // レンダリング完了を待つ
-    const { setTimeout } = require('node:timers/promises');
-    await setTimeout(2000);
-
-    // スクリーンショット取得
-    const pngBuffer = await page.screenshot({
-      type: 'png',
-      fullPage: false,
-      encoding: 'binary'
-    });
-
-    await browser.close();
-    browser = null;
-
-    // sharpを使用して画像を処理
-    const imageId = `staff_report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-    const fileName = `${imageId}_original.jpg`;
-    const originalPath = path.join(TEMP_DIR, fileName);
-    await sharp(pngBuffer)
-      .resize(1024, 1024, {
-        fit: 'cover',
-        position: 'top'
-      })
-      .jpeg({
-        progressive: true,
-        mozjpeg: true
-      })
-      .toFile(originalPath);
-
-    console.log('[スタッフ日報画像生成] 完了:', { imageId });
+    console.log('[スタッフ日報PDF生成] 完了:', { fileId });
 
     res.json({
       success: true,
-      imageId,
-      imageUrl: `/api/line/download-image/${encodeURIComponent(fileName)}`,
+      imageId: fileId,
+      imageUrl: `/api/line/download-pdf/${encodeURIComponent(fileName)}`,
       fileName
     });
 
   } catch (error) {
-    console.error('[スタッフ日報画像生成エラー]:', error);
-
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (closeError) {
-        console.error('[Browser close error]:', closeError);
-      }
-    }
-
+    console.error('[スタッフ日報PDF生成エラー]:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'スタッフ日報画像の生成に失敗しました'
+      message: error.message || 'スタッフ日報PDFの生成に失敗しました'
     });
   }
 });
+
+/* === 旧・スタッフ日報Puppeteer/Sharp画像生成（コメントアウト） ===
+router.post('/generate-staff-report-image-legacy', async (req, res) => {
+  let browser = null;
+  try {
+    const { staffReportData, userData, date } = req.body;
+    if (!staffReportData || !userData) throw new Error('必須データ不足');
+    const html = generateStaffReportHTML(staffReportData, userData, date);
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--disable-gpu','--single-process'],
+      timeout: 30000
+    });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1024, height: 1024, deviceScaleFactor: 2 });
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const { setTimeout } = require('node:timers/promises');
+    await setTimeout(2000);
+    const pngBuffer = await page.screenshot({ type: 'png', fullPage: false, encoding: 'binary' });
+    await browser.close();
+    browser = null;
+    const imageId = `staff_report_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+    const fileName = `${imageId}_original.jpg`;
+    await sharp(pngBuffer).resize(1024, 1024, { fit: 'cover', position: 'top' }).jpeg({ progressive: true, mozjpeg: true }).toFile(path.join(TEMP_DIR, fileName));
+    res.json({ success: true, imageId, imageUrl: `/api/line/download-image/${encodeURIComponent(fileName)}`, fileName });
+  } catch (error) {
+    if (browser) try { await browser.close(); } catch {}
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+=== 旧・スタッフ日報画像生成ここまで === */
 
 /**
  * スタッフ日報用HTMLテンプレート生成

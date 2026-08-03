@@ -30,27 +30,21 @@ export class LineReportSender {
       
        
       if (!imageResponse.success) {
-        // 画像生成エラーの詳細化
-        const errorMsg = imageResponse.message || '画像生成に失敗しました';
-        console.error('[画像生成] エラー:', errorMsg);
-        
-        if (errorMsg.includes('Puppeteer')) {
-          throw new Error('画像生成エンジンエラー: ブラウザの起動に失敗しました');
-        } else if (errorMsg.includes('sharp')) {
-          throw new Error('画像処理エラー: 画像の変換に失敗しました');
-        } else if (errorMsg.includes('必須データ')) {
+        const errorMsg = imageResponse.message || 'PDF生成に失敗しました';
+        console.error('[PDF生成] エラー:', errorMsg);
+
+        if (errorMsg.includes('必須データ')) {
           throw new Error('データエラー: 必要な情報が不足しています');
         } else {
-          throw new Error(`画像生成エラー: ${errorMsg}`);
+          throw new Error(`PDF生成エラー: ${errorMsg}`);
         }
       }
 
       const safeUserName = userData.name.replace(/[\\/:*?"<>|]/g, '_');
       const safeDate = (reportData?.date || new Date().toISOString().split('T')[0]).replace(/[:]/g, '-');
 
-      // 自動ダウンロード（サーバー側でダウンロード完了後に自動削除される）
       if (imageResponse.imageUrl) {
-        const downloadName = `${safeUserName}_${safeDate}.jpg`;
+        const downloadName = `${safeUserName}_${safeDate}.pdf`;
         const downloadUrl = `${imageResponse.imageUrl}?name=${encodeURIComponent(downloadName)}`;
 
         const link = document.createElement('a');
@@ -59,34 +53,28 @@ export class LineReportSender {
         link.click();
         document.body.removeChild(link);
 
-        this.app.showNotification('日報画像を保存しました', 'success');
+        this.app.showNotification('日報PDFを保存しました', 'success');
       } else {
-        throw new Error('画像URLが返されませんでした');
+        throw new Error('PDFのURLが返されませんでした');
       }
 
       return imageResponse;
     
     } catch (error) {
-      console.error('[画像生成] 完全なエラー:', error);
-      
-      // ユーザーフレンドリーなエラーメッセージ
-      if (error.message.includes('画像')) {
+      console.error('[PDF生成] エラー:', error);
+
+      if (error.message.includes('404')) {
         this.app.showNotification(
-          '画像の生成に失敗しました。システム管理者にお問い合わせください。', 
-          'danger'
-        );
-      } else if (error.message.includes('404')) {
-        this.app.showNotification(
-          'APIエンドポイントが見つかりません。サーバー設定を確認してください。', 
+          'APIエンドポイントが見つかりません。サーバー設定を確認してください。',
           'danger'
         );
       } else {
         this.app.showNotification(
-          `エラー: ${error.message}`, 
+          `エラー: ${error.message}`,
           'danger'
         );
       }
-      
+
       throw error;
     }
   }
@@ -111,17 +99,16 @@ export class LineReportSender {
 
 
       if (!imageResponse.success) {
-        const errorMsg = imageResponse.message || 'スタッフ日報画像生成に失敗しました';
-        console.error('[スタッフ日報画像生成] エラー:', errorMsg);
-        throw new Error(`画像生成エラー: ${errorMsg}`);
+        const errorMsg = imageResponse.message || 'スタッフ日報PDF生成に失敗しました';
+        console.error('[スタッフ日報PDF生成] エラー:', errorMsg);
+        throw new Error(`PDF生成エラー: ${errorMsg}`);
       }
 
       const safeUserName = userData.name.replace(/[\\/:*?"<>|]/g, '_');
       const safeDate = (staffReportData?.date || new Date().toISOString().split('T')[0]).replace(/[:]/g, '-');
 
-      // 自動ダウンロード（サーバー側でダウンロード完了後に自動削除される）
       if (imageResponse.imageUrl) {
-        const downloadName = `staff_${safeUserName}_${safeDate}.jpg`;
+        const downloadName = `staff_${safeUserName}_${safeDate}.pdf`;
         const downloadUrl = `${imageResponse.imageUrl}?name=${encodeURIComponent(downloadName)}`;
 
         const link = document.createElement('a');
@@ -130,15 +117,15 @@ export class LineReportSender {
         link.click();
         document.body.removeChild(link);
 
-        this.app.showNotification('スタッフ日報画像を保存しました', 'success');
+        this.app.showNotification('スタッフ日報PDFを保存しました', 'success');
       } else {
-        throw new Error('画像URLが返されませんでした');
+        throw new Error('PDFのURLが返されませんでした');
       }
 
       return imageResponse;
 
     } catch (error) {
-      console.error('[スタッフ日報画像生成] エラー:', error);
+      console.error('[スタッフ日報PDF生成] エラー:', error);
 
       this.app.showNotification(
         `エラー: ${error.message}`,
