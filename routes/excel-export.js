@@ -845,17 +845,18 @@ module.exports = function (dbGet, dbAll, dbRun, requireAuth, requireRole) {
                 const sectionFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
                 const serviceFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3F2FD' } };
 
-                const colBWidth = 90;
+                // 列幅90 / font9pt ≈ 全角30文字/行（charWidth換算60）
+                const charsPerLine = 60;
                 const calcTextHeight = (text, lineH = 15, padding = 30) => {
                     const str = String(text);
-                    const explicitLines = str.split('\n');
+                    const explicitLines = str.split(/\r?\n|\r/);
                     let totalLines = 0;
                     for (const line of explicitLines) {
                         let charWidth = 0;
                         for (const ch of line) {
                             charWidth += ch.charCodeAt(0) > 255 ? 2 : 1;
                         }
-                        totalLines += Math.max(1, Math.ceil(charWidth / colBWidth));
+                        totalLines += Math.max(1, Math.ceil(charWidth / charsPerLine));
                     }
                     return totalLines * lineH + padding;
                 };
