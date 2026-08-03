@@ -148,6 +148,7 @@ const attendanceRouter = require('./routes/attendance')(dbGet, dbAll, dbRun, req
 const handoverRouter = require('./routes/handover')(dbGet, dbAll, dbRun, requireAuth);
 const trialVisitsRouter = require('./routes/trial-visits')(dbGet, dbAll, dbRun, requireAuth, requireRole);
 const lineRouter = require('./routes/line');
+const excelExportRouter = require('./routes/excel-export')(dbGet, dbAll, dbRun, requireAuth, requireRole);
 const holidaysRouter = require('./routes/holidays')(requireAuth);
 
 // 認証チェック用エンドポイント（認証前でもアクセス可能）
@@ -174,7 +175,8 @@ app.use('/api/admin', requireAuth, requireRole(['admin']), adminRouter);
 app.use('/api/attendance', requireAuth, attendanceRouter);
 app.use('/api/handover', requireAuth, handoverRouter);
 app.use('/api/trial-visits', requireAuth, requireRole(['staff', 'admin']), trialVisitsRouter);
-app.use('/api/line', requireAuth, lineRouter); 
+app.use('/api/line', requireAuth, lineRouter);
+app.use('/api/excel', requireAuth, requireRole(['admin']), excelExportRouter);
 app.use('/api/holidays', holidaysRouter);
 
 // サーバー日付取得エンドポイント（JST統一モジュール使用）

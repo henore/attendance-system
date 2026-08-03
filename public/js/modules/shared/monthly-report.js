@@ -96,9 +96,19 @@ export default class SharedMonthlyReport {
         
         if (this.isAdmin) {
             buttons += `
-                <button class="btn btn-outline-light btn-sm" id="exportExcelBtn" style="display: none;">
-                    <i class="fas fa-file-excel"></i> Excel出力
-                </button>
+                <div class="btn-group" id="excelBtnGroup" style="display: none;">
+                    <button class="btn btn-outline-light btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="fas fa-file-excel"></i> Excel出力
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" id="exportExcelBtn">
+                            <i class="fas fa-table me-2"></i>月別出勤簿
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" id="exportDailyReportsBtn">
+                            <i class="fas fa-clipboard-list me-2"></i>日報・サービス提供記録
+                        </a></li>
+                    </ul>
+                </div>
             `;
         }
         
@@ -290,10 +300,14 @@ export default class SharedMonthlyReport {
         // 編集可能ユーザーのイベントリスナー
         if (this.canEdit) {
             const exportBtn = this.container.querySelector('#exportExcelBtn');
+            const exportDailyBtn = this.container.querySelector('#exportDailyReportsBtn');
             const saveAttendanceBtn = this.container.querySelector('#saveMonthlyAttendanceEditBtn');
 
             if (exportBtn) {
-                exportBtn.addEventListener('click', () => this.exportToExcel());
+                exportBtn.addEventListener('click', (e) => { e.preventDefault(); this.exportToExcel(); });
+            }
+            if (exportDailyBtn) {
+                exportDailyBtn.addEventListener('click', (e) => { e.preventDefault(); this.exportDailyReportsExcel(); });
             }
 
             if (saveAttendanceBtn) {
@@ -543,10 +557,10 @@ export default class SharedMonthlyReport {
             
             // ボタン表示
             const printBtn = this.container.querySelector('#printMonthlyReportBtn');
-            const exportBtn = this.container.querySelector('#exportExcelBtn');
-            
+            const excelBtnGroup = this.container.querySelector('#excelBtnGroup');
+
             if (printBtn) printBtn.style.display = 'inline-block';
-            if (exportBtn) exportBtn.style.display = 'inline-block';
+            if (excelBtnGroup) excelBtnGroup.style.display = 'inline-block';
             
         } catch (error) {
             console.error('[月別出勤簿] エラー:', error);
@@ -1080,16 +1094,97 @@ export default class SharedMonthlyReport {
         
         // ボタン非表示
         const printBtn = this.container.querySelector('#printMonthlyReportBtn');
-        const exportBtn = this.container.querySelector('#exportExcelBtn');
+        const excelBtnGroup = this.container.querySelector('#excelBtnGroup');
         if (printBtn) printBtn.style.display = 'none';
-        if (exportBtn) exportBtn.style.display = 'none';
+        if (excelBtnGroup) excelBtnGroup.style.display = 'none';
     }
 
     async exportToExcel() {
-        if (!this.canEdit) return;
-        
-        // Excel出力機能は別途実装が必要
-        this.app.showNotification('Excel出力機能は準備中です', 'info');
+        if (!this.isAdmin) return;
+
+        const yearSelect = this.container.querySelector('#monthlyYearSelect');
+        const monthSelect = this.container.querySelector('#monthlyMonthSelect');
+        const userSelect = this.container.querySelector('#monthlyUserSelect');
+
+        if (!yearSelect || !monthSelect || !userSelect) return;
+
+        const year = yearSelect.value;
+        const month = monthSelect.value;
+        const userId = userSelect.value;
+
+        if (!userId) {
+            this.app.showNotification('ユーザーを選択してください', 'warning');
+            return;
+        }
+
+        try {
+            const url = API_ENDPOINTS.EXCEL.MONTHLY_ATTENDANCE(year, month, userId);
+            const response = await fetch(url, { credentials: 'include' });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || 'Excel出力に失敗しました');
+            }
+
+            const blob = await response.blob();
+            const userName = userSelect.selectedOptions[0]?.text || 'user';
+            const filename = `月別出勤簿_${userName}_${year}年${month}月.xlsx`;
+
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+
+            this.app.showNotification('Excelファイルをダウンロードしました', 'success');
+        } catch (error) {
+            console.error('Excel出力エラー:', error);
+            this.app.showNotification(error.message || 'Excel出力に失敗しました', 'danger');
+        }
+    }
+
+    async exportDailyReportsExcel() {
+        if (!this.isAdmin) return;
+
+        const yearSelect = this.container.querySelector('#monthlyYearSelect');
+        const monthSelect = this.container.querySelector('#monthlyMonthSelect');
+        const userSelect = this.container.querySelector('#monthlyUserSelect');
+
+        if (!yearSelect || !monthSelect || !userSelect) return;
+
+        const year = yearSelect.value;
+        const month = monthSelect.value;
+        const userId = userSelect.value;
+
+        if (!userId) {
+            this.app.showNotification('ユーザーを選択してください', 'warning');
+            return;
+        }
+
+        try {
+            const url = API_ENDPOINTS.EXCEL.DAILY_REPORTS(year, month, userId);
+            const response = await fetch(url, { credentials: 'include' });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || '日報Excel出力に失敗しました');
+            }
+
+            const blob = await response.blob();
+            const userName = userSelect.selectedOptions[0]?.text || 'user';
+            const filename = `日報記録_${userName}_${year}年${month}月.xlsx`;
+
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+
+            this.app.showNotification('日報Excelファイルをダウンロードしました', 'success');
+        } catch (error) {
+            console.error('日報Excel出力エラー:', error);
+            this.app.showNotification(error.message || '日報Excel出力に失敗しました', 'danger');
+        }
     }
 
     // コメント保存時のコールバック

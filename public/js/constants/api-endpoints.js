@@ -116,5 +116,13 @@ export const API_ENDPOINTS = {
     TRIAL_VISITS_MONTHLY: (year, month) => `/api/trial-visits/monthly/${year}/${month}`,
     TRIAL_VISITS_NOTIFICATION_CHECK: '/api/trial-visits/notification-check',
     ATTENDANCE_STATS: '/api/admin/attendance-stats'
+  },
+
+  // Excel出力
+  EXCEL: {
+    MONTHLY_ATTENDANCE: (year, month, userId) =>
+        `/api/excel/monthly-attendance/${year}/${month}/${userId}`,
+    DAILY_REPORTS: (year, month, userId) =>
+        `/api/excel/daily-reports/${year}/${month}/${userId}`
   }
 };
