@@ -1360,6 +1360,40 @@ router.post('/break/end', async (req, res) => {
         [updated, staffId, date]
       );
 
+      // 出勤記録が無い利用者の自動生成日報をクリーンアップ
+      const attendance = await dbGet(
+        'SELECT id, clock_in FROM attendance WHERE user_id = ? AND date = ?',
+        [user_id, date]
+      );
+      if (!attendance || !attendance.clock_in) {
+        // 他スタッフにも支援記録が残っていないか確認
+        const allReports = await dbAll(
+          'SELECT work_report FROM staff_daily_reports WHERE date = ?',
+          [date]
+        );
+        let hasOtherEntry = false;
+        for (const r of allReports) {
+          if (!r.work_report) continue;
+          try {
+            const p = JSON.parse(r.work_report);
+            const ents = (p && p.entries && Array.isArray(p.entries)) ? p.entries : [];
+            if (ents.some(e => e.user_id === user_id && (
+              (e.work_content && e.work_content.trim()) ||
+              (e.support_content && e.support_content.trim()) ||
+              (e.user_condition && e.user_condition.trim()) ||
+              (e.attendance_info && e.attendance_info.trim())
+            ))) {
+              hasOtherEntry = true;
+              break;
+            }
+          } catch { /* 旧形式は無視 */ }
+        }
+        if (!hasOtherEntry) {
+          await dbRun('DELETE FROM daily_reports WHERE user_id = ? AND date = ?', [user_id, date]);
+          await dbRun('DELETE FROM staff_comments WHERE user_id = ? AND date = ?', [user_id, date]);
+        }
+      }
+
       res.json({ success: true, message: '支援記録を削除しました' });
     } catch (error) {
       console.error('支援記録削除エラー:', error);
@@ -1462,30 +1496,27 @@ router.post('/break/end', async (req, res) => {
         return res.status(400).json({ success: false, error: '日付とユーザーIDは必須です' });
       }
 
-      // 他スタッフが記入済みか確認（adminは除外）
-      const userRole = req.session.user.role;
-      if (userRole !== 'admin') {
-        const otherReports = await dbAll(
-          'SELECT work_report FROM staff_daily_reports WHERE date = ? AND staff_id != ?',
-          [date, staffId]
-        );
-        for (const r of otherReports) {
-          if (!r.work_report) continue;
-          try {
-            const parsed = JSON.parse(r.work_report);
-            const entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
-              ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
-            const taken = entries.find(e => e.user_id === user_id && (
-              (e.work_content && e.work_content.trim()) ||
-              (e.support_content && e.support_content.trim()) ||
-              (e.user_condition && e.user_condition.trim()) ||
-              (e.attendance_info && e.attendance_info.trim())
-            ));
-            if (taken) {
-              return res.status(409).json({ success: false, error: 'この利用者は他のスタッフが既に記録済みです' });
-            }
-          } catch { /* 旧形式は無視 */ }
-        }
+      // 他スタッフが記入済みか確認
+      const otherReports = await dbAll(
+        'SELECT work_report FROM staff_daily_reports WHERE date = ? AND staff_id != ?',
+        [date, staffId]
+      );
+      for (const r of otherReports) {
+        if (!r.work_report) continue;
+        try {
+          const parsed = JSON.parse(r.work_report);
+          const entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
+            ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+          const taken = entries.find(e => e.user_id === user_id && (
+            (e.work_content && e.work_content.trim()) ||
+            (e.support_content && e.support_content.trim()) ||
+            (e.user_condition && e.user_condition.trim()) ||
+            (e.attendance_info && e.attendance_info.trim())
+          ));
+          if (taken) {
+            return res.status(409).json({ success: false, error: 'この利用者は他のスタッフが既に記録済みです' });
+          }
+        } catch { /* 旧形式は無視 */ }
       }
 
       // 既存のレポートを取得
@@ -1514,7 +1545,7 @@ router.post('/break/end', async (req, res) => {
           (e.user_condition && e.user_condition.trim()) ||
           (e.attendance_info && e.attendance_info.trim())
         ).length;
-        if (filledCount >= MAX_USERS_PER_STAFF && userRole !== 'admin') {
+        if (filledCount >= MAX_USERS_PER_STAFF) {
           return res.status(400).json({ success: false, error: '1スタッフあたりの記録上限（6名）に達しています' });
         }
       }
