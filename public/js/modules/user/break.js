@@ -65,7 +65,7 @@ export class UserBreakHandler {
     if (this.autoBreakRefreshInterval) return;
     this.autoBreakRefreshInterval = setInterval(async () => {
       const now = getCurrentTime();
-      if (now >= '11:46' && !this.autoBreakRefreshed && !this.hasBreakToday) {
+      if (now >= '11:48' && !this.autoBreakRefreshed && !this.hasBreakToday) {
         this.autoBreakRefreshed = true;
         clearInterval(this.autoBreakRefreshInterval);
         this.autoBreakRefreshInterval = null;

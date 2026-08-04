@@ -63,27 +63,9 @@ fi
 log "node_modules と package-lock.json を削除"
 rm -rf node_modules package-lock.json
 
-log "~/.cache/puppeteer を削除"
-rm -rf "$HOME/.cache/puppeteer"
-
 # 再インストール
 log "npm install"
 npm install >> "$LOG_FILE" 2>&1
-
-# PDF用フォントダウンロード（存在しなければ取得）
-FONT_DIR="${PROJECT_DIR}/fonts"
-FONT_FILE="${FONT_DIR}/NotoSansJP-Regular.ttf"
-if [ ! -f "$FONT_FILE" ]; then
-    log "Noto Sans JP フォントをダウンロード"
-    mkdir -p "$FONT_DIR"
-    curl -L -o "$FONT_FILE" "https://github.com/google/fonts/raw/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf" >> "$LOG_FILE" 2>&1
-fi
-
-# puppeteer/sharpは使用停止（PDF化に移行）
-# log "npm install sharp"
-# npm install sharp >> "$LOG_FILE" 2>&1
-# log "npm install puppeteer"
-# npm install puppeteer >> "$LOG_FILE" 2>&1
 
 # PM2でアプリ再起動（プロセスが無ければ起動）
 if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
