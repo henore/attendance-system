@@ -412,6 +412,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
       LEFT JOIN staff_comments sc ON u.id = sc.user_id AND sc.date = ?
       LEFT JOIN break_records br ON u.id = br.user_id AND br.date = ?
       LEFT JOIN staff_daily_reports sdr ON u.id = sdr.staff_id AND sdr.date = ?
+        AND (
+          (sdr.communication IS NOT NULL AND sdr.communication != '')
+          OR COALESCE(json_array_length(json_extract(sdr.work_report, '$.entries')), 0) > 0
+        )
       WHERE u.is_active = 1
     `;
 
@@ -798,6 +802,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 JOIN users u ON a.user_id = u.id
                 LEFT JOIN daily_reports dr ON a.user_id = dr.user_id AND a.date = dr.date
                 LEFT JOIN staff_daily_reports sdr ON a.user_id = sdr.staff_id AND a.date = sdr.date
+                  AND (
+                    (sdr.communication IS NOT NULL AND sdr.communication != '')
+                    OR COALESCE(json_array_length(json_extract(sdr.work_report, '$.entries')), 0) > 0
+                  )
                 LEFT JOIN staff_comments sc ON a.user_id = sc.user_id AND a.date = sc.date
                 LEFT JOIN break_records br ON a.user_id = br.user_id AND a.date = br.date AND u.role = 'user'
                 WHERE a.user_id = ? AND a.date BETWEEN ? AND ?
