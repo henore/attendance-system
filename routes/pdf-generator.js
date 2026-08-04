@@ -319,9 +319,9 @@ function generateUserReportPDF(data) {
             doc.fontSize(8).fillColor(COLORS.textMuted);
             doc.text(`${label}:`, contentX + 12, sy, { width: contentW - 30 });
             sy += 12;
-            doc.fontSize(9).fillColor(COLORS.text);
             const th = measureText(doc, val, { width: contentW - 40, fontSize: 9 });
             drawRoundedRect(doc, contentX + 10, sy, contentW - 20, th + 6, 4, COLORS.white);
+            doc.fontSize(9).fillColor(COLORS.text);
             doc.text(val, contentX + 14, sy + 3, { width: contentW - 28 });
             sy += th + 12;
           });
