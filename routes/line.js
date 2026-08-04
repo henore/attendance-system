@@ -14,10 +14,9 @@ const router = express.Router();
 // tempディレクトリの作成と古いファイルのクリーンアップ
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
 
-async function initTempDirectory() {
+async function cleanupTempFiles() {
   await fs.mkdir(TEMP_DIR, { recursive: true });
 
-  // 1時間以上前の古いファイルを一括削除
   try {
     const files = await fs.readdir(TEMP_DIR);
     const now = Date.now();
@@ -40,8 +39,9 @@ async function initTempDirectory() {
   }
 }
 
-// 起動時に実行
-initTempDirectory();
+// 起動時に実行 + 1時間ごとに定期クリーンアップ
+cleanupTempFiles();
+setInterval(cleanupTempFiles, 60 * 60 * 1000);
 
 /**
  * 日報PDF生成
