@@ -1353,12 +1353,27 @@ router.post('/break/end', async (req, res) => {
         ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
 
       const filtered = entries.filter(e => e.user_id !== user_id);
-      const updated = JSON.stringify({ free_text: parsed.free_text || '', entries: filtered });
+      const freeText = parsed.free_text || '';
 
-      await dbRun(
-        'UPDATE staff_daily_reports SET work_report = ?, updated_at = CURRENT_TIMESTAMP WHERE staff_id = ? AND date = ?',
-        [updated, staffId, date]
+      // エントリもフリーテキストも空なら staff_daily_reports 自体を削除
+      const hasRemainingContent = filtered.some(e =>
+        (e.work_content && e.work_content.trim()) ||
+        (e.support_content && e.support_content.trim()) ||
+        (e.user_condition && e.user_condition.trim()) ||
+        (e.attendance_info && e.attendance_info.trim())
       );
+      if (!hasRemainingContent && !freeText.trim()) {
+        await dbRun(
+          'DELETE FROM staff_daily_reports WHERE staff_id = ? AND date = ?',
+          [staffId, date]
+        );
+      } else {
+        const updated = JSON.stringify({ free_text: freeText, entries: filtered });
+        await dbRun(
+          'UPDATE staff_daily_reports SET work_report = ?, updated_at = CURRENT_TIMESTAMP WHERE staff_id = ? AND date = ?',
+          [updated, staffId, date]
+        );
+      }
 
       // 出勤記録が無い利用者の自動生成日報をクリーンアップ
       const attendance = await dbGet(
