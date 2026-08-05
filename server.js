@@ -60,6 +60,16 @@ const dbRun = (sql, params = []) => {
     });
 };
 
+// 不正URIエンコードによるクラッシュ防止（パストラバーサル攻撃対策）
+app.use((req, res, next) => {
+  try {
+    decodeURIComponent(req.path);
+    next();
+  } catch (e) {
+    res.status(400).end();
+  }
+});
+
 // セキュリティ強化ミドルウェア設定
 app.use(helmet({
     contentSecurityPolicy: {
