@@ -89,8 +89,9 @@ function drawLeftBorderCard(doc, x, y, w, h, borderColor, bgColor) {
   doc.rect(x, y, 3, h).fill(borderColor);
 }
 
-// テキストの高さを事前計算
-function measureText(doc, text, opts) {
+// テキストの高さを事前計算（fontSizeを反映してから測定）
+function measureText(doc, text, opts = {}) {
+  if (opts.fontSize) doc.fontSize(opts.fontSize);
   return doc.heightOfString(text || '', opts);
 }
 
