@@ -485,7 +485,7 @@ export class AttendanceTable {
     const buttons = [];
     const date = currentDate || record.date;
 
-    // 利用者の場合：日報マーク表示
+    // 利用者の場合：日報マーク・サービス提供記録マーク表示
     if (record.user_role === 'user') {
       // 日報ボタン（日報がある場合）
       if (record.report_id) {
@@ -500,7 +500,20 @@ export class AttendanceTable {
         `);
       }
 
-      // admin画面：日報マークのみ（操作は日付クリックで行う）
+      // サービス提供記録ボタン
+      if (record.has_service_entry) {
+        buttons.push(`
+          <button class="btn btn-sm btn-outline-success btn-show-report"
+                  data-user-id="${record.user_id}"
+                  data-user-name="${record.user_name}"
+                  data-date="${date}"
+                  title="サービス提供記録あり">
+            <i class="fas fa-clipboard-list"></i>
+          </button>
+        `);
+      }
+
+      // admin画面：マークのみ（操作は日付クリックで行う）
       if (this.userRole === 'admin') {
         return buttons.length > 0 ?
           `<div class="btn-group" role="group">${buttons.join('')}</div>` :

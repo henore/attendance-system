@@ -846,9 +846,34 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
               } catch (e) { /* ignore */ }
             });
 
+            // 利用者の場合：サービス提供記録の有無を日付ごとにチェック
+            const serviceEntryDates = new Set();
+            if (user.role === 'user') {
+              const allStaffReports = await dbAll(
+                'SELECT date, work_report FROM staff_daily_reports WHERE date BETWEEN ? AND ?',
+                [startDate, endDate]
+              );
+              for (const sr of allStaffReports) {
+                if (!sr.work_report) continue;
+                try {
+                  const parsed = JSON.parse(sr.work_report);
+                  const entries = (parsed && parsed.entries && Array.isArray(parsed.entries)) ? parsed.entries : [];
+                  if (entries.some(e => String(e.user_id) === String(userId) && (
+                    (e.work_content && e.work_content.trim()) ||
+                    (e.support_content && e.support_content.trim()) ||
+                    (e.user_condition && e.user_condition.trim()) ||
+                    (e.attendance_info && e.attendance_info.trim())
+                  ))) {
+                    serviceEntryDates.add(sr.date);
+                  }
+                } catch { /* 旧形式は無視 */ }
+              }
+            }
+
             records.forEach(r => {
               r.has_pending_correction = pendingByRecordId.has(r.id) || pendingByUserDate.has(`${r.user_id}_${r.date}`);
               if (!_hasStaffReportContent(r)) r.staff_report_id = null;
+              r.has_service_entry = serviceEntryDates.has(r.date);
             });
 
             res.json({
