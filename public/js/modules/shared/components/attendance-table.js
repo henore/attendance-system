@@ -487,7 +487,6 @@ export class AttendanceTable {
 
     // 利用者の場合：日報マーク・サービス提供記録マーク表示
     if (record.user_role === 'user') {
-      // 日報ボタン（日報がある場合）
       if (record.report_id) {
         buttons.push(`
           <button class="btn btn-sm btn-outline-primary btn-show-report"
@@ -499,8 +498,6 @@ export class AttendanceTable {
           </button>
         `);
       }
-
-      // サービス提供記録ボタン
       if (record.has_service_entry) {
         buttons.push(`
           <button class="btn btn-sm btn-outline-success btn-show-report"
@@ -512,15 +509,24 @@ export class AttendanceTable {
           </button>
         `);
       }
-
-      // admin画面：マークのみ（操作は日付クリックで行う）
       if (this.userRole === 'admin') {
         return buttons.length > 0 ?
           `<div class="btn-group" role="group">${buttons.join('')}</div>` :
           '-';
       }
+    }
 
-      // staff画面：日報マーク＋編集ボタンを並べて表示
+    // スタッフ・管理者の場合：日報マーク表示
+    if ((record.user_role === 'staff' || record.user_role === 'admin') && record.staff_report_id) {
+      buttons.push(`
+        <button class="btn btn-sm btn-outline-primary btn-show-report"
+                data-user-id="${record.user_id}"
+                data-user-name="${record.user_name}"
+                data-date="${date}"
+                title="日報">
+          <i class="fas fa-file-alt"></i>
+        </button>
+      `);
     }
 
     // 編集ボタン（admin→staff記録、staff→user記録）
