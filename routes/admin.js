@@ -874,12 +874,16 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
               r.has_pending_correction = pendingByRecordId.has(r.id) || pendingByUserDate.has(`${r.user_id}_${r.date}`);
               if (!_hasStaffReportContent(r)) r.staff_report_id = null;
               r.has_service_entry = serviceEntryDates.has(r.date);
+              // フロントに不要なフィールドを除去
+              delete r.sdr_work_report;
+              delete r.sdr_communication;
             });
 
             res.json({
                 success: true,
                 records,
-                user
+                user,
+                serviceEntryDates: Array.from(serviceEntryDates)
             });
             
         } catch (error) {

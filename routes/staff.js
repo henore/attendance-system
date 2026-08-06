@@ -760,7 +760,8 @@ router.post('/break/end', async (req, res) => {
       res.json({
         success: true,
         records: processedRecords,
-        user: targetUser
+        user: targetUser,
+        serviceEntryDates: Array.from(serviceEntryDates)
       });
     } catch (error) {
       console.error('月別出勤簿取得エラー:', error);

@@ -560,7 +560,7 @@ export default class SharedMonthlyReport {
             
             // 月次出勤記録を生成
             displayContainer.innerHTML = this.generateMonthlyAttendanceReport(
-                year, month, response.user, response.records || []
+                year, month, response.user, response.records || [], response.serviceEntryDates || []
             );
             
             // ボタン表示
@@ -576,11 +576,12 @@ export default class SharedMonthlyReport {
         }
     }
 
-    generateMonthlyAttendanceReport(year, month, user, records) {
+    generateMonthlyAttendanceReport(year, month, user, records, serviceEntryDates = []) {
         const monthName = `${year}年${month}月`;
         const daysInMonth = getDaysInMonth(year, month);
         const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-        
+        const serviceEntryDateSet = new Set(serviceEntryDates);
+
         // 記録を日付でインデックス化
         const recordMap = {};
         records.forEach(record => {
@@ -588,14 +589,14 @@ export default class SharedMonthlyReport {
             const day = date.getDate();
             recordMap[day] = record;
         });
-        
+
         // 日付ごとの仮想レコードを作成
         const dailyRecords = [];
         for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(year, month - 1, day);
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const record = recordMap[day];
-            
+
             if (record) {
                 // 既存のレコードに日付情報を追加（休憩データも含む）
                 const dailyRecord = {
@@ -609,7 +610,8 @@ export default class SharedMonthlyReport {
                     user_role: user.role,
                     service_no: user.service_no,
                     service_type: record.service_type || user.service_type,
-                    transportation: user.transportation
+                    transportation: user.transportation,
+                    has_service_entry: serviceEntryDateSet.has(dateStr)
                 };
 
                 // 利用者の休憩記録を含める（APIから直接取得したデータをマッピング）
@@ -627,7 +629,7 @@ export default class SharedMonthlyReport {
                         dailyRecord.break_duration = record.break_duration;
                     }
                 }
-                
+
                 dailyRecords.push(dailyRecord);
             } else {
                 // 空のレコードを作成
@@ -642,6 +644,7 @@ export default class SharedMonthlyReport {
                     service_type: user.service_type,
                     service_no: user.service_no,
                     transportation: user.transportation,
+                    has_service_entry: serviceEntryDateSet.has(dateStr),
                     clock_in: null,
                     clock_out: null
                 });
