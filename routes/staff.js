@@ -644,6 +644,7 @@ router.post('/break/end', async (req, res) => {
             recordId,
             'attendance',
             JSON.stringify({
+              user_id: oldRecord.user_id,
               clock_in: oldRecord.clock_in,
               clock_out: oldRecord.clock_out,
               status: oldRecord.status,
@@ -651,6 +652,7 @@ router.post('/break/end', async (req, res) => {
               break_end: currentBreak ? currentBreak.end_time : oldRecord.break_end
             }),
             JSON.stringify({
+              user_id: oldRecord.user_id,
               clock_in: newClockIn,
               clock_out: newClockOut,
               status: status,
