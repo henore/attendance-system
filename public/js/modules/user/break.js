@@ -80,220 +80,148 @@ export class UserBreakHandler {
    * @param {HTMLElement} container 
    */
   updateUI(container) {
-    const breakElement = document.getElementById('userBreakStatus');
-    const breakDisplay = document.getElementById('userBreakTimeDisplay');
-    if (!breakElement) return;
-
     const clockInTime = this.getCurrentClockInTime();
+
     if (!clockInTime) {
-      this.renderNotWorkingUI(breakElement, breakDisplay);
+      this.renderBreakUI('not-working');
       return;
     }
 
-    // 出勤時刻による休憩可否判定（通所者のみ）
     if (this.currentUser.service_type === 'commute') {
       const clockInMinutes = timeToMinutes(clockInTime);
-      if (clockInMinutes >= 690) { // 11:30以降の出勤
-        this.renderNoBreakUI(breakElement, breakDisplay);
+      if (clockInMinutes >= 690) {
+        this.renderBreakUI('no-break');
         return;
       }
     }
 
     if (this.hasBreakToday) {
-      if (this.isOnBreak) {
-        this.renderBreakingUI(breakElement, breakDisplay);
-      } else {
-        this.renderBreakCompletedUI(breakElement, breakDisplay);
-      }
+      this.renderBreakUI(this.isOnBreak ? 'breaking' : 'break-completed');
     } else {
-      this.renderBreakAvailableUI(breakElement, breakDisplay);
+      this.renderBreakUI('break-available');
     }
   }
 
   /**
-   * 未出勤時のUI
-   */
-
-  renderNotWorkingUI(breakElement, breakDisplay) {
-    breakElement.innerHTML = `
-      <p class="text-muted">出勤後に休憩機能が利用できます</p>
-      <div class="d-grid gap-2">
-        <button class="btn btn-info" id="userBreakBtn" disabled>
-          <i class="fas fa-pause"></i> 休憩
-        </button>
-        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn" disabled>
-          <i class="fas fa-clock"></i> 小休憩（10分）
-        </button>
-        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn" disabled>
-          <i class="fas fa-door-open"></i> 中抜け
-        </button>
-      </div>
-    `;
-    if (breakDisplay) breakDisplay.style.display = 'none';
-}
-  /**
-   * 休憩不可UIを表示（通所者の午後出勤）
-   */
-  renderNoBreakUI(breakElement, breakDisplay) {
-    breakElement.innerHTML = `
-      <p class="text-muted">午後出勤のため休憩はありません</p>
-      <div class="d-grid gap-2">
-        <button class="btn btn-info" id="userBreakBtn" disabled>
-          <i class="fas fa-pause"></i> 休憩なし
-        </button>
-        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn">
-          <i class="fas fa-clock"></i> 小休憩（10分）
-        </button>
-        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn">
-          <i class="fas fa-door-open"></i> 中抜け
-        </button>
-      </div>
-    `;
-    if (breakDisplay) breakDisplay.style.display = 'none';
-
-    // イベントリスナーを追加
-    this.attachShortBreakAndAbsenceListeners();
-  }
-
-  /**
-   * 休憩中UIを表示
-   */
-  renderBreakingUI(breakElement, breakDisplay) {
-    const serviceType = this.currentUser.service_type;
-
-    let breakButtons = '';
-    let breakInfo = '';
-
-    if (serviceType === 'commute') {
-      breakInfo = '<p class="text-info">通所の方は12:30に自動終了します</p>';
-    } else {
-      breakButtons = `
-        <button class="btn btn-warning" id="userBreakEndBtn">
-          <i class="fas fa-play"></i> 休憩終了
-        </button>
-      `;
-      breakInfo = '<p class="text-info mt-2">60分で自動終了します</p>';
-    }
-
-    breakElement.innerHTML = `
-      <p class="mb-3 text-warning">
-        <i class="fas fa-pause-circle"></i> 休憩中（${this.currentBreakStart}〜）
-      </p>
-      <div class="d-grid gap-2">
-        ${breakButtons}
-        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn" disabled>
-          <i class="fas fa-clock"></i> 小休憩（10分）
-        </button>
-        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn" disabled>
-          <i class="fas fa-door-open"></i> 中抜け
-        </button>
-      </div>
-      ${breakInfo}
-    `;
-
-    if (breakDisplay) breakDisplay.style.display = 'block';
-
-    // 在宅者の手動終了ボタン
-    if (serviceType === 'home') {
-      const endBtn = document.getElementById('userBreakEndBtn');
-      if (endBtn) {
-        endBtn.addEventListener('click', () => this.handleBreakEnd());
-      }
-    }
-
-    // イベントリスナーを追加
-    this.attachShortBreakAndAbsenceListeners();
-  }
-
-  /**
-   * 休憩完了UIを表示
-   */
-  renderBreakCompletedUI(breakElement, breakDisplay) {
-    breakElement.innerHTML = `
-      <p class="text-info">本日の休憩は完了しました（60分）</p>
-      <div class="d-grid gap-2">
-        <button class="btn btn-info" id="userBreakBtn" disabled>
-          <i class="fas fa-check"></i> 休憩済み
-        </button>
-        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn">
-          <i class="fas fa-clock"></i> 小休憩（10分）
-        </button>
-        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn">
-          <i class="fas fa-door-open"></i> 中抜け
-        </button>
-      </div>
-    `;
-    if (breakDisplay) breakDisplay.style.display = 'none';
-
-    // イベントリスナーを追加
-    this.attachShortBreakAndAbsenceListeners();
-  }
-
-  /**
-   * 休憩可能UIを表示
-   */
-  renderBreakAvailableUI(breakElement, breakDisplay) {
-    const serviceType = this.currentUser.service_type;
-    let breakInfo = '';
-
-    if (serviceType === 'commute') {
-      breakInfo = '通所の方：どのタイミングでも11:30-12:30固定（60分）';
-    } else {
-      breakInfo = '在宅の方：15分刻み切り捨てで開始、60分固定';
-    }
-
-    breakElement.innerHTML = `
-      <p class="text-muted">${breakInfo}</p>
-      <div class="d-grid gap-2">
-        <button class="btn btn-info" id="userBreakStartBtn">
-          <i class="fas fa-pause"></i> 休憩開始
-        </button>
-        <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn">
-          <i class="fas fa-clock"></i> 小休憩（10分）
-        </button>
-        <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn">
-          <i class="fas fa-door-open"></i> 中抜け
-        </button>
-      </div>
-    `;
-
-    if (breakDisplay) breakDisplay.style.display = 'none';
-
-    const startBtn = document.getElementById('userBreakStartBtn');
-    if (startBtn) {
-      startBtn.addEventListener('click', () => this.handleBreakStart());
-    }
-
-    // イベントリスナーを追加
-    this.attachShortBreakAndAbsenceListeners();
-  }
-
-  /**
-   * 休憩無効UIを表示
+   * 外部からの退勤済みUI切替用エイリアス
    */
   disableUI() {
+    this.renderBreakUI('disabled');
+  }
+
+  /**
+   * 状態に応じた休憩UIを描画
+   */
+  renderBreakUI(state) {
     const breakElement = document.getElementById('userBreakStatus');
     const breakDisplay = document.getElementById('userBreakTimeDisplay');
+    if (!breakElement) return;
 
-    if (breakElement) {
-      breakElement.innerHTML = `
-        <p class="text-muted">退勤済みです</p>
-        <div class="d-grid gap-2">
-          <button class="btn btn-info" id="userBreakBtn" disabled>
-            <i class="fas fa-pause"></i> 休憩開始
-          </button>
-          <button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn" disabled>
-            <i class="fas fa-clock"></i> 小休憩（10分）
-          </button>
-          <button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn" disabled>
-            <i class="fas fa-door-open"></i> 中抜け
-          </button>
-        </div>
-      `;
+    const serviceType = this.currentUser.service_type;
+
+    // 各状態のコンフィグ
+    const configs = {
+      'not-working': {
+        message: '出勤後に休憩機能が利用できます',
+        msgClass: 'text-muted',
+        breakLabel: '休憩', breakDisabled: true,
+        shortBreakDisabled: true, absenceDisabled: true,
+        showBreakDisplay: false
+      },
+      'no-break': {
+        message: '午後出勤のため休憩はありません',
+        msgClass: 'text-muted',
+        breakLabel: '休憩なし', breakDisabled: true,
+        shortBreakDisabled: false, absenceDisabled: false,
+        showBreakDisplay: false
+      },
+      'breaking': {
+        message: `<i class="fas fa-pause-circle"></i> 休憩中（${this.currentBreakStart}〜）`,
+        msgClass: 'mb-3 text-warning',
+        breakLabel: null,
+        shortBreakDisabled: true, absenceDisabled: true,
+        showBreakDisplay: true,
+        showBreakEndBtn: serviceType === 'home',
+        breakInfo: serviceType === 'commute'
+          ? '<p class="text-info">通所の方は12:30に自動終了します</p>'
+          : '<p class="text-info mt-2">60分で自動終了します</p>'
+      },
+      'break-completed': {
+        message: '本日の休憩は完了しました（60分）',
+        msgClass: 'text-info',
+        breakLabel: '休憩済み', breakIcon: 'fa-check', breakDisabled: true,
+        shortBreakDisabled: false, absenceDisabled: false,
+        showBreakDisplay: false
+      },
+      'break-available': {
+        message: serviceType === 'commute'
+          ? '通所の方：どのタイミングでも11:30-12:30固定（60分）'
+          : '在宅の方：15分刻み切り捨てで開始、60分固定',
+        msgClass: 'text-muted',
+        breakLabel: '休憩開始', breakDisabled: false, breakIsStart: true,
+        shortBreakDisabled: false, absenceDisabled: false,
+        showBreakDisplay: false
+      },
+      'disabled': {
+        message: '退勤済みです',
+        msgClass: 'text-muted',
+        breakLabel: '休憩開始', breakDisabled: true,
+        shortBreakDisabled: true, absenceDisabled: true,
+        showBreakDisplay: false
+      }
+    };
+
+    const c = configs[state];
+    if (!c) return;
+
+    // HTML組み立て
+    let html = `<p class="${c.msgClass}">${c.message}</p>`;
+    html += '<div class="d-grid gap-2">';
+
+    // 休憩中は休憩終了ボタン（在宅のみ）を表示
+    if (state === 'breaking') {
+      if (c.showBreakEndBtn) {
+        html += `<button class="btn btn-warning" id="userBreakEndBtn">
+          <i class="fas fa-play"></i> 休憩終了
+        </button>`;
+      }
+    } else if (c.breakLabel) {
+      const icon = c.breakIcon || 'fa-pause';
+      const id = c.breakIsStart ? 'userBreakStartBtn' : 'userBreakBtn';
+      html += `<button class="btn btn-info" id="${id}" ${c.breakDisabled ? 'disabled' : ''}>
+        <i class="fas ${icon}"></i> ${c.breakLabel}
+      </button>`;
     }
 
+    html += `<button class="btn btn-outline-secondary btn-sm" id="userShortBreakBtn" ${c.shortBreakDisabled ? 'disabled' : ''}>
+      <i class="fas fa-clock"></i> 小休憩（10分）
+    </button>`;
+    html += `<button class="btn btn-outline-warning btn-sm" id="userAbsenceBtn" ${c.absenceDisabled ? 'disabled' : ''}>
+      <i class="fas fa-door-open"></i> 中抜け
+    </button>`;
+    html += '</div>';
+
+    if (c.breakInfo) html += c.breakInfo;
+
+    breakElement.innerHTML = html;
+
     if (breakDisplay) {
-      breakDisplay.style.display = 'none';
+      breakDisplay.style.display = c.showBreakDisplay ? 'block' : 'none';
+    }
+
+    // イベントリスナー
+    if (c.breakIsStart) {
+      const startBtn = document.getElementById('userBreakStartBtn');
+      if (startBtn) startBtn.addEventListener('click', () => this.handleBreakStart());
+    }
+
+    if (state === 'breaking' && c.showBreakEndBtn) {
+      const endBtn = document.getElementById('userBreakEndBtn');
+      if (endBtn) endBtn.addEventListener('click', () => this.handleBreakEnd());
+    }
+
+    if (!c.shortBreakDisabled || !c.absenceDisabled) {
+      this.attachShortBreakAndAbsenceListeners();
     }
   }
 
@@ -455,8 +383,7 @@ export class UserBreakHandler {
     
     this.breakCheckInterval = setInterval(() => {
       this.updateBreakTimeDisplay();
-      this.checkBreakTimeLimit();
-    }, 60000); // 1分ごと
+    }, 60000);
   }
 
   /**
@@ -483,22 +410,6 @@ export class UserBreakHandler {
       const hours = Math.floor(duration / 60);
       const minutes = duration % 60;
       durationElement.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-    }
-  }
-
-  /**
-   * 休憩時間制限をチェック
-   */
-  checkBreakTimeLimit() {
-    if (!this.isOnBreak || !this.currentBreakStart) return;
-    
-    const currentTime = getCurrentTime();
-    const duration = calculateBreakDuration(this.currentBreakStart, currentTime);
-    
-    // 60分経過で自動終了（安全策として監視も継続）
-    if (duration >= 60) {
-      this.showNotification('休憩時間が60分に達しました。自動終了します。', 'info');
-      this.handleBreakEnd();
     }
   }
 

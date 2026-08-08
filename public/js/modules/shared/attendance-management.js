@@ -3,10 +3,11 @@
 
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { modalManager } from '../shared/modal-manager.js';
-import { getCurrentDate, formatDate } from '../../utils/date-time.js';
+import { getCurrentDate } from '../../utils/date-time.js';
 import { AttendanceTable } from './components/attendance-table.js';
 import { ReportDetailModal } from './modals/report-detail-modal.js';
 import { LineReportSender } from './line-report-sender.js';
+import { AttendanceEditHandler } from './attendance-edit-handler.js';
 
 export class SharedAttendanceManagement {
   constructor(app, parentModule) {
@@ -20,6 +21,20 @@ export class SharedAttendanceManagement {
     this.attendanceTable = new AttendanceTable(parentModule);
     this.reportDetailModal = new ReportDetailModal(app, parentModule);
     this.lineSender = new LineReportSender(app);
+
+    // 出勤記録編集ハンドラ
+    if (this.userRole === 'admin' || this.userRole === 'staff') {
+      this.editHandler = new AttendanceEditHandler({
+        userRole: this.userRole,
+        idPrefix: 'edit',
+        modalId: 'attendanceEditModal',
+        notify: (msg, type) => this.parent.showNotification(msg, type),
+        confirm: (opts) => this.parent.showConfirm(opts),
+        callApi: (endpoint, opts) => this.parent.callApi(endpoint, opts),
+        onSaved: () => this.searchAttendanceRecords(),
+        context: 'attendance'
+      });
+    }
 
     // 出勤者、出勤予定者のみ表示フラグ
     this.showOnlyWorking = true; // デフォルトで出勤者のみ表示
@@ -127,145 +142,12 @@ export class SharedAttendanceManagement {
       </div>
     </div>
 
-    ${(this.userRole === 'admin' || this.userRole === 'staff') ? this.renderEditModals() : ''}
+    ${this.editHandler ? this.editHandler.renderModalHTML() : ''}
   `;
-  
+
   // デフォルト値を明示的に設定
   this.showOnlyWorking = true;
 }
-
-  renderEditModals() {
-    return `
-      <!-- 出勤記録編集モーダル -->
-      <div class="modal fade" id="attendanceEditModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-          <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-              <h5 class="modal-title">
-                <i class="fas fa-edit"></i> 出勤記録編集
-                ${this.userRole === 'staff' ? '<small class="ms-2">（承認後に反映）</small>' : ''}
-              </h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-              <form id="attendanceEditForm">
-                <input type="hidden" id="editRecordId">
-                <input type="hidden" id="editUserId">
-                <input type="hidden" id="editUserRole">
-                
-                <div class="row mb-3">
-                  <div class="col-6">
-                    <label for="editUserName" class="form-label">ユーザー</label>
-                    <input type="text" class="form-control" id="editUserName" readonly>
-                  </div>
-                  <div class="col-6">
-                    <label for="editDate" class="form-label">日付</label>
-                    <input type="date" class="form-control" id="editDate" readonly>
-                  </div>
-                </div>
-                
-                <div class="row mb-3">
-                  <div class="col-6">
-                    <label for="editClockIn" class="form-label">出勤時間</label>
-                    <input type="time" class="form-control" id="editClockIn">
-                  </div>
-                  <div class="col-6">
-                    <label for="editClockOut" class="form-label">退勤時間</label>
-                    <input type="time" class="form-control" id="editClockOut">
-                  </div>
-                </div>
-
-                <div class="row mb-3">
-                  <div class="col-6">
-                    <label for="editBreakStart" class="form-label">休憩開始時間</label>
-                    <input type="time" class="form-control" id="editBreakStart">
-                  </div>
-                  <div class="col-6">
-                    <label for="editBreakEnd" class="form-label">休憩終了時間</label>
-                    <input type="time" class="form-control" id="editBreakEnd">
-                  </div>
-                </div>
-
-                <div class="row mb-3" id="editNakanukeGroup" style="display: none;">
-                  <div class="col-6">
-                    <label for="editNakanukeMinutes" class="form-label">中抜け経過分数</label>
-                    <input type="number" class="form-control" id="editNakanukeMinutes" min="0" placeholder="0">
-                  </div>
-                </div>
-
-                <div class="row mb-3">
-                  <div class="col-6">
-                    <label for="editStatus" class="form-label">ステータス</label>
-                    <select class="form-control" id="editStatus">
-                      <option value="normal">正常</option>
-                      <option value="late">遅刻</option>
-                      <option value="early">早退</option>
-                      <option value="absence">欠勤</option>
-                      <option value="paid_leave">有給欠勤</option>
-                    </select>
-                  </div>
-                  <div class="col-6" id="absenceTypeGroup" style="display: none;">
-                    <label class="form-label">欠勤種別（スタッフのみ）</label>
-                    <div class="btn-group w-100" role="group">
-                      <input type="radio" class="btn-check" name="absenceType" id="normalAbsence" value="absence">
-                      <label class="btn btn-outline-secondary" for="normalAbsence">通常欠勤</label>
-                      
-                      <input type="radio" class="btn-check" name="absenceType" id="paidLeave" value="paid_leave">
-                      <label class="btn btn-outline-primary" for="paidLeave">有給欠勤</label>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="mb-3">
-                  <label for="editReason" class="form-label">変更理由${this.userRole === 'staff' ? ' <span class="text-danger">*</span>' : '（任意）'}</label>
-                  <textarea class="form-control" id="editReason" rows="3"
-                            placeholder="変更理由を入力してください..."${this.userRole === 'staff' ? ' required' : ''}></textarea>
-                </div>
-
-                <!-- 削除セクション（管理者のみ） -->
-                ${this.userRole === 'admin' ? `
-                <div class="border-top pt-3 mt-3" id="deleteAttendanceSection" style="display: none;">
-                  <div class="alert alert-danger">
-                    <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> 危険な操作</h6>
-                    <p class="mb-2">この出勤記録を完全に削除します。この操作は取り消せません。</p>
-                    <button type="button" class="btn btn-danger btn-sm" id="deleteAttendanceBtn">
-                      <i class="fas fa-trash"></i> この出勤記録を削除する
-                    </button>
-                  </div>
-                </div>
-                ` : ''}
-
-                <!-- 削除要望セクション（スタッフのみ） -->
-                ${this.userRole === 'staff' ? `
-                <div class="border-top pt-3 mt-3" id="deleteRequestSection" style="display: none;">
-                  <div class="alert alert-warning">
-                    <h6 class="alert-heading"><i class="fas fa-trash-alt"></i> 記録削除要望</h6>
-                    <p class="mb-2">この出勤記録の削除を管理者に要望します。承認後に削除されます。</p>
-                    <div class="mb-2">
-                      <textarea class="form-control" id="deleteRequestReason" rows="2"
-                                placeholder="削除理由を入力してください..." required></textarea>
-                    </div>
-                    <button type="button" class="btn btn-danger btn-sm" id="deleteRequestBtn">
-                      <i class="fas fa-paper-plane"></i> 削除要望を送信
-                    </button>
-                  </div>
-                </div>
-                ` : ''}
-              </form>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                <i class="fas fa-times"></i> キャンセル
-              </button>
-              <button type="button" class="btn btn-warning" id="saveAttendanceEditBtn">
-                <i class="fas fa-save"></i> 変更保存
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
 
   setupEventListeners() {
   // 検索・更新ボタン
@@ -293,24 +175,8 @@ export class SharedAttendanceManagement {
   });
 
   // 編集機能（管理者・スタッフ共通）
-  if (this.userRole === 'admin' || this.userRole === 'staff') {
-    const editStatusSelect = this.container.querySelector('#editStatus');
-    editStatusSelect?.addEventListener('change', () => this.toggleAbsenceTypeField());
-
-    const saveEditBtn = this.container.querySelector('#saveAttendanceEditBtn');
-    saveEditBtn?.addEventListener('click', () => this.saveAttendanceEdit());
-
-    // 削除は管理者のみ
-    if (this.userRole === 'admin') {
-      const deleteBtn = this.container.querySelector('#deleteAttendanceBtn');
-      deleteBtn?.addEventListener('click', () => this.deleteAttendance());
-    }
-
-    // 削除要望はスタッフのみ
-    if (this.userRole === 'staff') {
-      const deleteRequestBtn = this.container.querySelector('#deleteRequestBtn');
-      deleteRequestBtn?.addEventListener('click', () => this.requestDeleteAttendance());
-    }
+  if (this.editHandler) {
+    this.editHandler.setupEventListeners();
   }
 
   // 日付変更時の自動検索
@@ -342,9 +208,9 @@ export class SharedAttendanceManagement {
     }
 
     // 編集ボタン（管理者・スタッフ）
-    if ((this.userRole === 'admin' || this.userRole === 'staff') && e.target.closest('.btn-edit-attendance')) {
+    if (this.editHandler && e.target.closest('.btn-edit-attendance')) {
       const btn = e.target.closest('.btn-edit-attendance');
-      this.editAttendance(btn.dataset);
+      this.editHandler.editAttendance(btn.dataset);
     }
   });
 }
@@ -399,8 +265,8 @@ async updateUserSelectOptions() {
 
   registerModals() {
     try {
-      if (this.userRole === 'admin' || this.userRole === 'staff') {
-        modalManager.register('attendanceEditModal');
+      if (this.editHandler) {
+        this.editHandler.registerModal();
       }
     } catch (error) {
       console.error('モーダル登録エラー:', error);
@@ -618,235 +484,6 @@ async searchAttendanceRecords() {
     `;
   }
 
-  // 編集関連メソッド
-  toggleAbsenceTypeField() {
-    if (this.userRole !== 'admin' && this.userRole !== 'staff') return;
-    
-    const statusSelect = this.container.querySelector('#editStatus');
-    const absenceTypeGroup = this.container.querySelector('#absenceTypeGroup');
-    const userRole = this.container.querySelector('#editUserRole').value;
-    
-    if (userRole === 'staff' && (statusSelect.value === 'absence' || statusSelect.value === 'paid_leave')) {
-      absenceTypeGroup.style.display = 'block';
-      if (statusSelect.value === 'absence') {
-        this.container.querySelector('#normalAbsence').checked = true;
-      } else if (statusSelect.value === 'paid_leave') {
-        this.container.querySelector('#paidLeave').checked = true;
-      }
-    } else {
-      absenceTypeGroup.style.display = 'none';
-    }
-  }
-
-  async editAttendance(data) {
-    if (this.userRole !== 'admin' && this.userRole !== 'staff') return;
-
-    // フォーム要素に値設定
-    this.container.querySelector('#editRecordId').value = data.recordId || '';
-    this.container.querySelector('#editUserId').value = data.userId;
-    this.container.querySelector('#editUserRole').value = data.userRole;
-    this.container.querySelector('#editUserName').value = data.userName;
-    this.container.querySelector('#editDate').value = data.date;
-    this.container.querySelector('#editClockIn').value = data.clockIn || '';
-    this.container.querySelector('#editClockOut').value = data.clockOut || '';
-    this.container.querySelector('#editBreakStart').value = data.breakStart || '';
-    this.container.querySelector('#editBreakEnd').value = data.breakEnd || '';
-    this.container.querySelector('#editStatus').value = data.status || 'normal';
-    this.container.querySelector('#editReason').value = '';
-
-    // 中抜けフィールドの表示制御（スタッフのみ）
-    const nakanukeGroup = this.container.querySelector('#editNakanukeGroup');
-    const nakanukeInput = this.container.querySelector('#editNakanukeMinutes');
-    if (nakanukeGroup && nakanukeInput) {
-      if (data.userRole === 'staff') {
-        nakanukeGroup.style.display = 'flex';
-        nakanukeInput.value = data.nakanukeMinutes || 0;
-      } else {
-        nakanukeGroup.style.display = 'none';
-        nakanukeInput.value = 0;
-      }
-    }
-
-    // 削除セクションの表示制御（管理者のみ）
-    const deleteSection = this.container.querySelector('#deleteAttendanceSection');
-    if (deleteSection) {
-      deleteSection.style.display = (this.userRole === 'admin' && data.recordId) ? 'block' : 'none';
-    }
-
-    // 削除要望セクションの表示制御（スタッフのみ、既存記録がある場合）
-    const deleteRequestSection = this.container.querySelector('#deleteRequestSection');
-    if (deleteRequestSection) {
-      deleteRequestSection.style.display = (this.userRole === 'staff' && data.recordId) ? 'block' : 'none';
-      const reasonField = this.container.querySelector('#deleteRequestReason');
-      if (reasonField) reasonField.value = '';
-    }
-
-    // スタッフの場合のみ欠勤種別表示
-    const absenceTypeGroup = this.container.querySelector('#absenceTypeGroup');
-    if (data.userRole === 'staff') {
-      absenceTypeGroup.style.display = 'block';
-      this.toggleAbsenceTypeField();
-    } else {
-      absenceTypeGroup.style.display = 'none';
-    }
-
-    modalManager.show('attendanceEditModal');
-  }
-
-  async saveAttendanceEdit() {
-    if (this.userRole !== 'admin' && this.userRole !== 'staff') return;
-
-    try {
-      const recordId = this.container.querySelector('#editRecordId').value;
-      const clockIn = this.container.querySelector('#editClockIn').value;
-      const clockOut = this.container.querySelector('#editClockOut').value;
-      const breakStart = this.container.querySelector('#editBreakStart').value;
-      const breakEnd = this.container.querySelector('#editBreakEnd').value;
-      const status = this.container.querySelector('#editStatus').value;
-      const reason = this.container.querySelector('#editReason').value;
-      const userRole = this.container.querySelector('#editUserRole').value;
-
-      // 欠勤種別の確認（スタッフの場合）
-      let finalStatus = status;
-      if (userRole === 'staff') {
-        const selectedAbsenceType = this.container.querySelector('input[name="absenceType"]:checked');
-        if (selectedAbsenceType) {
-          finalStatus = selectedAbsenceType.value;
-        }
-      }
-
-      // staffは理由必須、adminは任意
-      if (this.userRole === 'staff' && !reason.trim()) {
-        this.parent.showNotification('変更理由を入力してください', 'warning');
-        return;
-      }
-
-      // 中抜け経過分数
-      const nakanukeMinutesInput = this.container.querySelector('#editNakanukeMinutes');
-      const nakanukeMinutes = nakanukeMinutesInput ? parseInt(nakanukeMinutesInput.value) || 0 : undefined;
-
-      const requestData = {
-        recordId: recordId,
-        userId: this.container.querySelector('#editUserId').value,
-        date: this.container.querySelector('#editDate').value,
-        newClockIn: clockIn,
-        newClockOut: clockOut,
-        newBreakStart: breakStart,
-        newBreakEnd: breakEnd,
-        nakanukeMinutes: nakanukeMinutes,
-        status: finalStatus,
-        reason: reason
-      };
-
-      // 権限に応じてAPIエンドポイントを切り替え
-      const endpoint = this.userRole === 'admin'
-        ? API_ENDPOINTS.ADMIN.ATTENDANCE_CORRECT
-        : API_ENDPOINTS.STAFF.ATTENDANCE_CORRECT;
-
-      await this.parent.callApi(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(requestData)
-      });
-
-      const message = this.userRole === 'staff'
-        ? '訂正申請を送信しました（管理者の承認後に反映されます）'
-        : '出勤記録を更新しました';
-      this.parent.showNotification(message, 'success');
-      
-      modalManager.hide('attendanceEditModal');
-      await this.searchAttendanceRecords();
-      
-    } catch (error) {
-      console.error('出勤記録更新エラー:', error);
-      this.parent.showNotification(error.message || '出勤記録の更新に失敗しました', 'danger');
-    }
-  }
-
-  async deleteAttendance() {
-    if (this.userRole !== 'admin') return;
-
-    try {
-      const recordId = this.container.querySelector('#editRecordId').value;
-      const userName = this.container.querySelector('#editUserName').value;
-      const date = this.container.querySelector('#editDate').value;
-
-      if (!recordId) {
-        this.parent.showNotification('削除する記録が選択されていません', 'warning');
-        return;
-      }
-
-      // 確認ダイアログ
-      const confirmed = await this.parent.showConfirm({
-        title: '出勤記録の削除確認',
-        message: `${userName}さんの${date}の出勤記録を完全に削除します。\n\nこの操作は取り消せません。本当に削除しますか？`,
-        confirmText: '削除する',
-        confirmClass: 'btn-danger',
-        cancelText: 'キャンセル'
-      });
-
-      if (!confirmed) return;
-
-      // 削除API呼び出し
-      const response = await this.parent.callApi(
-        `/api/admin/attendance/${recordId}`,
-        {
-          method: 'DELETE',
-          body: JSON.stringify({})
-        }
-      );
-
-      // 成功メッセージ
-      this.parent.showNotification(response.message, 'success');
-
-      // モーダルを閉じる
-      modalManager.hide('attendanceEditModal');
-
-      // リスト更新
-      await this.searchAttendanceRecords();
-
-    } catch (error) {
-      console.error('出勤記録削除エラー:', error);
-      this.parent.showNotification(
-        error.message || '出勤記録の削除に失敗しました',
-        'danger'
-      );
-    }
-  }
-
-  async requestDeleteAttendance() {
-    if (this.userRole !== 'staff') return;
-
-    try {
-      const recordId = this.container.querySelector('#editRecordId').value;
-      const reason = this.container.querySelector('#deleteRequestReason').value;
-
-      if (!recordId) {
-        this.parent.showNotification('削除する記録が選択されていません', 'warning');
-        return;
-      }
-
-      if (!reason || !reason.trim()) {
-        this.parent.showNotification('削除理由を入力してください', 'warning');
-        return;
-      }
-
-      await this.parent.callApi('/api/staff/attendance/delete-request', {
-        method: 'POST',
-        body: JSON.stringify({ recordId, reason: reason.trim() })
-      });
-
-      this.parent.showNotification('削除要望を送信しました（管理者の承認待ち）', 'success');
-      modalManager.hide('attendanceEditModal');
-      await this.searchAttendanceRecords();
-
-    } catch (error) {
-      console.error('削除要望エラー:', error);
-      this.parent.showNotification(
-        error.message || '削除要望の送信に失敗しました',
-        'danger'
-      );
-    }
-  }
 
   async refresh() {
     await this.searchAttendanceRecords();
@@ -915,7 +552,7 @@ async searchAttendanceRecords() {
 
   async showStaffReportModal(userId, userName, date) {
     try {
-      const response = await this.app.apiCall(`/api/staff/daily-report/${date}?staffId=${userId}`);
+      const response = await this.app.apiCall(`${API_ENDPOINTS.REPORTS.DAILY_REPORT(date)}?staffId=${userId}`);
 
       if (!response.report) {
         this.parent.showNotification('サービス提供記録が見つかりません', 'warning');

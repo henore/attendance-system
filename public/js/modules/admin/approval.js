@@ -2,6 +2,7 @@
 // 管理者用稟議承認モジュール
 
 import { formatDateTime } from '../../utils/date-time.js';
+import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 
 export default class AdminApproval {
     constructor(app, parentModule) {
@@ -202,7 +203,7 @@ export default class AdminApproval {
                 params.append('status', statusFilter);
             }
 
-            const response = await this.parentModule.callApi(`/api/staff/approval/list?${params}`);
+            const response = await this.parentModule.callApi(`${API_ENDPOINTS.APPROVAL.LIST}?${params}`);
 
             if (response.success) {
                 this.approvals = response.approvals;
@@ -278,7 +279,7 @@ export default class AdminApproval {
 
     async viewDetail(id) {
         try {
-            const response = await this.parentModule.callApi(`/api/staff/approval/${id}`);
+            const response = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.GET(id));
 
             if (response.success) {
                 this.showDetailModal(response.approval);
@@ -386,7 +387,7 @@ export default class AdminApproval {
         }
 
         try {
-            const response = await this.parentModule.callApi(`/api/admin/approval/approve/${id}`, {
+            const response = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.APPROVE(id), {
                 method: 'POST'
             });
 
@@ -435,7 +436,7 @@ export default class AdminApproval {
         }
 
         try {
-            const response = await this.parentModule.callApi(`/api/admin/approval/reject/${id}`, {
+            const response = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.REJECT(id), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason: reason.trim() })
@@ -467,7 +468,7 @@ export default class AdminApproval {
         }
 
         try {
-            const response = await this.parentModule.callApi(`/api/admin/approval/complete/${id}`, {
+            const response = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.COMPLETE(id), {
                 method: 'POST'
             });
 
@@ -497,7 +498,7 @@ export default class AdminApproval {
         }
 
         try {
-            const response = await this.parentModule.callApi(`/api/staff/approval/${id}`, {
+            const response = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.DELETE(id), {
                 method: 'DELETE'
             });
 

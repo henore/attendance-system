@@ -56,24 +56,12 @@ export const API_ENDPOINTS = {
     NAKANUKE_END: '/api/staff/nakanuke/end',
     USERS: '/api/staff/users',
     USERS_LIST: '/api/staff/users/list',
-    COMMENT: '/api/staff/comment',
     ATTENDANCE_BOOK: '/api/staff/attendance-book',
-    ATTENDANCE_SEARCH: '/api/staff/attendance/search', // 元に戻す
+    ATTENDANCE_SEARCH: '/api/staff/attendance/search',
     ATTENDANCE: (date) => `/api/staff/attendance/${date}`,
     USER_STATUS: (userId) => `/api/staff/users/${userId}/status`,
-    REPORT: (userId, date) => `/api/staff/reports/${userId}/${date}`,
-    MONTHLY_ATTENDANCE: (year, month, userId) =>
-        `/api/staff/monthly-attendance?year=${year}&month=${month}&userId=${userId}`,
     ATTENDANCE_CORRECT: '/api/staff/attendance/correct',
     ATTENDANCE_DELETE_REQUEST: '/api/staff/attendance/delete-request',
-    // スタッフ日報（サービス提供記録）
-    DAILY_REPORT_SUBMIT: '/api/staff/daily-report',
-    DAILY_REPORT_TODAY: '/api/staff/daily-report-today',
-    DAILY_REPORT: (date) => `/api/staff/daily-report/${date}`,
-    DAILY_REPORT_CLOCKED_IN_USERS: '/api/staff/daily-report-clocked-in-users',
-    DAILY_REPORT_DELETE_ENTRY: '/api/staff/daily-report-delete-entry',
-    DAILY_REPORT_ENTRY: (date, userId) => `/api/staff/daily-report-entry/${date}/${userId}`,
-    DAILY_REPORT_SAVE_ENTRY: '/api/staff/daily-report-save-entry',
     // 体験入所管理
     TRIAL_VISITS_TODAY: '/api/trial-visits/today',
     TRIAL_VISITS_BY_DATE: (date) => `/api/trial-visits/by-date/${date}`,
@@ -89,8 +77,6 @@ export const API_ENDPOINTS = {
     STATUS_TODAY: '/api/admin/status/today',
     ATTENDANCE_SEARCH: '/api/admin/attendance/search',
     ATTENDANCE_CORRECT: '/api/admin/attendance/correct',
-    ATTENDANCE_MONTHLY: (year, month, userId) => 
-        `/api/admin/attendance/${year}/${month}/${userId}`, // 追加
     USERS: '/api/admin/users',
     USER_CREATE: '/api/admin/users/create',
     USER_UPDATE: (userId) => `/api/admin/users/${userId}`,
@@ -116,6 +102,38 @@ export const API_ENDPOINTS = {
     TRIAL_VISITS_MONTHLY: (year, month) => `/api/trial-visits/monthly/${year}/${month}`,
     TRIAL_VISITS_NOTIFICATION_CHECK: '/api/trial-visits/notification-check',
     ATTENDANCE_STATS: '/api/admin/attendance-stats'
+  },
+
+  // 月別出勤簿（共通）
+  MONTHLY_ATTENDANCE: {
+    GET: (year, month, userId) =>
+        `/api/monthly-attendance?year=${year}&month=${month}&userId=${userId}`,
+  },
+
+  // 日報・サービス提供記録（共通）
+  REPORTS: {
+    REPORT: (userId, date) => `/api/reports/reports/${userId}/${date}`,
+    REPORT_UPDATE: (userId, date) => `/api/reports/report/${userId}/${date}`,
+    COMMENT: '/api/reports/comment',
+    DAILY_REPORT_SUBMIT: '/api/reports/daily-report',
+    DAILY_REPORT_TODAY: '/api/reports/daily-report-today',
+    DAILY_REPORT: (date) => `/api/reports/daily-report/${date}`,
+    DAILY_REPORT_CLOCKED_IN_USERS: '/api/reports/daily-report-clocked-in-users',
+    DAILY_REPORT_DELETE_ENTRY: '/api/reports/daily-report-delete-entry',
+    DAILY_REPORT_ENTRY: (date, userId) => `/api/reports/daily-report-entry/${date}/${userId}`,
+    DAILY_REPORT_SAVE_ENTRY: '/api/reports/daily-report-save-entry',
+  },
+
+  // 稟議（共通）
+  APPROVAL: {
+    SAVE: '/api/approval/save',
+    SUBMIT: (id) => `/api/approval/submit/${id}`,
+    LIST: '/api/approval/list',
+    GET: (id) => `/api/approval/${id}`,
+    DELETE: (id) => `/api/approval/${id}`,
+    APPROVE: (id) => `/api/approval/approve/${id}`,
+    REJECT: (id) => `/api/approval/reject/${id}`,
+    COMPLETE: (id) => `/api/approval/complete/${id}`,
   },
 
   // Excel出力

@@ -81,8 +81,8 @@ export class UserAttendanceCalendar {
         const newDate = new Date(this.currentDate);
         newDate.setMonth(newDate.getMonth() - 1);
         
-        // 1年間制限チェック
-        if (this.isWithinOneYear(newDate)) {
+        // 閲覧範囲チェック
+        if (this.isWithinRange(newDate)) {
           this.currentDate = newDate;
           this.updateCalendar();
         }
@@ -94,8 +94,8 @@ export class UserAttendanceCalendar {
         const newDate = new Date(this.currentDate);
         newDate.setMonth(newDate.getMonth() + 1);
         
-        // 1年間制限チェック
-        if (this.isWithinOneYear(newDate)) {
+        // 閲覧範囲チェック
+        if (this.isWithinRange(newDate)) {
           this.currentDate = newDate;
           this.updateCalendar();
         }
@@ -104,16 +104,18 @@ export class UserAttendanceCalendar {
   }
 
   /**
-   * 1年間の範囲内かチェック
+   * 閲覧範囲内かチェック（過去12ヶ月〜先2ヶ月）
    * @param {Date} date 
    * @returns {boolean}
    */
-  isWithinOneYear(date) {
+  isWithinRange(date) {
     const now = new Date();
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(now.getFullYear() - 1);
-    
-    return date >= oneYearAgo && date <= now;
+    const pastLimit = new Date();
+    pastLimit.setFullYear(now.getFullYear() - 1);
+    const futureLimit = new Date();
+    futureLimit.setMonth(now.getMonth() + 2);
+
+    return date >= pastLimit && date <= futureLimit;
   }
 
   /**

@@ -4,6 +4,7 @@
 import { formatDate, getDaysInMonth } from '../../utils/date-time.js';
 import { modalManager } from '../shared/modal-manager.js';
 import { isJapaneseHoliday, preloadHolidays } from '../../utils/holidays.js';
+import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 
 export class StaffAttendanceBook {
   constructor(apiCall, showNotification) {
@@ -94,8 +95,8 @@ export class StaffAttendanceBook {
         const newDate = new Date(this.currentDate);
         newDate.setMonth(newDate.getMonth() - 1);
         
-        // 1年間制限チェック
-        if (this.isWithinOneYear(newDate)) {
+        // 閲覧範囲チェック
+        if (this.isWithinRange(newDate)) {
           this.currentDate = newDate;
           this.updateCalendar();
         }
@@ -107,8 +108,8 @@ export class StaffAttendanceBook {
         const newDate = new Date(this.currentDate);
         newDate.setMonth(newDate.getMonth() + 1);
         
-        // 1年間制限チェック
-        if (this.isWithinOneYear(newDate)) {
+        // 閲覧範囲チェック
+        if (this.isWithinRange(newDate)) {
           this.currentDate = newDate;
           this.updateCalendar();
         }
@@ -121,16 +122,18 @@ export class StaffAttendanceBook {
   }
 
   /**
-   * 1年間の範囲内かチェック
+   * 閲覧範囲内かチェック（過去12ヶ月〜先2ヶ月）
    * @param {Date} date 
    * @returns {boolean}
    */
-  isWithinOneYear(date) {
+  isWithinRange(date) {
     const now = new Date();
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(now.getFullYear() - 1);
-    
-    return date >= oneYearAgo && date <= now;
+    const pastLimit = new Date();
+    pastLimit.setFullYear(now.getFullYear() - 1);
+    const futureLimit = new Date();
+    futureLimit.setMonth(now.getMonth() + 2);
+
+    return date >= pastLimit && date <= futureLimit;
   }
 
   /**
@@ -257,7 +260,7 @@ export class StaffAttendanceBook {
     html += '<span class="calendar-indicator indicator-work" title="出勤記録あり"></span>';
     
     // 休憩マーク
-    if (attendanceData.break_time > 0) {
+    if (attendanceData.break_start && attendanceData.break_end) {
       html += '<span class="calendar-indicator indicator-break" title="休憩記録あり"></span>';
     }
     
@@ -277,33 +280,28 @@ export class StaffAttendanceBook {
    * 出勤キャッシュを読み込み（修正版）
    */
   async loadAttendanceCache() {
-    // 現在月の出勤データを取得
     const year = this.currentDate.getFullYear();
     const month = this.currentDate.getMonth();
     const daysInMonth = getDaysInMonth(year, month + 1);
-    
-    // キャッシュクリア
+
     this.attendanceCache.clear();
-    
-    // 各日付のデータを取得
+
+    const dateStrings = [];
     for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const dateStr = this.formatDateString(date);
-      
-      try {
-        // スタッフ自身の出勤記録を取得
-        const attendance = await this.apiCall(`/api/staff/attendance/${dateStr}`);
-        if (attendance.attendance) {
-          // 休憩記録も取得
-          const breakData = await this.apiCall(`/api/user/break/status/${dateStr}`);
-          const attendanceData = {
-            ...attendance.attendance,
-            break_time: breakData.breakRecord ? 60 : 0
-          };
-          this.attendanceCache.set(dateStr, attendanceData);
-        }
-      } catch (error) {
-        console.error(`出勤データ取得エラー (${dateStr}):`, error);
+      dateStrings.push(this.formatDateString(new Date(year, month, day)));
+    }
+
+    const results = await Promise.all(
+      dateStrings.map(dateStr =>
+        this.apiCall(API_ENDPOINTS.STAFF.ATTENDANCE(dateStr))
+          .then(res => ({ dateStr, attendance: res.attendance }))
+          .catch(() => ({ dateStr, attendance: null }))
+      )
+    );
+
+    for (const { dateStr, attendance } of results) {
+      if (attendance) {
+        this.attendanceCache.set(dateStr, attendance);
       }
     }
   }
@@ -341,7 +339,7 @@ export class StaffAttendanceBook {
   async showAttendanceDetail(dateStr, attendanceData) {
     try {
       // スタッフ日報を取得
-      const reportResponse = await this.apiCall(`/api/staff/daily-report/${dateStr}`);
+      const reportResponse = await this.apiCall(API_ENDPOINTS.REPORTS.DAILY_REPORT(dateStr));
       const dailyReport = reportResponse.report;
 
       // 既存のモーダルがあれば破棄
@@ -418,11 +416,11 @@ export class StaffAttendanceBook {
     }
 
     // 休憩記録
-    if (attendanceData.break_time > 0) {
+    if (attendanceData.break_start && attendanceData.break_end) {
       html += `
         <div class="detail-section">
           <h6><i class="fas fa-coffee text-warning"></i> 休憩記録</h6>
-          <p>休憩時間: ${attendanceData.break_time}分</p>
+          <p>休憩時間: ${attendanceData.break_start} 〜 ${attendanceData.break_end}</p>
         </div>
       `;
     }

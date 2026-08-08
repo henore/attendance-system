@@ -2,6 +2,7 @@
 // スタッフ用稟議申請モジュール
 
 import { formatDateTime } from '../../utils/date-time.js';
+import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 
 export default class StaffApproval {
     constructor(app, parentModule) {
@@ -235,7 +236,7 @@ export default class StaffApproval {
         }
 
         try {
-            const response = await this.parentModule.callApi('/api/staff/approval/save', {
+            const response = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.SAVE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -258,7 +259,7 @@ export default class StaffApproval {
 
         try {
             // まず保存
-            const saveResponse = await this.parentModule.callApi('/api/staff/approval/save', {
+            const saveResponse = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.SAVE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -272,7 +273,7 @@ export default class StaffApproval {
             const approvalId = data.id || saveResponse.id;
 
             // 次に申請
-            const submitResponse = await this.parentModule.callApi(`/api/staff/approval/submit/${approvalId}`, {
+            const submitResponse = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.SUBMIT(approvalId), {
                 method: 'POST'
             });
 
@@ -329,7 +330,7 @@ export default class StaffApproval {
                 params.append('status', statusFilter);
             }
 
-            const response = await this.parentModule.callApi(`/api/staff/approval/list?${params}`);
+            const response = await this.parentModule.callApi(`${API_ENDPOINTS.APPROVAL.LIST}?${params}`);
 
             if (response.success) {
                 this.approvals = response.approvals;
@@ -396,7 +397,7 @@ export default class StaffApproval {
 
     async viewDetail(id) {
         try {
-            const response = await this.parentModule.callApi(`/api/staff/approval/${id}`);
+            const response = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.GET(id));
 
             if (response.success) {
                 this.showDetailModal(response.approval);
@@ -475,7 +476,7 @@ export default class StaffApproval {
 
     async editApproval(id) {
         try {
-            const response = await this.parentModule.callApi(`/api/staff/approval/${id}`);
+            const response = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.GET(id));
 
             if (response.success) {
                 const approval = response.approval;
@@ -509,7 +510,7 @@ export default class StaffApproval {
         }
 
         try {
-            const response = await this.parentModule.callApi(`/api/staff/approval/${id}`, {
+            const response = await this.parentModule.callApi(API_ENDPOINTS.APPROVAL.GET(id), {
                 method: 'DELETE'
             });
 

@@ -498,17 +498,6 @@ export class AttendanceTable {
           </button>
         `);
       }
-      if (record.has_service_entry) {
-        buttons.push(`
-          <button class="btn btn-sm btn-outline-success btn-show-report"
-                  data-user-id="${record.user_id}"
-                  data-user-name="${record.user_name}"
-                  data-date="${date}"
-                  title="サービス提供記録あり">
-            <i class="fas fa-clipboard-list"></i>
-          </button>
-        `);
-      }
       if (this.userRole === 'admin') {
         return buttons.length > 0 ?
           `<div class="btn-group" role="group">${buttons.join('')}</div>` :

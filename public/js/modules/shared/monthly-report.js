@@ -8,32 +8,47 @@ import { AttendanceTable } from './components/attendance-table.js';
 import { ReportDetailModal } from './modals/report-detail-modal.js';
 import { PrintManager } from'./managers/print-manager.js';
 import { preloadHolidays } from '../../utils/holidays.js';
+import { AttendanceEditHandler } from './attendance-edit-handler.js';
 
 export default class SharedMonthlyReport {
     constructor(app, parentModule) {
         this.app = app;
         this.parent = parentModule;
         this.container = null;
-        
+
         // 現在の選択状態
         this.selectedYear = new Date().getFullYear();
         this.selectedMonth = new Date().getMonth() + 1;
         this.selectedUserId = null;
-        
+
         // 権限情報
         this.userRole = app.currentUser.role;
         this.isAdmin = this.userRole === 'admin';
         this.isStaff = this.userRole === 'staff';
-        
+
         // 表示モード
         this.canEdit = this.isAdmin || this.isStaff; // 管理者・スタッフ編集可能
         this.canViewAllUsers = this.isAdmin; // 管理者は全ユーザー表示
         this.canPrint = true; // 全権限で印刷可能
-        
+
         // 新しいコンポーネント
         this.attendanceTable = new AttendanceTable(parentModule);
         this.reportDetailModal = new ReportDetailModal(app, parentModule);
         this.printManager = new PrintManager(app, parentModule);
+
+        // 出勤記録編集ハンドラ
+        if (this.canEdit) {
+            this.editHandler = new AttendanceEditHandler({
+                userRole: this.userRole,
+                idPrefix: 'monthlyEdit',
+                modalId: 'monthlyAttendanceEditModal',
+                notify: (msg, type) => this.app.showNotification(msg, type),
+                confirm: (opts) => modalManager.confirm(opts),
+                callApi: (endpoint, opts) => this.app.apiCall(endpoint, opts),
+                onSaved: () => this.showMonthlyReport(),
+                context: 'monthly'
+            });
+        }
     } 
 
     async init(containerElement) {
@@ -158,129 +173,7 @@ export default class SharedMonthlyReport {
     }
 
     renderModals() {
-        // 編集モーダル（管理者のみ）
-        if (this.canEdit) {
-            return `
-                <!-- 出勤記録編集モーダル -->
-                <div class="modal fade" id="monthlyAttendanceEditModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header bg-warning text-dark">
-                                <h5 class="modal-title">
-                                    <i class="fas fa-edit"></i> 出勤記録編集
-                                    ${this.isStaff ? '<small class="ms-2">（承認後に反映）</small>' : ''}
-                                </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                ${this.renderEditForm()}
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                    <i class="fas fa-times"></i> キャンセル
-                                </button>
-                                <button type="button" class="btn btn-warning" id="saveMonthlyAttendanceEditBtn">
-                                    <i class="fas fa-save"></i> 変更保存
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        return '';
-    }
-
-    renderEditForm() {
-        return `
-            <form id="monthlyAttendanceEditForm">
-                <input type="hidden" id="monthlyEditRecordId">
-                <input type="hidden" id="monthlyEditUserId">
-                <input type="hidden" id="monthlyEditDate">
-                
-                <div class="mb-3">
-                    <label class="form-label">対象日</label>
-                    <input type="text" class="form-control" id="monthlyEditDateDisplay" readonly>
-                </div>
-                
-                <div class="row mb-3">
-                    <div class="col-6">
-                        <label for="monthlyEditClockIn" class="form-label">出勤時間</label>
-                        <input type="time" class="form-control" id="monthlyEditClockIn">
-                    </div>
-                    <div class="col-6">
-                        <label for="monthlyEditClockOut" class="form-label">退勤時間</label>
-                        <input type="time" class="form-control" id="monthlyEditClockOut">
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-6">
-                        <label for="monthlyEditBreakStart" class="form-label">休憩開始</label>
-                        <input type="time" class="form-control" id="monthlyEditBreakStart">
-                    </div>
-                    <div class="col-6">
-                        <label for="monthlyEditBreakEnd" class="form-label">休憩終了</label>
-                        <input type="time" class="form-control" id="monthlyEditBreakEnd">
-                    </div>
-                </div>
-
-                <div class="row mb-3" id="monthlyEditNakanukeGroup" style="display: none;">
-                    <div class="col-6">
-                        <label for="monthlyEditNakanukeMinutes" class="form-label">中抜け経過分数</label>
-                        <input type="number" class="form-control" id="monthlyEditNakanukeMinutes" min="0" placeholder="0">
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="monthlyEditStatus" class="form-label">状態</label>
-                    <select class="form-control" id="monthlyEditStatus">
-                        <option value="normal">正常</option>
-                        <option value="late">遅刻</option>
-                        <option value="early">早退</option>
-                        <option value="absence">欠勤</option>
-                        <option value="paid_leave">有給</option>
-                    </select>
-                </div>
-
-                <div class="mb-3">
-                    <label for="monthlyEditReason" class="form-label">変更理由${this.isStaff ? ' <span class="text-danger">*</span>' : '（任意）'}</label>
-                    <textarea class="form-control" id="monthlyEditReason" rows="3"
-                              placeholder="変更理由を入力してください..."${this.isStaff ? ' required' : ''}></textarea>
-                </div>
-
-                <!-- 削除セクション（管理者のみ） -->
-                ${this.isAdmin ? `
-                <div class="border-top pt-3 mt-3" id="monthlyDeleteSection" style="display: none;">
-                    <div class="alert alert-danger">
-                        <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> 危険な操作</h6>
-                        <p class="mb-2">この出勤記録を完全に削除します。この操作は取り消せません。</p>
-                        <button type="button" class="btn btn-danger btn-sm" id="monthlyDeleteBtn">
-                            <i class="fas fa-trash"></i> この出勤記録を削除する
-                        </button>
-                    </div>
-                </div>
-                ` : ''}
-
-                <!-- 削除要望セクション（スタッフのみ） -->
-                ${this.isStaff ? `
-                <div class="border-top pt-3 mt-3" id="monthlyDeleteRequestSection" style="display: none;">
-                    <div class="alert alert-warning">
-                        <h6 class="alert-heading"><i class="fas fa-trash-alt"></i> 記録削除要望</h6>
-                        <p class="mb-2">この出勤記録の削除を管理者に要望します。承認後に削除されます。</p>
-                        <div class="mb-2">
-                            <textarea class="form-control" id="monthlyDeleteRequestReason" rows="2"
-                                      placeholder="削除理由を入力してください..." required></textarea>
-                        </div>
-                        <button type="button" class="btn btn-danger btn-sm" id="monthlyDeleteRequestBtn">
-                            <i class="fas fa-paper-plane"></i> 削除要望を送信
-                        </button>
-                    </div>
-                </div>
-                ` : ''}
-            </form>
-        `;
+        return this.editHandler ? this.editHandler.renderModalHTML() : '';
     }
 
     setupEventListeners() {
@@ -305,7 +198,6 @@ export default class SharedMonthlyReport {
         if (this.canEdit) {
             const exportBtn = this.container.querySelector('#exportExcelBtn');
             const exportDailyBtn = this.container.querySelector('#exportDailyReportsBtn');
-            const saveAttendanceBtn = this.container.querySelector('#saveMonthlyAttendanceEditBtn');
 
             if (exportBtn) {
                 exportBtn.addEventListener('click', (e) => { e.preventDefault(); this.exportToExcel(); });
@@ -318,24 +210,9 @@ export default class SharedMonthlyReport {
                 exportDailyBtn.addEventListener('click', (e) => { e.preventDefault(); this.exportDailyReportsExcel(); });
             }
 
-            if (saveAttendanceBtn) {
-                saveAttendanceBtn.addEventListener('click', () => this.saveAttendanceEdit());
-            }
-
-            // 削除は管理者のみ
-            if (this.isAdmin) {
-                const deleteBtn = this.container.querySelector('#monthlyDeleteBtn');
-                if (deleteBtn) {
-                    deleteBtn.addEventListener('click', () => this.deleteAttendance());
-                }
-            }
-
-            // 削除要望はスタッフのみ
-            if (this.isStaff) {
-                const deleteRequestBtn = this.container.querySelector('#monthlyDeleteRequestBtn');
-                if (deleteRequestBtn) {
-                    deleteRequestBtn.addEventListener('click', () => this.requestDeleteAttendance());
-                }
+            // 編集ハンドラのイベントリスナー
+            if (this.editHandler) {
+                this.editHandler.setupEventListeners();
             }
         }
         
@@ -351,9 +228,9 @@ export default class SharedMonthlyReport {
             }
 
             // 編集ボタン（管理者・スタッフ）
-            if (this.canEdit && e.target.closest('.btn-edit-attendance')) {
+            if (this.editHandler && e.target.closest('.btn-edit-attendance')) {
                 const btn = e.target.closest('.btn-edit-attendance');
-                this.editAttendance(btn.dataset);
+                this.editHandler.editAttendance(btn.dataset);
             }
         });
 
@@ -361,9 +238,9 @@ export default class SharedMonthlyReport {
         if (this.isAdmin) {
             this.container.addEventListener('dblclick', (e) => {
                 // 利用者の日付ダブルクリックで編集モーダルを開く
-                if (e.target.closest('.monthly-user-day-edit')) {
+                if (this.editHandler && e.target.closest('.monthly-user-day-edit')) {
                     const cell = e.target.closest('.monthly-user-day-edit');
-                    this.editAttendance(cell.dataset);
+                    this.editHandler.editAttendance(cell.dataset);
                     return;
                 }
 
@@ -384,8 +261,8 @@ export default class SharedMonthlyReport {
 
     registerModals() {
         try {
-            if (this.canEdit) {
-                modalManager.register('monthlyAttendanceEditModal');
+            if (this.editHandler) {
+                this.editHandler.registerModal();
             }
         } catch (error) {
             console.error('モーダル登録エラー:', error);
@@ -537,21 +414,10 @@ export default class SharedMonthlyReport {
                 console.warn('祝日データ取得失敗:', error);
             }
 
-            // APIエンドポイントを権限によって切り替え
-            let response;
             const monthPadded = String(month).padStart(2, '0');
-            
-            if (this.isAdmin) {
-                // 管理者APIを使用
-                response = await this.app.apiCall(
-                    API_ENDPOINTS.ADMIN.ATTENDANCE_MONTHLY(year, monthPadded, userId)
-                );
-            } else {
-                // スタッフAPIを使用
-                response = await this.app.apiCall(
-                    API_ENDPOINTS.STAFF.MONTHLY_ATTENDANCE(year, monthPadded, userId)
-                );
-            }
+            const response = await this.app.apiCall(
+                API_ENDPOINTS.MONTHLY_ATTENDANCE.GET(year, monthPadded, userId)
+            );
             
             if (!response || !response.user) {
                 this.app.showNotification('データが見つかりません', 'danger');
@@ -887,209 +753,6 @@ export default class SharedMonthlyReport {
         </div>`;
     }
 
-    // 以下、編集関連のメソッド
-    async editAttendance(data) {
-        if (!this.canEdit) return;
-        
-        // フォームに値を設定
-        document.getElementById('monthlyEditRecordId').value = data.recordId || '';
-        document.getElementById('monthlyEditUserId').value = data.userId;
-        document.getElementById('monthlyEditDate').value = data.date;
-        
-        const dateDisplay = document.getElementById('monthlyEditDateDisplay');
-        if (dateDisplay) {
-            dateDisplay.value = formatDate(data.date, {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                weekday: 'long'
-            });
-        }
-        
-        document.getElementById('monthlyEditClockIn').value = data.clockIn || '';
-        document.getElementById('monthlyEditClockOut').value = data.clockOut || '';
-        document.getElementById('monthlyEditBreakStart').value = data.breakStart || '';
-        document.getElementById('monthlyEditBreakEnd').value = data.breakEnd || '';
-        document.getElementById('monthlyEditStatus').value = data.status || 'normal';
-        document.getElementById('monthlyEditReason').value = '';
-
-        // 中抜けフィールドの表示制御（スタッフのみ）
-        const nakanukeGroup = document.getElementById('monthlyEditNakanukeGroup');
-        const nakanukeInput = document.getElementById('monthlyEditNakanukeMinutes');
-        if (nakanukeGroup && nakanukeInput) {
-            if (data.userRole === 'staff') {
-                nakanukeGroup.style.display = 'flex';
-                nakanukeInput.value = data.nakanukeMinutes || 0;
-            } else {
-                nakanukeGroup.style.display = 'none';
-                nakanukeInput.value = 0;
-            }
-        }
-
-        // 削除セクションの表示制御（管理者のみ）
-        const deleteSection = document.getElementById('monthlyDeleteSection');
-        if (deleteSection) {
-            deleteSection.style.display = (this.isAdmin && data.recordId) ? 'block' : 'none';
-        }
-
-        // 削除要望セクションの表示制御（スタッフのみ）
-        const deleteRequestSection = document.getElementById('monthlyDeleteRequestSection');
-        if (deleteRequestSection) {
-            deleteRequestSection.style.display = (this.isStaff && data.recordId) ? 'block' : 'none';
-            const reasonField = document.getElementById('monthlyDeleteRequestReason');
-            if (reasonField) reasonField.value = '';
-        }
-
-        // モーダル表示
-        modalManager.show('monthlyAttendanceEditModal');
-    }
-
-    async saveAttendanceEdit() {
-        if (!this.canEdit) return;
-        
-        try {
-            const recordId = document.getElementById('monthlyEditRecordId').value;
-            const userId = document.getElementById('monthlyEditUserId').value;
-            const date = document.getElementById('monthlyEditDate').value;
-            const clockIn = document.getElementById('monthlyEditClockIn').value;
-            const clockOut = document.getElementById('monthlyEditClockOut').value;
-            const breakStart = document.getElementById('monthlyEditBreakStart').value;
-            const breakEnd = document.getElementById('monthlyEditBreakEnd').value;
-            const status = document.getElementById('monthlyEditStatus').value;
-            const reason = document.getElementById('monthlyEditReason').value;
-
-            // staffは理由必須、adminは任意
-            if (this.isStaff && !reason.trim()) {
-                this.app.showNotification('変更理由を入力してください', 'warning');
-                return;
-            }
-
-            // 中抜け経過分数
-            const nakanukeMinutesInput = document.getElementById('monthlyEditNakanukeMinutes');
-            const nakanukeMinutes = nakanukeMinutesInput ? parseInt(nakanukeMinutesInput.value) || 0 : undefined;
-
-            const requestData = {
-                recordId: recordId || null,
-                userId: userId,
-                date: date,
-                newClockIn: clockIn,
-                newClockOut: clockOut,
-                newBreakStart: breakStart,
-                newBreakEnd: breakEnd,
-                nakanukeMinutes: nakanukeMinutes,
-                status: status,
-                reason: reason
-            };
-            
-            // 権限に応じてAPIエンドポイントを切り替え
-            const endpoint = this.isAdmin
-                ? API_ENDPOINTS.ADMIN.ATTENDANCE_CORRECT
-                : API_ENDPOINTS.STAFF.ATTENDANCE_CORRECT;
-
-            await this.app.apiCall(endpoint, {
-                method: 'POST',
-                body: JSON.stringify(requestData)
-            });
-
-            const message = this.isStaff
-                ? '訂正申請を送信しました（管理者の承認後に反映されます）'
-                : '出勤記録を更新しました';
-            this.app.showNotification(message, 'success');
-            modalManager.hide('monthlyAttendanceEditModal');
-            
-            // 再表示
-            await this.showMonthlyReport();
-            
-        } catch (error) {
-            console.error('出勤記録更新エラー:', error);
-            this.app.showNotification(error.message || '出勤記録の更新に失敗しました', 'danger');
-        }
-    }
-
-    async deleteAttendance() {
-        if (!this.canEdit) return;
-
-        try {
-            const recordId = document.getElementById('monthlyEditRecordId').value;
-            const dateDisplay = document.getElementById('monthlyEditDateDisplay').value;
-
-            if (!recordId) {
-                this.app.showNotification('削除する記録が選択されていません', 'warning');
-                return;
-            }
-
-            // 確認ダイアログ
-            const confirmed = await modalManager.confirm({
-                title: '出勤記録の削除確認',
-                message: `${dateDisplay}の出勤記録を完全に削除します。\n\nこの操作は取り消せません。本当に削除しますか？`,
-                confirmText: '削除する',
-                confirmClass: 'btn-danger',
-                cancelText: 'キャンセル'
-            });
-
-            if (!confirmed) return;
-
-            // 削除API呼び出し
-            const response = await this.app.apiCall(
-                `/api/admin/attendance/${recordId}`,
-                {
-                    method: 'DELETE',
-                    body: JSON.stringify({})
-                }
-            );
-
-            // 成功メッセージ
-            this.app.showNotification(response.message, 'success');
-
-            // モーダルを閉じる
-            modalManager.hide('monthlyAttendanceEditModal');
-
-            // リスト更新
-            await this.showMonthlyReport();
-
-        } catch (error) {
-            console.error('出勤記録削除エラー:', error);
-            this.app.showNotification(
-                error.message || '出勤記録の削除に失敗しました',
-                'danger'
-            );
-        }
-    }
-
-    async requestDeleteAttendance() {
-        if (!this.isStaff) return;
-
-        try {
-            const recordId = document.getElementById('monthlyEditRecordId').value;
-            const reason = document.getElementById('monthlyDeleteRequestReason').value;
-
-            if (!recordId) {
-                this.app.showNotification('削除する記録が選択されていません', 'warning');
-                return;
-            }
-
-            if (!reason || !reason.trim()) {
-                this.app.showNotification('削除理由を入力してください', 'warning');
-                return;
-            }
-
-            await this.app.apiCall('/api/staff/attendance/delete-request', {
-                method: 'POST',
-                body: JSON.stringify({ recordId, reason: reason.trim() })
-            });
-
-            this.app.showNotification('削除要望を送信しました（管理者の承認待ち）', 'success');
-            modalManager.hide('monthlyAttendanceEditModal');
-            await this.showMonthlyReport();
-
-        } catch (error) {
-            console.error('削除要望エラー:', error);
-            this.app.showNotification(
-                error.message || '削除要望の送信に失敗しました',
-                'danger'
-            );
-        }
-    }
 
     clearReport() {
         const displayContainer = this.container.querySelector('#monthlyReportDisplay');

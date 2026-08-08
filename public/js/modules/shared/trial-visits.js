@@ -558,7 +558,7 @@ export default class TrialVisitsManager {
         return `${year}-${month}-${day}`;
     }
 
-    // 月ナビゲーション（1年制限付き）
+    // 月ナビゲーション（過去12ヶ月〜先2ヶ月）
     navigateMonth(direction) {
         const newMonth = this.currentMonth + direction;
         let newYear = this.currentYear;
@@ -572,9 +572,9 @@ export default class TrialVisitsManager {
             newYear--;
         }
         
-        // 1年間制限チェック
+        // 閲覧範囲チェック
         const newDate = new Date(newYear, targetMonth - 1, 1);
-        if (this.isWithinOneYear(newDate)) {
+        if (this.isWithinRange(newDate)) {
             this.currentMonth = targetMonth;
             this.currentYear = newYear;
             this.loadCalendar();
@@ -582,16 +582,18 @@ export default class TrialVisitsManager {
     }
 
     /**
-     * 1年間の範囲内かチェック
+     * 閲覧範囲内かチェック（過去12ヶ月〜先2ヶ月）
      * @param {Date} date 
      * @returns {boolean}
      */
-    isWithinOneYear(date) {
+    isWithinRange(date) {
         const now = new Date();
-        const oneYearAgo = new Date();
-        oneYearAgo.setFullYear(now.getFullYear() - 1);
-        
-        return date >= oneYearAgo && date <= now;
+        const pastLimit = new Date();
+        pastLimit.setFullYear(now.getFullYear() - 1);
+        const futureLimit = new Date();
+        futureLimit.setMonth(now.getMonth() + 2);
+
+        return date >= pastLimit && date <= futureLimit;
     }
 
     // 日付クリック処理

@@ -4,6 +4,7 @@
 import { API_ENDPOINTS } from '../../constants/api-endpoints.js';
 import { getCurrentTime, getCurrentDate, calculateWorkHours, calculateBreakDuration } from '../../utils/date-time.js';
 import { ConfirmationModal } from '../user/confirmation-modal.js';
+import { ServiceReportForm } from './service-report-form.js';
 
 export class StaffAttendanceUI {
   constructor(app, parentModule) {
@@ -22,7 +23,9 @@ export class StaffAttendanceUI {
     this.nakanukeStartTime = null;
     this.breakButtonUpdateInterval = null;
     this.nakanukeTimerInterval = null;
-    this.breakOverAlerted = false; // 60分超過アラート済みフラグ
+
+    // サービス提供記録フォーム
+    this.reportForm = new ServiceReportForm(app);
   }
 
   /**
@@ -358,16 +361,12 @@ export class StaffAttendanceUI {
    * 休憩タイマー開始（経過時間表示の定期更新＋60分超過アラート）
    */
   startBreakTimer() {
-    this.breakOverAlerted = false;
-
     // 60分超過時のアラートをスケジュール
     const elapsed = this.getElapsedBreakMinutes();
     const remainingToAlert = Math.max(0, 60 - elapsed);
     this.breakAlertTimeout = setTimeout(() => {
       if (this.isOnBreak) {
-        this.breakOverAlerted = true;
         alert('休憩時間が60分を超えています。管理者、上長に確認、報告をしてください。');
-        this.updateBreakStatusDisplay();
       }
     }, remainingToAlert * 60 * 1000);
 
@@ -588,38 +587,19 @@ export class StaffAttendanceUI {
 
     if (this.isOnBreak) {
       const elapsed = this.getElapsedBreakMinutes();
-      const isOver = elapsed >= 60;
-
-      if (isOver) {
-        html = `
-          <div class="break-status-content text-danger">
-            <div class="break-status-icon">
-              <i class="fas fa-exclamation-triangle fa-2x"></i>
-            </div>
-            <div class="break-status-text">
-              <p class="mb-1 fw-bold">休憩時間が60分を超えています（${elapsed} 分経過）</p>
-              <p class="mb-1">管理者、上長に確認、報告をしてください</p>
-              <small class="text-muted">
-                <i class="fas fa-clock"></i> ${this.breakStartTime} から休憩開始
-              </small>
-            </div>
+      html = `
+        <div class="break-status-content">
+          <div class="break-status-icon text-warning">
+            <i class="fas fa-coffee fa-2x"></i>
           </div>
-        `;
-      } else {
-        html = `
-          <div class="break-status-content">
-            <div class="break-status-icon text-warning">
-              <i class="fas fa-coffee fa-2x"></i>
-            </div>
-            <div class="break-status-text">
-              <p class="mb-1 fw-bold">休憩中（${elapsed} 分経過）</p>
-              <small class="text-muted">
-                <i class="fas fa-clock"></i> ${this.breakStartTime} から休憩開始
-              </small>
-            </div>
+          <div class="break-status-text">
+            <p class="mb-1 fw-bold">休憩中（${elapsed} 分経過）</p>
+            <small class="text-muted">
+              <i class="fas fa-clock"></i> ${this.breakStartTime} から休憩開始
+            </small>
           </div>
-        `;
-      }
+        </div>
+      `;
     }
 
     breakStatusElement.innerHTML = html;
@@ -732,373 +712,11 @@ export class StaffAttendanceUI {
     const reportSection = document.getElementById('staffReportSection');
     if (!reportSection) return;
 
-    await this.loadReportForm(reportSection);
-  }
-
-  /**
-   * 日報フォームを読み込み
-   */
-  async loadReportForm(container) {
-    try {
-      const [reportResponse, usersResponse] = await Promise.all([
-        this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_TODAY),
-        this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_CLOCKED_IN_USERS)
-      ]);
-      const existingReport = reportResponse.report;
-      this.clockedInUsers = usersResponse.users || [];
-
-      const attendance = this.currentAttendance || {};
-      const canSubmit = !!attendance.clock_in && !this.isOnNakanuke && !this.isOnBreak;
-
-      const breakMinutes = (attendance.break_start && attendance.break_end)
-        ? calculateBreakDuration(attendance.break_start, attendance.break_end)
-        : 0;
-
-      const nakanukeMinutes = attendance.nakanuke_minutes || 0;
-
-      let workHours = '-';
-      if (attendance.clock_in && attendance.clock_out) {
-        const totalDeduction = breakMinutes + nakanukeMinutes;
-        const hours = calculateWorkHours(attendance.clock_in, attendance.clock_out, totalDeduction);
-        if (hours && hours > 0) {
-          const totalMin = Math.round(hours * 60);
-          const h = Math.floor(totalMin / 60);
-          const m = totalMin % 60;
-          workHours = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        }
-      }
-
-      container.innerHTML = this.generateReportForm(workHours, existingReport, breakMinutes, canSubmit, nakanukeMinutes);
-      this.setupReportEventListeners();
-
-    } catch (error) {
-      console.error('サービス提供記録読み込みエラー:', error);
-      container.innerHTML = `
-        <div class="alert alert-danger">
-          <i class="fas fa-exclamation-triangle"></i> サービス提供記録の読み込みに失敗しました
-        </div>
-      `;
-    }
-  }
-
-  /**
-   * 既存データからユーザー別記録をパース
-   */
-  parseExistingReport(workReport) {
-    if (!workReport) return { freeText: '', entries: {} };
-    try {
-      const parsed = JSON.parse(workReport);
-      if (parsed && parsed.entries && Array.isArray(parsed.entries)) {
-        const map = {};
-        parsed.entries.forEach(e => { map[e.user_id] = e; });
-        return { freeText: parsed.free_text || '', entries: map };
-      }
-      if (Array.isArray(parsed)) {
-        const map = {};
-        parsed.forEach(e => { map[e.user_id] = e; });
-        return { freeText: '', entries: map };
-      }
-    } catch { /* 旧形式 */ }
-    return { freeText: '', entries: {} };
-  }
-
-  /**
-   * サービス提供記録フォームHTML生成
-   */
-  generateReportForm(workHours, existingReport, breakMinutes = 0, canSubmit = true, nakanukeMinutes = 0) {
-    const communication = existingReport?.communication || '';
-    const { freeText, entries: existingEntries } = this.parseExistingReport(existingReport?.work_report);
-    const attendance = this.currentAttendance || {};
-    const clockInDisplay = attendance.clock_in || '-';
-    const clockOutDisplay = attendance.clock_out || '-';
-
-    let breakDisplay = 'なし';
-    if (attendance.break_start && attendance.break_end) {
-      breakDisplay = `${attendance.break_start}〜${attendance.break_end}（${breakMinutes}分）`;
-    } else if (attendance.break_start) {
-      breakDisplay = `${attendance.break_start}〜（進行中）`;
-    }
-
-    let nakanukeDisplay = 'なし';
-    if (this.isOnNakanuke) {
-      nakanukeDisplay = `${this.nakanukeStartTime}〜（進行中）`;
-    } else if (nakanukeMinutes > 0) {
-      nakanukeDisplay = `${nakanukeMinutes}分`;
-    }
-
-    const isResubmit = !!existingReport;
-    const submitBtnLabel = isResubmit ? 'サービス提供記録を再提出' : 'サービス提供記録を提出';
-    const submitBtnDisabled = canSubmit ? '' : 'disabled';
-
-    const users = this.clockedInUsers || [];
-    const userRows = users.map(u => {
-      const entry = existingEntries[u.id] || {};
-      return `
-        <tr>
-          <td class="align-middle fw-bold text-nowrap">${u.name}</td>
-          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="work_content" value="${this.escapeHtml(entry.work_content || '')}" /></td>
-          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="support_content" value="${this.escapeHtml(entry.support_content || '')}" /></td>
-          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="user_condition" value="${this.escapeHtml(entry.user_condition || '')}" /></td>
-          <td><input type="text" class="form-control form-control-sm" data-user-id="${u.id}" data-field="attendance_info" value="${this.escapeHtml(entry.attendance_info || '')}" /></td>
-          <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm sr-delete-btn" data-user-id="${u.id}" data-user-name="${this.escapeHtml(u.name)}" title="削除"><i class="fas fa-trash-alt"></i></button></td>
-        </tr>`;
-    }).join('');
-
-    return `
-      <div class="card">
-        <div class="card-header bg-primary text-white">
-          <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> サービス提供記録</h5>
-        </div>
-        <div class="card-body">
-          <div class="row mb-3">
-            <div class="col-md-3">
-              <div class="info-box">
-                <label class="form-label">出勤時間</label>
-                <div class="info-value">${clockInDisplay}</div>
-              </div>
-            </div>
-            <div class="col-md-3">
-              <div class="info-box">
-                <label class="form-label">退勤時間</label>
-                <div class="info-value">${clockOutDisplay}</div>
-              </div>
-            </div>
-            <div class="col-md-2">
-              <div class="info-box">
-                <label class="form-label">休憩時間</label>
-                <div class="info-value">${breakDisplay}</div>
-              </div>
-            </div>
-            <div class="col-md-2">
-              <div class="info-box">
-                <label class="form-label">中抜け</label>
-                <div class="info-value">${nakanukeDisplay}</div>
-              </div>
-            </div>
-            <div class="col-md-2">
-              <div class="info-box">
-                <label class="form-label text-primary">実働時間</label>
-                <div class="info-value text-primary fw-bold">${workHours}</div>
-              </div>
-            </div>
-          </div>
-
-          <hr>
-
-          <form id="staffDailyReportForm">
-            <div class="mb-3">
-              <label class="form-label required">
-                <i class="fas fa-tasks"></i> 本日のサービス提供記録及び業務報告
-              </label>
-              ${users.length > 0 ? `
-              <div class="service-record-table-wrapper">
-                <table class="table table-sm table-bordered mb-0 service-record-table">
-                  <thead>
-                    <tr>
-                      <th class="sr-col-name">利用者名</th>
-                      <th class="sr-col-work">作業内容</th>
-                      <th class="sr-col-support">支援内容</th>
-                      <th class="sr-col-condition">利用者の様子</th>
-                      <th class="sr-col-attendance">勤怠</th>
-                      <th class="sr-col-delete"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${userRows}
-                  </tbody>
-                </table>
-              </div>
-              ` : `
-              <div class="alert alert-info mb-0">
-                <i class="fas fa-info-circle"></i> 本日出勤している利用者はいません
-              </div>
-              `}
-            </div>
-
-            <div class="mb-3">
-              <label for="staffCommunication" class="form-label">
-                <i class="fas fa-clipboard"></i> 業務報告
-              </label>
-              <textarea
-                class="form-control"
-                id="staffCommunication"
-                rows="2"
-                placeholder="業務報告や特記事項があれば記入してください"
-              >${communication}</textarea>
-            </div>
-
-            <div class="d-grid">
-              <button type="submit" class="btn btn-primary btn-lg" id="staffSubmitReportBtn" ${submitBtnDisabled}>
-                <i class="fas fa-paper-plane"></i> ${submitBtnLabel}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <style>
-        .info-box {
-          background: #f8f9fa;
-          border-radius: 8px;
-          padding: 10px;
-          text-align: center;
-        }
-        .info-box .form-label {
-          font-size: 0.875rem;
-          color: #6c757d;
-          margin-bottom: 5px;
-        }
-        .info-box .info-value {
-          font-size: 1.1rem;
-          font-weight: bold;
-          color: #333;
-        }
-        .required::after {
-          content: " *";
-          color: #dc3545;
-        }
-        .service-record-table-wrapper {
-          max-height: 234px;
-          overflow-y: auto;
-          border: 1px solid #dee2e6;
-          border-radius: 4px;
-        }
-        .service-record-table {
-          font-size: 0.8rem;
-          margin-bottom: 0;
-        }
-        .service-record-table thead {
-          position: sticky;
-          top: 0;
-          z-index: 1;
-          background: #e9ecef;
-        }
-        .service-record-table thead th {
-          font-size: 0.75rem;
-          padding: 6px 4px;
-          white-space: nowrap;
-          border-bottom: 2px solid #dee2e6;
-        }
-        .service-record-table tbody td {
-          padding: 3px 4px;
-          vertical-align: middle;
-        }
-        .sr-col-name { width: 7%; }
-        .sr-col-work { width: 20%; }
-        .sr-col-support { width: 27%; }
-        .sr-col-condition { width: 27%; }
-        .sr-col-attendance { width: 15%; }
-        .sr-col-delete { width: 4%; }
-        .service-record-table .form-control-sm {
-          font-size: 0.78rem;
-          padding: 2px 6px;
-          height: auto;
-        }
-        .sr-delete-btn {
-          padding: 1px 5px;
-          font-size: 0.7rem;
-          line-height: 1;
-        }
-      </style>
-    `;
-  }
-
-  escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  /**
-   * 日報フォームのイベントリスナー設定
-   */
-  setupReportEventListeners() {
-    const form = document.getElementById('staffDailyReportForm');
-    if (form) {
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        this.handleReportSubmit();
-      });
-    }
-
-    document.querySelectorAll('.sr-delete-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const userId = parseInt(e.currentTarget.dataset.userId);
-        const userName = e.currentTarget.dataset.userName;
-        this.handleDeleteEntry(userId, userName);
-      });
+    await this.reportForm.loadReportForm(reportSection, this.currentAttendance, {
+      isOnNakanuke: this.isOnNakanuke,
+      isOnBreak: this.isOnBreak,
+      nakanukeStartTime: this.nakanukeStartTime
     });
-  }
-
-  async handleDeleteEntry(userId, userName) {
-    if (!confirm(`${userName} の支援記録を削除しますか？`)) return;
-
-    try {
-      const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_DELETE_ENTRY, {
-        method: 'POST',
-        body: JSON.stringify({ date: this.currentAttendance.date, user_id: userId })
-      });
-      if (response.success) {
-        this.app.showNotification(`${userName} の記録を削除しました`, 'success');
-        await this.updateReportSection();
-      } else {
-        throw new Error(response.error);
-      }
-    } catch (error) {
-      console.error('記録削除エラー:', error);
-      this.app.showNotification(error.message || '記録の削除に失敗しました', 'danger');
-    }
-  }
-
-  /**
-   * サービス提供記録提出処理
-   */
-  async handleReportSubmit() {
-    try {
-      const communication = document.getElementById('staffCommunication').value;
-
-      // ユーザー別記録を収集
-      const userEntries = [];
-      const users = this.clockedInUsers || [];
-      users.forEach(u => {
-        const workContent = document.querySelector(`input[data-user-id="${u.id}"][data-field="work_content"]`)?.value?.trim() || '';
-        const supportContent = document.querySelector(`input[data-user-id="${u.id}"][data-field="support_content"]`)?.value?.trim() || '';
-        const userCondition = document.querySelector(`input[data-user-id="${u.id}"][data-field="user_condition"]`)?.value?.trim() || '';
-        const attendanceInfo = document.querySelector(`input[data-user-id="${u.id}"][data-field="attendance_info"]`)?.value?.trim() || '';
-        userEntries.push({
-          user_id: u.id,
-          user_name: u.name,
-          work_content: workContent,
-          support_content: supportContent,
-          user_condition: userCondition,
-          attendance_info: attendanceInfo
-        });
-      });
-
-      const data = {
-        date: this.currentAttendance.date,
-        work_report: JSON.stringify({ free_text: '', entries: userEntries }),
-        communication: communication
-      };
-
-      const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_SUBMIT, {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
-
-      if (response.success) {
-        this.app.showNotification('サービス提供記録を提出しました', 'success');
-        await this.updateReportSection();
-      } else {
-        throw new Error(response.error || 'サービス提供記録の提出に失敗しました');
-      }
-
-    } catch (error) {
-      console.error('サービス提供記録提出エラー:', error);
-      this.app.showNotification(error.message, 'danger');
-      if (error.message && error.message.includes('既に記録済み')) {
-        await this.updateReportSection();
-      }
-    }
   }
 
   /**

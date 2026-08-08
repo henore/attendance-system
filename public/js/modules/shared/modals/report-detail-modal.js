@@ -161,7 +161,7 @@ export class ReportDetailModal {
 
       // データ取得
       const response = await this.app.apiCall(
-        API_ENDPOINTS.STAFF.REPORT(userId, date)
+        API_ENDPOINTS.REPORTS.REPORT(userId, date)
       );
 
 
@@ -173,7 +173,7 @@ export class ReportDetailModal {
       if (targetUserRole === 'staff' || targetUserRole === 'admin') {
         try {
           const staffReportResponse = await this.app.apiCall(
-            `${API_ENDPOINTS.STAFF.DAILY_REPORT(date)}?staffId=${userId}`
+            `${API_ENDPOINTS.REPORTS.DAILY_REPORT(date)}?staffId=${userId}`
           );
           staffReport = staffReportResponse.report;
         } catch (error) {
@@ -194,7 +194,7 @@ export class ReportDetailModal {
       if ((response.user?.role === 'user') && this.canComment) {
         try {
           const entryResponse = await this.app.apiCall(
-            API_ENDPOINTS.STAFF.DAILY_REPORT_ENTRY(date, userId)
+            API_ENDPOINTS.REPORTS.DAILY_REPORT_ENTRY(date, userId)
           );
           serviceEntry = entryResponse.entry || null;
           serviceEntryTaken = entryResponse.takenByStaff || null;
@@ -295,7 +295,7 @@ export class ReportDetailModal {
       try {
         // 最新の日報データを取得
         const response = await this.app.apiCall(
-          API_ENDPOINTS.STAFF.REPORT(this.currentData.userId, this.currentData.date)
+          API_ENDPOINTS.REPORTS.REPORT(this.currentData.userId, this.currentData.date)
         );
         
         if (response && response.comment) {
@@ -1018,7 +1018,7 @@ export class ReportDetailModal {
       deleteBtn.addEventListener('click', async () => {
         if (!confirm(`${this.currentData.userName} の支援記録を削除しますか？`)) return;
         try {
-          const response = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_DELETE_ENTRY, {
+          const response = await this.app.apiCall(API_ENDPOINTS.REPORTS.DAILY_REPORT_DELETE_ENTRY, {
             method: 'POST',
             body: JSON.stringify({ date: this.currentData.date, user_id: parseInt(this.currentData.userId) })
           });
@@ -1090,7 +1090,7 @@ export class ReportDetailModal {
       // 保存前に最新のコメント状態をチェック（競合検知）
       try {
         const latestResponse = await this.app.apiCall(
-          API_ENDPOINTS.STAFF.REPORT(userId, date)
+          API_ENDPOINTS.REPORTS.REPORT(userId, date)
         );
         
         if (latestResponse && latestResponse.comment) {
@@ -1132,7 +1132,7 @@ export class ReportDetailModal {
 
       if (hasServiceData) {
         try {
-          const seResponse = await this.app.apiCall(API_ENDPOINTS.STAFF.DAILY_REPORT_SAVE_ENTRY, {
+          const seResponse = await this.app.apiCall(API_ENDPOINTS.REPORTS.DAILY_REPORT_SAVE_ENTRY, {
             method: 'POST',
             body: JSON.stringify({
               date: date, user_id: parseInt(userId), user_name: userName,
@@ -1150,7 +1150,7 @@ export class ReportDetailModal {
       }
 
       // コメントAPI呼び出し
-      const saveResponse = await this.app.apiCall(API_ENDPOINTS.STAFF.COMMENT, {
+      const saveResponse = await this.app.apiCall(API_ENDPOINTS.REPORTS.COMMENT, {
         method: 'POST',
         body: JSON.stringify({
           userId: userId,
@@ -1441,7 +1441,7 @@ export class ReportDetailModal {
       
       const userId = this.currentData.userId || this.currentData.user?.id;
       
-      const response = await this.app.apiCall(`/api/admin/report/${userId}/${this.currentData.date}`, {
+      const response = await this.app.apiCall(API_ENDPOINTS.REPORTS.REPORT_UPDATE(userId, this.currentData.date), {
         method: 'PUT',
         body: JSON.stringify(formData)
       });
