@@ -466,29 +466,58 @@ export class ReportDetailModal {
    * コメントセクション生成
    */
   generateCommentSection(comment) {
-    // 閲覧のみ（利用者）
+    // 閲覧のみ（利用者・月別出勤簿）
     if (!this.canComment) {
+      let html = '';
       if (comment && comment.comment) {
         const staffName = comment.staff_name || 'スタッフ';
-        return `
+        html += `
           <div class="staff-comment-display">
             <h6><i class="fas fa-comment"></i> スタッフコメント</h6>
             <div class="comment-box bg-light p-3">
               ${comment.comment}
             </div>
             <small class="text-muted">
-              <i class="fas fa-user"></i> 記入者: ${staffName} | 
+              <i class="fas fa-user"></i> 記入者: ${staffName} |
               <i class="fas fa-clock"></i> 記入日時: ${formatDateTime(comment.created_at)}
             </small>
           </div>
         `;
       } else {
-        return `
+        html += `
           <div class="alert alert-info">
             <i class="fas fa-info-circle"></i> スタッフコメントはまだ記入されていません
           </div>
         `;
       }
+
+      // サービス提供記録の読み取り専用表示
+      const { serviceEntry, serviceEntryTaken, serviceEntryTakenEntry } = this.currentData;
+      const entry = serviceEntryTakenEntry || serviceEntry;
+      const hasEntry = entry && (
+        (entry.work_content && entry.work_content.trim()) ||
+        (entry.support_content && entry.support_content.trim()) ||
+        (entry.user_condition && entry.user_condition.trim()) ||
+        (entry.attendance_info && entry.attendance_info.trim())
+      );
+
+      if (hasEntry) {
+        html += `
+          <hr class="my-3">
+          <h6><i class="fas fa-clipboard-list"></i> サービス提供記録及び業務報告</h6>
+          ${serviceEntryTaken ? `<small class="text-muted d-block mb-2"><i class="fas fa-user-check"></i> 記入者: ${serviceEntryTaken}</small>` : ''}
+          <div class="border rounded p-2 bg-light small">
+            <div class="row g-2">
+              ${entry.work_content ? `<div class="col-6"><span class="text-muted">作業内容:</span> ${escapeAttr(entry.work_content)}</div>` : ''}
+              ${entry.support_content ? `<div class="col-6"><span class="text-muted">支援内容:</span> ${escapeAttr(entry.support_content)}</div>` : ''}
+              ${entry.user_condition ? `<div class="col-6"><span class="text-muted">利用者の様子:</span> ${escapeAttr(entry.user_condition)}</div>` : ''}
+              ${entry.attendance_info ? `<div class="col-6"><span class="text-muted">勤怠:</span> ${escapeAttr(entry.attendance_info)}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      return html;
     }
     
     // 編集可能（スタッフ・管理者）

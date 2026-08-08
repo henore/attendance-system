@@ -34,7 +34,6 @@ export default class SharedMonthlyReport {
         // 新しいコンポーネント
         this.attendanceTable = new AttendanceTable(parentModule);
         this.reportDetailModal = new ReportDetailModal(app, parentModule, {
-            canComment: false,
             modalId: 'monthlyReportDetailModal'
         });
         this.printManager = new PrintManager(app, parentModule);
