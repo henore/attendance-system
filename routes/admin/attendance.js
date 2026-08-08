@@ -425,7 +425,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
                 // ユーザー情報取得
                 const user = await dbGet(
-                    'SELECT id, role FROM users WHERE id = ?',
+                    'SELECT id, name, role FROM users WHERE id = ?',
                     [oldRecord.user_id]
                 );
 
@@ -491,11 +491,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 // スタッフの出勤記録訂正は監査ログに記録
                 if (user.role === 'staff') {
                     await dbRun(
-                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, old_value, new_value, ip_address)
-                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?, ?)`,
+                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, target_name, old_value, new_value, ip_address)
+                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?, ?, ?)`,
                         [
                             req.session.user.id,
                             oldRecord.user_id,
+                            user.name,
                             JSON.stringify({
                                 clock_in: oldRecord.clock_in,
                                 clock_out: oldRecord.clock_out,
@@ -519,7 +520,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             else if (userId && date) {
                 // ユーザー情報取得
                 const user = await dbGet(
-                    'SELECT id, role, service_type, skills FROM users WHERE id = ?',
+                    'SELECT id, name, role, service_type, skills FROM users WHERE id = ?',
                     [userId]
                 );
 
@@ -598,11 +599,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 // スタッフの出勤記録新規作成は監査ログに記録
                 if (user.role === 'staff') {
                     await dbRun(
-                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, new_value, ip_address)
-                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?)`,
+                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, target_name, new_value, ip_address)
+                         VALUES (?, 'attendance_correction', ?, 'user', ?, ?, ?)`,
                         [
                             req.session.user.id,
                             userId,
+                            user.name,
                             JSON.stringify({
                                 date: date,
                                 clock_in: clockInValue,
@@ -722,11 +724,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 // スタッフの出勤記録操作は監査ログに記録
                 if (attendance.user_role === 'staff') {
                     await dbRun(
-                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, old_value, ip_address)
-                         VALUES (?, 'attendance_deletion', ?, 'user', ?, ?)`,
+                        `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, target_name, old_value, ip_address)
+                         VALUES (?, 'attendance_deletion', ?, 'user', ?, ?, ?)`,
                         [
                             req.session.user.id,
                             attendance.user_id,
+                            attendance.user_name,
                             JSON.stringify({
                                 date: attendance.date,
                                 clock_in: attendance.clock_in,

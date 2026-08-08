@@ -149,6 +149,7 @@ db.serialize(() => {
             action_type TEXT NOT NULL,
             target_id INTEGER,
             target_type TEXT,
+            target_name TEXT,
             old_value TEXT,
             new_value TEXT,
             reason TEXT,

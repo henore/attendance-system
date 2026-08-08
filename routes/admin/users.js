@@ -285,12 +285,13 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
             // 監査ログに記録
             await dbRun(
-                `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, old_value, new_value, reason, ip_address)
-                 VALUES (?, ?, ?, 'user', ?, ?, ?, ?)`,
+                `INSERT INTO audit_log (admin_id, action_type, target_id, target_type, target_name, old_value, new_value, reason, ip_address)
+                 VALUES (?, ?, ?, 'user', ?, ?, ?, ?, ?)`,
                 [
                     req.session.user.id,
                     newStatus === 2 ? 'user_retire' : 'user_reinstate',
                     userId,
+                    user.name,
                     JSON.stringify({ is_active: user.is_active }),
                     JSON.stringify({ is_active: newStatus }),
                     `${user.name}を${actionLabel}処理`,

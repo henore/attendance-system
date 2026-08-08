@@ -528,14 +528,15 @@ router.post('/break/end', async (req, res) => {
       // 監査ログに記録
       await dbRun(
         `INSERT INTO audit_log (
-          admin_id, action_type, target_id, target_type,
+          admin_id, action_type, target_id, target_type, target_name,
           new_value, reason, ip_address
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           userId,
           'staff_nakanuke',
           attendance.id,
           'attendance',
+          req.session.user.name,
           JSON.stringify({
             date: today,
             nakanuke_start: attendance.nakanuke_start,
@@ -615,7 +616,7 @@ router.post('/break/end', async (req, res) => {
 
         // 対象が利用者であることを確認
         const targetUser = await dbGet(
-          'SELECT id, role FROM users WHERE id = ?',
+          'SELECT id, name, role FROM users WHERE id = ?',
           [oldRecord.user_id]
         );
 
@@ -635,14 +636,15 @@ router.post('/break/end', async (req, res) => {
         // 監査ログに申請を記録（実際のDB変更はしない）
         await dbRun(
           `INSERT INTO audit_log (
-            admin_id, action_type, target_id, target_type,
+            admin_id, action_type, target_id, target_type, target_name,
             old_value, new_value, reason, ip_address, approval_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             req.session.user.id,
             'staff_attendance_correction',
             recordId,
             'attendance',
+            targetUser.name,
             JSON.stringify({
               user_id: oldRecord.user_id,
               clock_in: oldRecord.clock_in,
@@ -668,7 +670,7 @@ router.post('/break/end', async (req, res) => {
       // 新規記録の作成申請
       else if (userId && date) {
         const user = await dbGet(
-          'SELECT id, role, service_type FROM users WHERE id = ?',
+          'SELECT id, name, role, service_type FROM users WHERE id = ?',
           [userId]
         );
 
@@ -682,14 +684,15 @@ router.post('/break/end', async (req, res) => {
         // 監査ログに申請を記録（実際のDB変更はしない）
         await dbRun(
           `INSERT INTO audit_log (
-            admin_id, action_type, target_id, target_type,
+            admin_id, action_type, target_id, target_type, target_name,
             new_value, reason, ip_address, approval_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             req.session.user.id,
             'staff_attendance_creation',
             null,
             'attendance',
+            user.name,
             JSON.stringify({
               user_id: userId,
               date: date,
@@ -776,14 +779,15 @@ router.post('/break/end', async (req, res) => {
       // 監査ログに削除要望を記録
       await dbRun(
         `INSERT INTO audit_log (
-          admin_id, action_type, target_id, target_type,
+          admin_id, action_type, target_id, target_type, target_name,
           old_value, reason, ip_address, approval_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           req.session.user.id,
           'staff_attendance_deletion',
           recordId,
           'attendance',
+          record.user_name,
           JSON.stringify({
             user_id: record.user_id,
             user_name: record.user_name,
