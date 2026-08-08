@@ -62,8 +62,12 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                 params.push(endDate);
             }
 
-            // 総件数取得
-            const countQuery = query.replace('SELECT a.*, u.name as admin_name', 'SELECT COUNT(*) as total');
+            // 総件数取得（フィルター条件のみ、JOINは不要）
+            let countQuery = 'SELECT COUNT(*) as total FROM audit_log a WHERE 1=1';
+            if (actionType) countQuery += ' AND a.action_type = ?';
+            if (adminId) countQuery += ' AND a.admin_id = ?';
+            if (startDate) countQuery += ' AND DATE(a.created_at) >= ?';
+            if (endDate) countQuery += ' AND DATE(a.created_at) <= ?';
             const totalResult = await dbGet(countQuery, params);
             const total = totalResult ? totalResult.total : 0;
 
