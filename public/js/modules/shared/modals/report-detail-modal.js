@@ -7,22 +7,24 @@ import { formatDate, formatDateTime } from '../../../utils/date-time.js';
 import { LineReportSender } from '../line-report-sender.js'; // 新規追加
 
 export class ReportDetailModal {
-  constructor(app, parentModule) {
+  constructor(app, parentModule, options = {}) {
     this.app = app;
     this.parent = parentModule;
-    this.modalId = 'unifiedReportDetailModal';
+    this.modalId = options.modalId || 'unifiedReportDetailModal';
     this.currentData = null;
-    
+
     // ユーザー権限
     this.userRole = app.currentUser.role;
-    this.canComment = this.userRole === 'staff' || this.userRole === 'admin';
-    
+    const isStaffOrAdmin = this.userRole === 'staff' || this.userRole === 'admin';
+    this.canComment = options.canComment !== undefined ? options.canComment : isStaffOrAdmin;
+    this.canExportPdf = isStaffOrAdmin;
+
     // 排他制御用
     this.originalComment = null;
     this.isEditing = false;
     this.lastCheckTime = null;
     this.checkInterval = null;
-    
+
     // LINE送信機能を追加
     this.lineSender = new LineReportSender(app);
   }
@@ -75,6 +77,11 @@ export class ReportDetailModal {
                   <i class="fas fa-file-pdf"></i> 保存してPDF出力
                 </button>
               ` : ''}
+              ${!this.canComment && this.canExportPdf ? `
+                <button type="button" class="btn btn-success" id="${this.modalId}PdfOnlyBtn">
+                  <i class="fas fa-file-pdf"></i> PDF出力
+                </button>
+              ` : ''}
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                 <i class="fas fa-times"></i> 閉じる
               </button>
@@ -103,6 +110,16 @@ export class ReportDetailModal {
       if (saveAndSendBtn) {
         saveAndSendBtn.addEventListener('click', () => {
           this.saveComment(true);
+        });
+      }
+    }
+
+    // PDF出力のみボタン（コメント無効時）
+    if (!this.canComment && this.canExportPdf) {
+      const pdfOnlyBtn = document.getElementById(`${this.modalId}PdfOnlyBtn`);
+      if (pdfOnlyBtn) {
+        pdfOnlyBtn.addEventListener('click', () => {
+          this.exportPdfOnly();
         });
       }
     }
@@ -159,50 +176,15 @@ export class ReportDetailModal {
         return;
       }
 
-      // データ取得
+      // データ一括取得
       const response = await this.app.apiCall(
         API_ENDPOINTS.REPORTS.REPORT(userId, date)
       );
 
-
-      // ユーザーのroleを確認
-      const targetUserRole = response.user?.role;
-
-      // staffまたはadminの場合、staff日報も取得
-      let staffReport = null;
-      if (targetUserRole === 'staff' || targetUserRole === 'admin') {
-        try {
-          const staffReportResponse = await this.app.apiCall(
-            `${API_ENDPOINTS.REPORTS.DAILY_REPORT(date)}?staffId=${userId}`
-          );
-          staffReport = staffReportResponse.report;
-        } catch (error) {
-        }
-      }
-
       // user日報とstaff日報のどちらもない場合
-      if (!response.report && !staffReport) {
+      if (!response.report && !response.staffReport) {
         this.app.showNotification('この日の日報はありません', 'info');
         return;
-      }
-
-      // 利用者の場合、自分のサービス提供記録エントリを取得
-      let serviceEntry = null;
-      let serviceEntryTaken = null;
-      let serviceEntryTakenEntry = null;
-      let serviceEntryLimitReached = false;
-      if ((response.user?.role === 'user') && this.canComment) {
-        try {
-          const entryResponse = await this.app.apiCall(
-            API_ENDPOINTS.REPORTS.DAILY_REPORT_ENTRY(date, userId)
-          );
-          serviceEntry = entryResponse.entry || null;
-          serviceEntryTaken = entryResponse.takenByStaff || null;
-          serviceEntryTakenEntry = entryResponse.takenEntry || null;
-          serviceEntryLimitReached = entryResponse.limitReached || false;
-        } catch (error) {
-          console.error('支援記録エントリ取得エラー:', error);
-        }
       }
 
       // 現在のデータを保存
@@ -215,11 +197,11 @@ export class ReportDetailModal {
         report: response.report || {},
         comment: response.comment || null,
         breakRecord: response.breakRecord || null,
-        staffReport: staffReport || null,
-        serviceEntry: serviceEntry,
-        serviceEntryTaken: serviceEntryTaken,
-        serviceEntryTakenEntry: serviceEntryTakenEntry,
-        serviceEntryLimitReached: serviceEntryLimitReached
+        staffReport: response.staffReport || null,
+        serviceEntry: response.serviceEntry || null,
+        serviceEntryTaken: response.serviceEntryTaken || null,
+        serviceEntryTakenEntry: response.serviceEntryTakenEntry || null,
+        serviceEntryLimitReached: response.serviceEntryLimitReached || false
       };
 
       // コメントのタイムスタンプを保存（競合検知用）
@@ -1238,6 +1220,47 @@ export class ReportDetailModal {
       }
       
       this.app.showNotification(errorMessage, 'danger');
+    }
+  }
+
+  /**
+   * PDF出力のみ（コメント保存なし、月別出勤簿用）
+   */
+  async exportPdfOnly() {
+    try {
+      if (!this.currentData) {
+        this.app.showNotification('データが読み込まれていません', 'warning');
+        return;
+      }
+
+      let serviceEntryForImage = null;
+      if (this.currentData.serviceEntryTakenEntry) {
+        serviceEntryForImage = {
+          ...this.currentData.serviceEntryTakenEntry,
+          staff_name: this.currentData.serviceEntryTaken
+        };
+      }
+
+      const commentData = this.currentData.comment ? {
+        comment: this.currentData.comment.comment,
+        staff_name: this.currentData.comment.staff_name,
+        created_at: this.currentData.comment.created_at
+      } : null;
+
+      await this.lineSender.sendReportCompletion(
+        {
+          ...this.currentData.report,
+          attendance: this.currentData.attendance,
+          breakRecord: this.currentData.breakRecord,
+          date: this.currentData.date,
+          serviceEntry: serviceEntryForImage
+        },
+        this.currentData.user,
+        commentData
+      );
+    } catch (error) {
+      console.error('PDF出力エラー:', error);
+      this.app.showNotification('PDFの出力に失敗しました', 'warning');
     }
   }
 

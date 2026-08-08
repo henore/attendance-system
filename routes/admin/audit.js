@@ -119,8 +119,10 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
             }
 
             const newValues = JSON.parse(log.new_value);
+            const oldValues = log.old_value ? JSON.parse(log.old_value) : {};
+            const normalize = (v) => (v && typeof v === 'string' && v.trim() !== '') ? v.trim() : null;
 
-            // 訂正の場合：既存レコードを更新
+            // 訂正の場合：スタッフが変更したフィールドのみ更新
             if (log.action_type === 'staff_attendance_correction' && log.target_id) {
                 const record = await dbGet(
                     'SELECT * FROM attendance WHERE id = ?',
@@ -134,47 +136,70 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     });
                 }
 
-                const clockInValue = newValues.clock_in && newValues.clock_in.trim() !== '' ? newValues.clock_in : null;
-                const clockOutValue = newValues.clock_out && newValues.clock_out.trim() !== '' ? newValues.clock_out : null;
+                // 出勤記録：変更があったフィールドのみ更新
+                const attUpdates = [];
+                const attParams = [];
 
-                await dbRun(
-                    'UPDATE attendance SET clock_in = ?, clock_out = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    [clockInValue, clockOutValue, newValues.status, log.target_id]
-                );
+                if (normalize(newValues.clock_in) !== normalize(oldValues.clock_in)) {
+                    attUpdates.push('clock_in = ?');
+                    attParams.push(normalize(newValues.clock_in));
+                }
+                if (normalize(newValues.clock_out) !== normalize(oldValues.clock_out)) {
+                    attUpdates.push('clock_out = ?');
+                    attParams.push(normalize(newValues.clock_out));
+                }
+                if (newValues.status !== oldValues.status) {
+                    attUpdates.push('status = ?');
+                    attParams.push(newValues.status);
+                }
 
-                // 休憩記録の処理
-                const user = await dbGet('SELECT role FROM users WHERE id = ?', [record.user_id]);
-                const breakStartValue = newValues.break_start && newValues.break_start.trim() !== '' ? newValues.break_start : null;
-                const breakEndValue = newValues.break_end && newValues.break_end.trim() !== '' ? newValues.break_end : null;
+                if (attUpdates.length > 0) {
+                    attUpdates.push('updated_at = CURRENT_TIMESTAMP');
+                    attParams.push(log.target_id);
+                    await dbRun(
+                        `UPDATE attendance SET ${attUpdates.join(', ')} WHERE id = ?`,
+                        attParams
+                    );
+                }
 
-                if (user && user.role === 'user') {
-                    if (breakStartValue) {
-                        const existingBreak = await dbGet(
-                            'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
-                            [record.user_id, record.date]
-                        );
-                        if (existingBreak) {
-                            await dbRun(
-                                'UPDATE break_records SET start_time = ?, end_time = ?, duration = ? WHERE id = ?',
-                                [breakStartValue, breakEndValue, breakEndValue ? 60 : null, existingBreak.id]
+                // 休憩記録：変更があった場合のみ処理
+                const breakChanged = normalize(newValues.break_start) !== normalize(oldValues.break_start) ||
+                                     normalize(newValues.break_end) !== normalize(oldValues.break_end);
+
+                if (breakChanged) {
+                    const user = await dbGet('SELECT role FROM users WHERE id = ?', [record.user_id]);
+                    const breakStartValue = normalize(newValues.break_start);
+                    const breakEndValue = normalize(newValues.break_end);
+
+                    if (user && user.role === 'user') {
+                        if (breakStartValue) {
+                            const existingBreak = await dbGet(
+                                'SELECT * FROM break_records WHERE user_id = ? AND date = ?',
+                                [record.user_id, record.date]
                             );
+                            if (existingBreak) {
+                                await dbRun(
+                                    'UPDATE break_records SET start_time = ?, end_time = ?, duration = ? WHERE id = ?',
+                                    [breakStartValue, breakEndValue, breakEndValue ? 60 : null, existingBreak.id]
+                                );
+                            } else {
+                                await dbRun(
+                                    'INSERT INTO break_records (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)',
+                                    [record.user_id, record.date, breakStartValue, breakEndValue, breakEndValue ? 60 : null]
+                                );
+                            }
                         } else {
                             await dbRun(
-                                'INSERT INTO break_records (user_id, date, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)',
-                                [record.user_id, record.date, breakStartValue, breakEndValue, breakEndValue ? 60 : null]
+                                'DELETE FROM break_records WHERE user_id = ? AND date = ?',
+                                [record.user_id, record.date]
                             );
                         }
                     } else {
                         await dbRun(
-                            'DELETE FROM break_records WHERE user_id = ? AND date = ?',
-                            [record.user_id, record.date]
+                            'UPDATE attendance SET break_start = ?, break_end = ? WHERE id = ?',
+                            [breakStartValue, breakEndValue, log.target_id]
                         );
                     }
-                } else {
-                    await dbRun(
-                        'UPDATE attendance SET break_start = ?, break_end = ? WHERE id = ?',
-                        [breakStartValue, breakEndValue, log.target_id]
-                    );
                 }
             }
             // 新規作成の場合：出勤記録を挿入

@@ -22,7 +22,8 @@ export default class UserModule extends BaseModule {
     
     this.reportHandler = new UserReportHandler(
       this.apiCall.bind(this),
-      this.app.showNotification.bind(this.app)
+      this.app.showNotification.bind(this.app),
+      this.currentUser
     );
 
     // confirmationModalを先に初期化

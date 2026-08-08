@@ -11,6 +11,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
   router.get('/reports/:userId/:date', requireAuth, requireRole(['staff', 'admin']), async (req, res) => {
     try {
       const { userId, date } = req.params;
+      const currentStaffId = req.session.user.id;
 
       const user = await dbGet(
         `SELECT id, username, name, role, service_type, service_no, workweek, transportation, certificate_expiry
@@ -40,13 +41,96 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         [userId, date]
       );
 
+      // スタッフ/管理者の日報（対象がスタッフ/管理者の場合）
+      let staffReport = null;
+      if (user && (user.role === 'staff' || user.role === 'admin')) {
+        staffReport = await dbGet(
+          `SELECT sdr.*, u.name as staff_name, u.role as staff_role
+           FROM staff_daily_reports sdr
+           LEFT JOIN users u ON sdr.staff_id = u.id
+           WHERE sdr.staff_id = ? AND sdr.date = ?`,
+          [userId, date]
+        );
+      }
+
+      // サービス提供記録（対象が利用者の場合）
+      let serviceEntry = null;
+      let serviceEntryTaken = null;
+      let serviceEntryTakenEntry = null;
+      let serviceEntryLimitReached = false;
+      if (user && user.role === 'user') {
+        const MAX_USERS_PER_STAFF = 6;
+        const myReport = await dbGet(
+          'SELECT work_report FROM staff_daily_reports WHERE staff_id = ? AND date = ?',
+          [currentStaffId, date]
+        );
+        let myEntryCount = 0;
+        if (myReport && myReport.work_report) {
+          try {
+            const parsed = JSON.parse(myReport.work_report);
+            const entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
+              ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+            serviceEntry = entries.find(e => e.user_id === parseInt(userId)) || null;
+            myEntryCount = entries.filter(e =>
+              (e.work_content && e.work_content.trim()) ||
+              (e.support_content && e.support_content.trim()) ||
+              (e.user_condition && e.user_condition.trim()) ||
+              (e.attendance_info && e.attendance_info.trim())
+            ).length;
+          } catch { /* 旧形式 */ }
+        }
+
+        const otherReports = await dbAll(
+          'SELECT staff_id, work_report FROM staff_daily_reports WHERE date = ? AND staff_id != ?',
+          [date, currentStaffId]
+        );
+        for (const r of otherReports) {
+          if (!r.work_report) continue;
+          try {
+            const parsed = JSON.parse(r.work_report);
+            const entries = (parsed && parsed.entries && Array.isArray(parsed.entries))
+              ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+            const found = entries.find(e => e.user_id === parseInt(userId) && (
+              (e.work_content && e.work_content.trim()) ||
+              (e.support_content && e.support_content.trim()) ||
+              (e.user_condition && e.user_condition.trim()) ||
+              (e.attendance_info && e.attendance_info.trim())
+            ));
+            if (found) {
+              const staffUser = await dbGet('SELECT name FROM users WHERE id = ?', [r.staff_id]);
+              serviceEntryTaken = staffUser ? staffUser.name : '他のスタッフ';
+              serviceEntryTakenEntry = {
+                work_content: found.work_content || '',
+                support_content: found.support_content || '',
+                user_condition: found.user_condition || '',
+                attendance_info: found.attendance_info || ''
+              };
+              break;
+            }
+          } catch { /* 旧形式は無視 */ }
+        }
+
+        const hasContent = serviceEntry && (
+          (serviceEntry.work_content && serviceEntry.work_content.trim()) ||
+          (serviceEntry.support_content && serviceEntry.support_content.trim()) ||
+          (serviceEntry.user_condition && serviceEntry.user_condition.trim()) ||
+          (serviceEntry.attendance_info && serviceEntry.attendance_info.trim())
+        );
+        serviceEntryLimitReached = !hasContent && myEntryCount >= MAX_USERS_PER_STAFF;
+      }
+
       res.json({
         success: true,
         user,
         attendance,
         report,
         comment,
-        breakRecord
+        breakRecord,
+        staffReport,
+        serviceEntry,
+        serviceEntryTaken,
+        serviceEntryTakenEntry,
+        serviceEntryLimitReached
       });
     } catch (error) {
       console.error('日報詳細取得エラー:', error);

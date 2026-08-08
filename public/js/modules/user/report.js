@@ -7,9 +7,10 @@ import { formatAppetite, formatSleepQuality, formatInterviewRequest, formatMedic
 import { getCurrentDate, formatDateTime } from '../../utils/date-time.js';
 
 export class UserReportHandler {
-  constructor(apiCall, showNotification) {
+  constructor(apiCall, showNotification, currentUser = null) {
     this.apiCall = apiCall;
     this.showNotification = showNotification;
+    this.currentUser = currentUser;
     this.hasTodayReport = false;
     this.currentAttendance = null;
     this.onReportSubmit = null;
@@ -81,6 +82,11 @@ export class UserReportHandler {
 
       // 作業場所に応じた施設外就労先の必須制御を設定
       this.setupWorkLocationValidation();
+
+      // 新規フォームの場合、サービス種別に応じたデフォルト値を設定
+      if (!response.report) {
+        this.applyServiceTypeDefaults();
+      }
 
     } catch (error) {
       console.error('日報フォーム読み込みエラー:', error);
@@ -447,6 +453,37 @@ export class UserReportHandler {
 
     // 作業場所変更時のイベントリスナー
     workLocationSelect.addEventListener('change', updateExternalWorkRequired);
+  }
+
+  /**
+   * サービス種別に応じたデフォルト値を設定（新規フォーム用）
+   */
+  applyServiceTypeDefaults() {
+    if (!this.currentUser?.service_type) return;
+
+    const workLocationSelect = document.getElementById('workLocation');
+    if (!workLocationSelect) return;
+
+    if (this.currentUser.service_type === 'commute') {
+      workLocationSelect.value = 'office';
+      workLocationSelect.dispatchEvent(new Event('change'));
+      const checkbox = document.getElementById('externalWorkLocation');
+      if (checkbox) checkbox.checked = true;
+    } else if (this.currentUser.service_type === 'home') {
+      workLocationSelect.value = 'home';
+      workLocationSelect.dispatchEvent(new Event('change'));
+      // 連絡時間に出勤・退勤時間をデフォルト入力
+      if (this.currentAttendance) {
+        const contactTime1 = document.getElementById('contactTime1');
+        const contactTime2 = document.getElementById('contactTime2');
+        if (contactTime1 && this.currentAttendance.clock_in) {
+          contactTime1.value = this.currentAttendance.clock_in;
+        }
+        if (contactTime2 && this.currentAttendance.clock_out) {
+          contactTime2.value = this.currentAttendance.clock_out;
+        }
+      }
+    }
   }
 
   /**

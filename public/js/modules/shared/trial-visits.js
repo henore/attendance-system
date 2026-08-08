@@ -434,11 +434,8 @@ export default class TrialVisitsManager {
             
             // モーダルが開いている場合は更新
             const modal = document.getElementById('trialVisitsModal');
-            if (modal && modal.classList.contains('show')) {
-                const modalDate = modal.querySelector('#modalDateTitle').dataset.date;
-                if (modalDate) {
-                    await this.showTrialVisitsModal(modalDate);
-                }
+            if (modal && modal.classList.contains('show') && this.currentModalDate) {
+                await this.showTrialVisitsModal(this.currentModalDate);
             }
 
         } catch (error) {
@@ -635,9 +632,10 @@ export default class TrialVisitsManager {
             
             
             if (modalElement && modalTitle && modalBody) {
+                this.currentModalDate = date;
                 modalTitle.innerHTML = `<i class="fas fa-users"></i> ${dateStr}の体験入所予定`;
                 modalBody.innerHTML = content;
-                
+
                 modalManager.show('trialVisitsModal');
             } else {
                 console.error('体験入所モーダル要素が見つかりません:', {

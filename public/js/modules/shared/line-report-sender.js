@@ -49,6 +49,7 @@ export class LineReportSender {
 
         const link = document.createElement('a');
         link.href = downloadUrl;
+        link.download = downloadName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -113,6 +114,7 @@ export class LineReportSender {
 
         const link = document.createElement('a');
         link.href = downloadUrl;
+        link.download = downloadName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

@@ -129,6 +129,12 @@ export class ModalManager {
     // 登録
     this.register(id);
 
+    // 閉じた時に自動クリーンアップ（動的モーダル用）
+    const modalElement = document.getElementById(id);
+    modalElement.addEventListener('hidden.bs.modal', () => {
+      this.cleanupOrphanedBackdrops();
+    });
+
     // 保存ボタンのイベント設定
     if (saveButton && onSave) {
       const saveBtn = document.getElementById(`${id}-save-btn`);
@@ -265,14 +271,35 @@ export class ModalManager {
     const modalInfo = this.modals.get(id);
     if (!modalInfo) return;
 
-    // インスタンスを破棄
-    modalInfo.instance.dispose();
-
-    // DOMから削除
-    modalInfo.element.remove();
+    // 表示中の場合はhideしてからdispose（バックドロップ残留防止）
+    if (modalInfo.element.classList.contains('show')) {
+      modalInfo.element.addEventListener('hidden.bs.modal', () => {
+        modalInfo.instance.dispose();
+        modalInfo.element.remove();
+        this.cleanupOrphanedBackdrops();
+      }, { once: true });
+      modalInfo.instance.hide();
+    } else {
+      modalInfo.instance.dispose();
+      modalInfo.element.remove();
+      this.cleanupOrphanedBackdrops();
+    }
 
     // 登録から削除
     this.modals.delete(id);
+  }
+
+  cleanupOrphanedBackdrops() {
+    // 表示中のモーダルが無ければバックドロップとbodyクラスを除去
+    const hasVisibleModal = [...this.modals.values()].some(
+      m => m.element.classList.contains('show')
+    );
+    if (!hasVisibleModal) {
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+    }
   }
 
   /**
