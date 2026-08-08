@@ -731,74 +731,38 @@ export class ReportDetailModal {
    * @param {boolean} sendToLine - 画像DLするかどうか
    */
   async saveComment(sendToLine = false) {
-    
+
     try {
       const textarea = document.getElementById('staffCommentTextarea');
       const comment = textarea ? textarea.value.trim() : '';
-      
-      
-      if (!comment) {
+
+      // コメント保存のみの場合は入力必須
+      if (!comment && !sendToLine) {
         this.app.showNotification('コメントを入力してください', 'warning');
         return;
       }
-      
+
       // adminの場合は日報変更も同時に保存
       if (this.userRole === 'admin') {
         await this.saveReportChanges();
       }
-      
+
       // currentDataの存在チェック
       if (!this.currentData) {
         console.error('[コメント保存] currentDataが存在しません');
         this.app.showNotification('データが正しく読み込まれていません。モーダルを閉じて再度開いてください。', 'danger');
         return;
       }
-      
+
       const { userId, userName, date } = this.currentData;
-      
+
       // 必須データの存在チェック
       if (!userId || !date) {
         console.error('[コメント保存] 必須データが不足しています:', { userId, userName, date });
         this.app.showNotification('必要なデータが不足しています', 'danger');
         return;
       }
-      
-      // 保存前に最新のコメント状態をチェック（競合検知）
-      try {
-        const latestResponse = await this.app.apiCall(
-          API_ENDPOINTS.REPORTS.REPORT(userId, date)
-        );
-        
-        if (latestResponse && latestResponse.comment) {
-          const latestComment = latestResponse.comment;
-          
-          // コメントが他のユーザーによって更新されているかチェック
-          if (this.hasCommentChanged(latestComment)) {
-            const confirmSave = confirm(
-              `警告: ${latestComment.staff_name || '他のスタッフ'}さんが既にコメントを記入しています。\n\n` +
-              `記入時刻: ${formatDateTime(latestComment.created_at)}\n` +
-              `内容: ${latestComment.comment.substring(0, 50)}${latestComment.comment.length > 50 ? '...' : ''}\n\n` +
-              `あなたのコメントで上書きしますか？`
-            );
-            
-            if (!confirmSave) {
-              // 最新のコメントを表示
-              this.currentData.comment = latestComment;
-              this.originalComment = {
-                comment: latestComment.comment,
-                updated_at: latestComment.updated_at || latestComment.created_at
-              };
-              this.updateModalContent();
-              return;
-            }
-          }
-        }
-      } catch (error) {
-        console.error('最新状態チェックエラー:', error);
-        // エラーがあっても保存は続行
-      }
-      
-      
+
       // サービス提供記録の保存
       const seWorkContent = document.getElementById('seWorkContent')?.value?.trim() || '';
       const seSupportContent = document.getElementById('seSupportContent')?.value?.trim() || '';
@@ -825,94 +789,126 @@ export class ReportDetailModal {
         }
       }
 
-      // コメントAPI呼び出し
-      const saveResponse = await this.app.apiCall(API_ENDPOINTS.REPORTS.COMMENT, {
-        method: 'POST',
-        body: JSON.stringify({
-          userId: userId,
-          date: date,
-          comment: comment
-        })
-      });
+      // コメントがある場合のみ保存
+      if (comment) {
+        // 保存前に最新のコメント状態をチェック（競合検知）
+        try {
+          const latestResponse = await this.app.apiCall(
+            API_ENDPOINTS.REPORTS.REPORT(userId, date)
+          );
 
-      // 保存成功後の処理
-      if (saveResponse.success !== false) {
-        this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
+          if (latestResponse && latestResponse.comment) {
+            const latestComment = latestResponse.comment;
 
-        // 受給者証有効期限の通知
-        this.showCertificateExpiryPopup();
+            if (this.hasCommentChanged(latestComment)) {
+              const confirmSave = confirm(
+                `警告: ${latestComment.staff_name || '他のスタッフ'}さんが既にコメントを記入しています。\n\n` +
+                `記入時刻: ${formatDateTime(latestComment.created_at)}\n` +
+                `内容: ${latestComment.comment.substring(0, 50)}${latestComment.comment.length > 50 ? '...' : ''}\n\n` +
+                `あなたのコメントで上書きしますか？`
+              );
 
-        // PDF出力処理
-        if (sendToLine) {
-          try {
-            // サービス提供記録（保存時に取得済みの値を再利用、DOMが消えている可能性があるため）
-            let serviceEntryForImage = null;
-            if (this.currentData.serviceEntryTakenEntry) {
-              serviceEntryForImage = {
-                ...this.currentData.serviceEntryTakenEntry,
-                staff_name: this.currentData.serviceEntryTaken
-              };
-            }
-            if (hasServiceData) {
-              serviceEntryForImage = {
-                work_content: seWorkContent, support_content: seSupportContent,
-                user_condition: seUserCondition, attendance_info: seAttendanceInfo,
-                staff_name: this.app.currentUser.name
-              };
-            }
-
-            await this.lineSender.sendReportCompletion(
-              {
-                ...this.currentData.report,
-                attendance: this.currentData.attendance,
-                breakRecord: this.currentData.breakRecord,
-                date: this.currentData.date,
-                serviceEntry: serviceEntryForImage
-              },
-              this.currentData.user,
-              {
-                comment: comment,
-                staff_name: this.app.currentUser.name,
-                created_at: new Date().toISOString()
+              if (!confirmSave) {
+                this.currentData.comment = latestComment;
+                this.originalComment = {
+                  comment: latestComment.comment,
+                  updated_at: latestComment.updated_at || latestComment.created_at
+                };
+                this.updateModalContent();
+                return;
               }
-            );
-          } catch (lineError) {
-            console.error('[画像DL] エラー:', lineError);
-            this.app.showNotification('PDFの保存に失敗しました', 'warning');
+            }
           }
+        } catch (error) {
+          console.error('最新状態チェックエラー:', error);
         }
-        
-        // モーダルを閉じる
-        modalManager.hide(this.modalId);
-        
-        // 親モジュールに通知（画面更新など）
-        if (this.parent && this.parent.onCommentSaved) {
-          this.parent.onCommentSaved();
+
+        const saveResponse = await this.app.apiCall(API_ENDPOINTS.REPORTS.COMMENT, {
+          method: 'POST',
+          body: JSON.stringify({
+            userId: userId,
+            date: date,
+            comment: comment
+          })
+        });
+
+        if (saveResponse.success === false) {
+          if (saveResponse.message) {
+            this.app.showNotification(saveResponse.message, 'danger');
+          }
+          if (saveResponse.conflict) {
+            await this.show(userId, userName, date);
+          }
+          return;
         }
-      } else {
-        // エラー処理
-        if (saveResponse.message) {
-          this.app.showNotification(saveResponse.message, 'danger');
-        }
-        
-        // 競合が発生した場合は最新データを再取得
-        if (saveResponse.conflict) {
-          await this.show(userId, userName, date);
+        this.app.showNotification(`${userName || 'ユーザー'}さんの日報にコメントを記入しました`, 'success');
+        this.showCertificateExpiryPopup();
+      }
+
+      // PDF出力処理
+      if (sendToLine) {
+        try {
+          let serviceEntryForImage = null;
+          if (this.currentData.serviceEntryTakenEntry) {
+            serviceEntryForImage = {
+              ...this.currentData.serviceEntryTakenEntry,
+              staff_name: this.currentData.serviceEntryTaken
+            };
+          }
+          if (hasServiceData) {
+            serviceEntryForImage = {
+              work_content: seWorkContent, support_content: seSupportContent,
+              user_condition: seUserCondition, attendance_info: seAttendanceInfo,
+              staff_name: this.app.currentUser.name
+            };
+          }
+
+          const commentData = comment ? {
+            comment: comment,
+            staff_name: this.app.currentUser.name,
+            created_at: new Date().toISOString()
+          } : this.currentData.comment ? {
+            comment: this.currentData.comment.comment,
+            staff_name: this.currentData.comment.staff_name,
+            created_at: this.currentData.comment.created_at
+          } : null;
+
+          await this.lineSender.sendReportCompletion(
+            {
+              ...this.currentData.report,
+              attendance: this.currentData.attendance,
+              breakRecord: this.currentData.breakRecord,
+              date: this.currentData.date,
+              serviceEntry: serviceEntryForImage
+            },
+            this.currentData.user,
+            commentData
+          );
+        } catch (lineError) {
+          console.error('[画像DL] エラー:', lineError);
+          this.app.showNotification('PDFの保存に失敗しました', 'warning');
         }
       }
-      
+
+      // モーダルを閉じる
+      modalManager.hide(this.modalId);
+
+      // 親モジュールに通知（画面更新など）
+      if (this.parent && this.parent.onCommentSaved) {
+        this.parent.onCommentSaved();
+      }
+
     } catch (error) {
       console.error('コメント保存エラー:', error);
-      
-      // エラーメッセージの詳細化
+
       let errorMessage = 'コメントの保存に失敗しました';
-      
+
       if (error.message && error.message.includes('already exists')) {
         errorMessage = '他のスタッフが既にコメントを記入しています。画面を更新して最新の状態を確認してください。';
       } else if (error.message) {
         errorMessage += ': ' + error.message;
       }
-      
+
       this.app.showNotification(errorMessage, 'danger');
     }
   }
