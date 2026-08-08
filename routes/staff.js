@@ -251,8 +251,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
   try {
     const { role } = req.query;
     
-    console.log('[STAFF API] ユーザー取得パラメータ:', { role });
-    
     let query = `
       SELECT
         u.id,
@@ -275,9 +273,7 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
     query += ' ORDER BY u.role, u.name';
     
     const users = await dbAll(query, params);
-    
-    console.log('[STAFF API] ユーザー取得結果:', users.length, '件');
-    
+
     res.json({ 
       success: true, 
       users 

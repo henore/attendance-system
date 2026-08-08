@@ -6,8 +6,6 @@ const router = express.Router();
 const { getCurrentDate, getCurrentTime } = require('../utils/date-time');
 
 module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
-    console.log('🔧 trial-visits router loaded');
-    
     // 体験入所予定一覧取得（指定日付）
     router.get('/by-date/:date', async (req, res) => {
         try {
@@ -28,7 +26,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
 
     // 当日の体験入所予定一覧取得
     router.get('/today', async (req, res) => {
-        console.log('📅 /today endpoint called');
         try {
             const today = getCurrentDate();
             

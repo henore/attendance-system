@@ -28,7 +28,6 @@ async function cleanupTempFiles() {
         const stat = await fs.stat(filePath);
         if (now - stat.mtimeMs > ONE_HOUR) {
           await fs.unlink(filePath);
-          console.log(`[temp cleanup] 削除: ${file}`);
         }
       } catch (err) {
         if (err.code !== 'ENOENT') console.error(`[temp cleanup] エラー: ${file}`, err.message);
@@ -50,11 +49,6 @@ router.post('/generate-report-image', async (req, res) => {
   try {
     const { reportData, userData, commentData, date } = req.body;
 
-    console.log('[PDF生成] 開始:', {
-      userName: userData?.name,
-      date: date || reportData?.date,
-    });
-
     if (!reportData || !userData) {
       throw new Error('必須データ（reportData, userData）が不足しています');
     }
@@ -66,8 +60,6 @@ router.post('/generate-report-image', async (req, res) => {
     const fileName = `${fileId}.pdf`;
     const filePath = path.join(TEMP_DIR, fileName);
     await fs.writeFile(filePath, pdfBuffer);
-
-    console.log('[PDF生成] 完了:', { fileId });
 
     res.json({
       success: true,
@@ -746,11 +738,6 @@ router.post('/generate-staff-report-image', async (req, res) => {
   try {
     const { staffReportData, userData, date } = req.body;
 
-    console.log('[スタッフ日報PDF生成] 開始:', {
-      userName: userData?.name,
-      date: date || staffReportData?.date,
-    });
-
     if (!staffReportData || !userData) {
       throw new Error('必須データ（staffReportData, userData）が不足しています');
     }
@@ -761,8 +748,6 @@ router.post('/generate-staff-report-image', async (req, res) => {
     const fileName = `${fileId}.pdf`;
     const filePath = path.join(TEMP_DIR, fileName);
     await fs.writeFile(filePath, pdfBuffer);
-
-    console.log('[スタッフ日報PDF生成] 完了:', { fileId });
 
     res.json({
       success: true,

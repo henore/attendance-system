@@ -404,9 +404,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
         try {
             const { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, nakanukeMinutes, status, reason } = req.body;
 
-            // デバッグログ
-            console.log('出勤記録修正リクエスト:', { recordId, userId, date, newClockIn, newClockOut, newBreakStart, newBreakEnd, nakanukeMinutes, status, reason });
-
             // バリデーション
             // recordIdがある場合は既存記録の更新
             if (recordId) {
@@ -592,7 +589,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                             ]
                         );
 
-                        console.log(`[日報自動生成] ユーザーID: ${userId}, 日付: ${date}, 区分: ${isHome ? '在宅' : '通所'}, 就寝: ${rd.bedtime}, 起床: ${rd.wakeupTime}`);
                     }
                 }
 
@@ -618,7 +614,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth, requireRole) => {
                     );
                 }
             } else {
-                console.log('パラメータ不足エラー:', { recordId, userId, date, newClockIn });
                 return res.status(400).json({
                     success: false,
                     error: '必要なパラメータが不足しています（userIdまたはdateが必要）'

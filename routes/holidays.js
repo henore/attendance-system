@@ -6,8 +6,6 @@ const router = express.Router();
 const https = require('https');
 
 module.exports = (requireAuth) => {
-    console.log('🔧 holidays router loaded');
-    
     // 祝日データキャッシュ（1日間有効）
     let holidaysCache = null;
     let cacheExpiry = null;
@@ -21,7 +19,6 @@ module.exports = (requireAuth) => {
             
             // キャッシュが有効な場合は返す
             if (holidaysCache && cacheExpiry && now < cacheExpiry) {
-                console.log('📋 祝日データをキャッシュから返却');
                 return res.json({
                     success: true,
                     holidays: holidaysCache,
@@ -29,17 +26,13 @@ module.exports = (requireAuth) => {
                 });
             }
             
-            console.log('🔄 内閣府祝日APIを呼び出し中...');
-            
             // 内閣府APIから祝日データを取得
             const holidayData = await fetchHolidaysFromApi();
             
             // キャッシュを更新（1日間有効）
             holidaysCache = holidayData;
             cacheExpiry = now + (24 * 60 * 60 * 1000);
-            
-            console.log('✅ 祝日データを取得・キャッシュしました');
-            
+
             res.json({
                 success: true,
                 holidays: holidayData,
@@ -74,7 +67,6 @@ module.exports = (requireAuth) => {
                 response.on('end', () => {
                     try {
                         const jsonData = JSON.parse(data);
-                        console.log('📅 取得した祝日データ件数:', Object.keys(jsonData).length);
                         resolve(jsonData);
                     } catch (parseError) {
                         reject(new Error('祝日データのパースに失敗しました'));

@@ -43,10 +43,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
             const userId = req.session.user.id;
             const today = getCurrentDate();
             
-            console.log('[日報API] リクエストボディ:', req.body);
-            console.log('[日報API] ユーザーID:', userId);
-            console.log('[日報API] 日付:', today);
-            
             const {
                 workContent,
                 externalWorkLocation,
@@ -64,17 +60,11 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 contactTime2
             } = req.body;
             
-            console.log('[日報API] 分割代入後 - workContent:', workContent);
-            console.log('[日報API] 分割代入後 - externalWorkLocation:', externalWorkLocation);
-            console.log('[日報API] 分割代入後 - temperature:', temperature);
-            
             // 出勤記録確認
             const attendance = await dbGet(
                 'SELECT * FROM attendance WHERE user_id = ? AND date = ?',
                 [userId, today]
             );
-            
-            console.log('[日報API] 出勤記録:', attendance);
             
             if (!attendance || !attendance.clock_out) {
                 return res.status(400).json({
@@ -98,8 +88,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 sleepQuality, reflection, interviewRequest || null,
                 contactTime1 || null, contactTime2 || null
             ];
-
-            console.log('[日報API] SQL実行パラメータ:', sqlParams);
 
             await dbRun(`
                 INSERT OR REPLACE INTO daily_reports (
@@ -433,8 +421,6 @@ module.exports = (dbGet, dbAll, dbRun, requireAuth) => {
                 ORDER BY a.date DESC
                 LIMIT 1
             `, [userId, today]);
-            
-            console.log(`[前回記録確認] ユーザーID: ${userId}, 今日: ${today}, 前回記録:`, lastRecord);
             
             res.json({
                 success: true,
