@@ -67,6 +67,12 @@ rm -rf node_modules package-lock.json
 log "npm install"
 npm install >> "$LOG_FILE" 2>&1
 
+# 不要パッケージ除去 + 脆弱性修正
+log "npm prune"
+npm prune >> "$LOG_FILE" 2>&1 || true
+log "npm audit fix"
+npm audit fix >> "$LOG_FILE" 2>&1 || true
+
 # PM2でアプリ再起動（プロセスが無ければ起動）
 if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
     log "pm2 restart ${PM2_APP_NAME}"
