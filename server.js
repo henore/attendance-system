@@ -8,18 +8,19 @@ const path = require('path');
 const morgan = require('morgan');
 const helmet = require('helmet');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const { getCurrentDate, getCurrentTime } = require('./utils/date-time');
 
 // Express アプリケーション作成
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// プロキシ経由のクライアントIP取得を有効化
-app.set('trust proxy', true);
+// プロキシ経由のクライアントIP取得を有効化（最初の1段のみ信頼）
+app.set('trust proxy', 1);
 
 // CORS設定
 app.use(cors({
-  origin: 'https://happytime-web.com',
+  origin: process.env.FRONTEND_URL || 'https://happytime-web.com',
   credentials: true,
 }));
 
@@ -99,11 +100,6 @@ app.use(helmet({
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
 
-app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true
-}));
-
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -119,9 +115,14 @@ app.use(express.static('public', {
     }
 }));
 
+// 本番環境でのセッションシークレット未設定チェック
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+    console.error('⚠️  警告: SESSION_SECRET が未設定です。本番環境では必ず設定してください');
+}
+
 // セッション設定
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
+    secret: process.env.SESSION_SECRET || 'default-dev-key-not-for-production',
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -180,7 +181,17 @@ app.get('/api/auth/check-auth', (req, res) => {
   }
 });
 
+// ログインAPIのレート制限（15分間に20回まで）
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    message: { success: false, error: 'ログイン試行回数が上限を超えました。しばらく待ってから再試行してください' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 // APIルート登録
+app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRouter);
 app.use('/api/user', requireAuth, userRouter);
 app.use('/api/staff', requireAuth, requireRole(['staff', 'admin']), staffRouter);
